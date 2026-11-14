@@ -1,0 +1,146 @@
+{
+  "$schema": "./node_modules/@dcaldeira/repo-tooling/config.schema.json",
+  "schemaVersion": 1,
+  "paths": {
+    "app": ["frontend/src/**", "frontend/e2e/**", "frontend/index.html", "shared/src/**"],
+    "database": [
+      "backend/supabase/migrations/**",
+      "backend/supabase/tests/**",
+      "backend/scripts/test-db.mjs",
+      "backend/scripts/check-migrations.mjs"
+    ],
+    "functions": [
+      "backend/supabase/functions/**",
+      "shared/src/**",
+      "backend/scripts/sync-shared.mjs"
+    ],
+    "tooling": [
+      "repo-tooling.config.json",
+      "*config*",
+      "**/*config*",
+      "scripts/**",
+      "frontend/scripts/**",
+      ".githooks/**",
+      ".github/dependabot.yml",
+      "tools/**",
+      ".nvmrc",
+      ".prettier*",
+      ".gitignore"
+    ]
+  },
+  "environment": [
+    "PG_BIN",
+    "PLAYWRIGHT_CHROMIUM_PATH",
+    "VITE_SUPABASE_URL",
+    "VITE_SUPABASE_ANON_KEY",
+    "VITE_SENTRY_DSN",
+    "CHROME_PATH"
+  ],
+  "styles": {
+    "source": "frontend/src",
+    "maxDepth": 3,
+    "maxSpecificity": [0, 4, 2]
+  },
+  "translations": {
+    "directory": "frontend/src/i18n/locales",
+    "source": "pt-PT"
+  },
+  "budgets": {
+    "bundle": {
+      "dist": "frontend/dist",
+      "initialKB": 170,
+      "chunkKB": 80,
+      "vendors": [
+        ["recharts", "charts", 116],
+        ["@supabase", "supabase", 60],
+        ["@sentry", "sentry", 165],
+        ["zod", "zod", 30],
+        ["@jsquash", "webp encoder", 10],
+        ["maplibre-gl", "map engine", 300]
+      ]
+    }
+  },
+  "checks": {
+    "format": {
+      "command": ["npm", "run", "format:check"]
+    },
+    "lint": {
+      "command": ["npm", "run", "lint"]
+    },
+    "styles": {
+      "command": ["npm", "run", "lint:styles"],
+      "devCommand": ["node", "scripts/lint-scss.mjs"]
+    },
+    "types": {
+      "command": ["npm", "run", "typecheck"]
+    },
+    "unit": {
+      "command": ["npm", "run", "test:coverage"]
+    },
+    "translations": {
+      "command": ["npm", "run", "check:translations"]
+    },
+    "size": {
+      "command": ["npm", "run", "size", "-w", "frontend"]
+    },
+    "security": {
+      "command": "npm run check:security && gitleaks git --redact",
+      "tools": ["gitleaks"]
+    },
+    "e2e": {
+      "command": ["npm", "run", "test:e2e"]
+    },
+    "visual": {
+      "command": ["npm", "run", "test:visual"]
+    },
+    "lighthouse": {
+      "command": ["lhci", "autorun"],
+      "cwd": "frontend",
+      "tools": ["lhci"]
+    },
+    "clean": {
+      "command": ["npm", "run", "check:clean"],
+      "groups": ["app", "database", "functions", "workflows"],
+      "profiles": ["push", "ci"]
+    },
+    "migrations": {
+      "command": ["npm", "run", "check:migrations"],
+      "groups": ["database"],
+      "profiles": ["push", "ci"]
+    },
+    "database": {
+      "command": ["npm", "run", "test:db"],
+      "groups": ["database"],
+      "profiles": ["push", "ci"],
+      "tools": ["initdb"]
+    },
+    "functions": {
+      "command": ["npm", "run", "check:functions", "-w", "backend"],
+      "groups": ["functions"],
+      "profiles": ["push", "ci"],
+      "tools": ["deno"]
+    },
+    "shared": {
+      "command": ["npm", "run", "check:shared"],
+      "groups": ["functions"],
+      "profiles": ["push", "ci"]
+    }
+  },
+  "release": {
+    "prepare": ["node", "scripts/release-prepare.mjs"],
+    "files": [
+      "package.json",
+      "package-lock.json",
+      "frontend/package.json",
+      "backend/package.json",
+      "shared/package.json",
+      "frontend/src/features/preferences/WhatsNew/changelog.ts"
+    ]
+  },
+  "inputs": [
+    "frontend/.env",
+    "frontend/.env.local",
+    "frontend/.env.production",
+    "frontend/.env.production.local"
+  ]
+}

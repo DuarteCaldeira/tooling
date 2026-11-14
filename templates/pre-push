@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+validate=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+  if [ "$(git rev-parse "$local_sha^{commit}")" != "$(git rev-parse HEAD)" ]; then
+    echo "Push refused: validate this ref from its own checkout first." >&2
+    exit 1
+  fi
+  validate=1
+done
+[ "$validate" -eq 0 ] && exit 0
+exec npm run check:push

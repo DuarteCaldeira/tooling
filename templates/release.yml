@@ -1,0 +1,23 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    uses: DuarteCaldeira/repo-tooling/.github/workflows/release-validation.yml@REPLACE_WITH_TOOLING_COMMIT_SHA
+    with:
+      tooling-sha: REPLACE_WITH_TOOLING_COMMIT_SHA
+      level: ${{ inputs.level }}
+    secrets:
+      RELEASE_SIGNING_KEY: ${{ secrets.REPO_TOOLING_RELEASE_SIGNING_KEY }}

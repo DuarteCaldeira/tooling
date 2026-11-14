@@ -1,0 +1,13 @@
+name: Dependabot merge
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+  checks: read
+jobs:
+  merge:
+    uses: DuarteCaldeira/repo-tooling/.github/workflows/dependabot-merge.yml@REPLACE_WITH_TOOLING_COMMIT_SHA

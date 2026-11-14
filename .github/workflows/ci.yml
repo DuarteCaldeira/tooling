@@ -1,0 +1,137 @@
+name: Reusable CI
+on:
+  workflow_call:
+    inputs:
+      tooling-sha:
+        type: string
+        required: true
+      config-path:
+        type: string
+        default: repo-tooling.config.json
+      pull-request-number:
+        type: string
+        default: ''
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+jobs:
+  route:
+    runs-on: ubuntu-24.04
+    outputs:
+      trusted: ${{ steps.route.outputs.trusted }}
+      ref: ${{ steps.route.outputs.ref }}
+      base: ${{ steps.route.outputs.base }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: DuarteCaldeira/repo-tooling
+          ref: ${{ inputs.tooling-sha }}
+          path: tooling
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        id: route
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pull-request-number }}
+          CONFIG_PATH: ${{ inputs.config-path }}
+          PUBLIC_KEY: ${{ vars.REPO_TOOLING_RELEASE_PUBLIC_KEY }}
+        with:
+          script: |
+            const { verifyPullRequest } = await import(`${process.cwd()}/tooling/packages/tooling/release/github.mjs`);
+            const { version } = require(`${process.cwd()}/tooling/packages/tooling/package.json`);
+            const { owner, repo } = context.repo;
+            const number = process.env.PR_NUMBER;
+            let trusted = false;
+            if (number) {
+              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: Number(number) });
+              core.setOutput('ref', `refs/pull/${pr.number}/merge`);
+              core.setOutput('base', pr.base.sha);
+              trusted = await verifyPullRequest({ github, owner, repo, number, publicKey: process.env.PUBLIC_KEY, workflow: '.github/workflows/release.yml', version, configPath: process.env.CONFIG_PATH });
+            } else {
+              core.setOutput('ref', context.sha);
+              core.setOutput('base', '');
+            }
+            core.setOutput('trusted', String(trusted));
+  checks:
+    needs: route
+    if: needs.route.outputs.trusted != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.route.outputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: DuarteCaldeira/repo-tooling
+          ref: ${{ inputs.tooling-sha }}
+          path: .repo-tooling/source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install
+        run: npm ci --ignore-scripts
+      - name: Plan the entire PR diff
+        env:
+          BASE: ${{ needs.route.outputs.base }}
+          CONFIG: ${{ inputs.config-path }}
+        run: |
+          args=(--all)
+          if [ -n "$BASE" ]; then args=(--changed --base="$BASE" --committed); fi
+          node .repo-tooling/source/packages/tooling/runner/cli.mjs --profile=ci --config="$CONFIG" "${args[@]}" --plan > .repo-tooling/plan.json
+      - name: Provision selected prerequisites
+        run: node .repo-tooling/source/packages/tooling/runner/provision.mjs .repo-tooling/plan.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install matching browsers
+        run: |
+          if node -e 'const p=JSON.parse(require("fs").readFileSync(".repo-tooling/plan.json")); process.exit(p.checks.some(c=>["e2e","visual"].includes(c.id))?0:1)'; then
+            npx --no-install playwright install --with-deps chromium
+            node -e 'require("fs").appendFileSync(process.env.GITHUB_ENV, `CHROME_PATH=${require("@playwright/test").chromium.executablePath()}\n`)'
+          fi
+      - name: Run shared check graph
+        env:
+          BASE: ${{ needs.route.outputs.base }}
+          CONFIG: ${{ inputs.config-path }}
+        run: |
+          args=(--all)
+          if [ -n "$BASE" ]; then args=(--changed --base="$BASE" --committed); fi
+          node .repo-tooling/source/packages/tooling/runner/cli.mjs --profile=ci --config="$CONFIG" "${args[@]}" --output=.repo-tooling/report
+      - name: Collect visual report
+        if: always()
+        run: |
+          if [ -f playwright-report/index.html ]; then
+            node .repo-tooling/source/packages/tooling/checks/visual-report.mjs
+          elif [ -f frontend/playwright-report/index.html ]; then
+            node .repo-tooling/source/packages/tooling/checks/visual-report.mjs frontend/playwright-report
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-${{ github.run_id }}
+          include-hidden-files: true
+          path: |
+            .repo-tooling/report/
+            **/test-results/
+            **/coverage/
+          retention-days: 3
+  result:
+    name: result
+    needs: [route, checks]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require complete validation or a verified release
+        env:
+          ROUTE: ${{ needs.route.result }}
+          TRUSTED: ${{ needs.route.outputs.trusted }}
+          CHECKS: ${{ needs.checks.result }}
+        run: |
+          test "$ROUTE" = success
+          test "$TRUSTED" = true || test "$CHECKS" = success

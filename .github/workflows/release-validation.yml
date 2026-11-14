@@ -1,0 +1,119 @@
+name: Reusable release validation
+on:
+  workflow_call:
+    inputs:
+      tooling-sha:
+        required: true
+        type: string
+      level:
+        required: true
+        type: string
+    secrets:
+      RELEASE_SIGNING_KEY:
+        required: true
+permissions:
+  contents: read
+jobs:
+  validate:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      head: ${{ steps.prepare.outputs.head }}
+      source: ${{ steps.prepare.outputs.source }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: DuarteCaldeira/repo-tooling
+          ref: ${{ inputs.tooling-sha }}
+          path: .repo-tooling/source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Prepare the exact release tree
+        id: prepare
+        env:
+          RELEASE_LEVEL: ${{ inputs.level }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          node .repo-tooling/source/packages/tooling/release/prepare.mjs
+      - name: Plan
+        run: node .repo-tooling/source/packages/tooling/runner/cli.mjs --all --plan > .repo-tooling/plan.json
+      - name: Prerequisites
+        run: node .repo-tooling/source/packages/tooling/runner/provision.mjs .repo-tooling/plan.json
+      - name: Browsers
+        run: |
+          npx --no-install playwright install --with-deps chromium
+          node -e 'require("fs").appendFileSync(process.env.GITHUB_ENV, `CHROME_PATH=${require("@playwright/test").chromium.executablePath()}\n`)'
+      - name: Validate the prepared commit
+        run: node .repo-tooling/source/packages/tooling/runner/cli.mjs --profile=ci --all --output=.repo-tooling/report
+      - name: Export the validated commit
+        run: git bundle create .repo-tooling/candidate.bundle HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate
+          include-hidden-files: true
+          path: |
+            .repo-tooling/candidate.bundle
+            .repo-tooling/candidate.json
+            .repo-tooling/report/summary.json
+          retention-days: 3
+  open:
+    needs: validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: DuarteCaldeira/repo-tooling
+          ref: ${{ inputs.tooling-sha }}
+          path: tooling
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-candidate
+          path: candidate
+      - uses: actions/github-script@v7
+        env:
+          PRIVATE_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+          EXPECTED_HEAD: ${{ needs.validate.outputs.head }}
+          EXPECTED_SOURCE: ${{ needs.validate.outputs.source }}
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { createEvidence, digest } = await import(`${process.cwd()}/tooling/packages/tooling/release/evidence.mjs`);
+            const { owner, repo } = context.repo;
+            const candidate = JSON.parse(fs.readFileSync('candidate/candidate.json'));
+            const report = JSON.parse(fs.readFileSync('candidate/report/summary.json'));
+            if (candidate.head !== process.env.EXPECTED_HEAD || candidate.source !== process.env.EXPECTED_SOURCE) throw new Error('Unexpected candidate');
+            const { data: base } = await github.rest.git.getRef({ owner, repo, ref: 'heads/main' });
+            if (base.object.sha !== candidate.source) throw new Error('Base advanced: regenerate the release');
+            await exec.exec('git', ['clone', '--no-checkout', 'candidate/candidate.bundle', 'prepared']);
+            let tree = '';
+            await exec.exec('git', ['-C', 'prepared', 'rev-parse', `${candidate.head}^{tree}`], { listeners: { stdout: b => tree += b } });
+            if (tree.trim() !== candidate.tree) throw new Error('Prepared tree mismatch');
+            let config = '';
+            await exec.exec('git', ['-C', 'prepared', 'show', `${candidate.head}:repo-tooling.config.json`], { listeners: { stdout: b => config += b } });
+            const envelope = createEvidence({ ...candidate, report, repository: `${owner}/${repo}`, workflow: '.github/workflows/release.yml', runId: String(context.runId), configHash: digest(config) }, process.env.PRIVATE_KEY);
+            delete process.env.PRIVATE_KEY;
+            const branch = `release/validated-${context.runId}`;
+            await exec.exec('git', ['-C', 'prepared', 'remote', 'add', 'github', `https://github.com/${owner}/${repo}.git`]);
+            const auth = Buffer.from(`x-access-token:${process.env.GITHUB_TOKEN}`).toString('base64');
+            core.setSecret(auth);
+            await exec.exec('git', ['-C', 'prepared', '-c', `http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}`, 'push', 'github', `${candidate.head}:refs/heads/${branch}`]);
+            const { data: pr } = await github.rest.pulls.create({ owner, repo, base: 'main', head: branch, title: 'Release validated version', body: `Validated prepared tree: ${candidate.tree}\n\n<!-- repo-tooling-evidence:${Buffer.from(JSON.stringify(envelope)).toString('base64')} -->` });
+            core.notice(pr.html_url);
+            await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: 'ci.yml', ref: branch, inputs: { 'pull-request-number': String(pr.number) } });

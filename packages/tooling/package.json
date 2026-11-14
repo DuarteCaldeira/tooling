@@ -1,0 +1,84 @@
+{
+  "name": "@dcaldeira/repo-tooling",
+  "version": "0.1.0",
+  "description": "Shared checks and change detection for local development and GitHub Actions",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DuarteCaldeira/repo-tooling.git",
+    "directory": "packages/tooling"
+  },
+  "bin": {
+    "repo-tooling": "runner/cli.mjs"
+  },
+  "exports": {
+    ".": "./runner/index.mjs",
+    "./configs/*": "./configs/*",
+    "./checks/*": "./checks/*",
+    "./release": "./release/evidence.mjs",
+    "./schema": "./config.schema.json"
+  },
+  "files": [
+    "configs",
+    "checks",
+    "runner",
+    "release",
+    "config.schema.json"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "peerDependencies": {
+    "prettier": ">=3 <4",
+    "eslint": ">=9 <11",
+    "typescript-eslint": ">=8 <9",
+    "@eslint/js": ">=9 <11",
+    "eslint-plugin-jsx-a11y": ">=6 <7",
+    "eslint-plugin-react-hooks": ">=7 <8",
+    "globals": ">=16 <18",
+    "postcss-scss": ">=4 <5",
+    "vitest": ">=3 <6",
+    "@playwright/test": ">=1.50 <2",
+    "knip": ">=5 <7"
+  },
+  "peerDependenciesMeta": {
+    "prettier": {
+      "optional": true
+    },
+    "eslint": {
+      "optional": true
+    },
+    "typescript-eslint": {
+      "optional": true
+    },
+    "@eslint/js": {
+      "optional": true
+    },
+    "eslint-plugin-jsx-a11y": {
+      "optional": true
+    },
+    "eslint-plugin-react-hooks": {
+      "optional": true
+    },
+    "globals": {
+      "optional": true
+    },
+    "postcss-scss": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
+    },
+    "knip": {
+      "optional": true
+    }
+  }
+}
