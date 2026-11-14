@@ -32,8 +32,8 @@ if (options.all && options.changed) throw new Error('Choose --all or --changed')
 if (options.watch && options.profile !== 'dev') throw new Error('--watch requires --profile=dev');
 if (options.head && !options.committed) throw new Error('--head requires --committed');
 const root = resolve(options.cwd ?? process.cwd());
-const state = resolve(root, git(root, 'rev-parse', '--git-path', 'repo-tooling'));
-const output = resolve(options.output ?? join(state, 'report'));
+const state = join(root, '.repo-tooling', 'state');
+const output = resolve(options.output ?? join(root, '.repo-tooling', 'report'));
 const list = (key) => options[key]?.split(',').filter(Boolean) ?? [];
 const profile = options.profile ?? 'ci';
 

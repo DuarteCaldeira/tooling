@@ -64,6 +64,7 @@ export function validateConfig(value) {
         ![
           'command',
           'devCommand',
+          'devAllCommand',
           'groups',
           'profiles',
           'dependsOn',
@@ -74,7 +75,7 @@ export function validateConfig(value) {
         ].includes(key)
       )
         throw new Error(`Unknown checks.${id}.${key}`);
-    for (const key of ['command', 'devCommand'])
+    for (const key of ['command', 'devCommand', 'devAllCommand'])
       if (
         check[key] !== undefined &&
         typeof check[key] !== 'string' &&

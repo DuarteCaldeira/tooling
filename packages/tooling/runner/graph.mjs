@@ -65,6 +65,7 @@ export const builtins = {
   unit: check(['vitest', 'run', '--coverage'], ['app', 'functions'], {
     profiles: all,
     devCommand: ['vitest', 'related', '--run', '--passWithNoTests'],
+    devAllCommand: ['vitest', 'run'],
     devFiles: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
   }),
   translations: check(

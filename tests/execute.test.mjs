@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import { execute } from '../packages/tooling/runner/execute.mjs';
 import { plan } from '../packages/tooling/runner/graph.mjs';
 
+test('broad development changes run tests without coverage while push retains coverage', async () => {
+  const commands = [];
+  const run = async (command) => {
+    commands.push(command);
+    return { status: 'passed' };
+  };
+  await execute(process.cwd(), plan({}, { profile: 'dev', only: ['unit'] }), { run });
+  await execute(process.cwd(), plan({}, { profile: 'push', only: ['unit'] }), { run });
+  assert.deepEqual(commands, [
+    ['vitest', 'run'],
+    ['vitest', 'run', '--coverage'],
+  ]);
+});
+
 test('missing tools, platform mismatches and explicit exclusions cannot pass validation', async () => {
   const selection = plan({}, { files: ['x.scss'], skip: ['styles'] });
   const excluded = await execute(process.cwd(), selection, {

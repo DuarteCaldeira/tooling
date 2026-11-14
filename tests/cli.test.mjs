@@ -25,6 +25,7 @@ function fixture() {
   };
   writeFileSync(join(root, 'repo-tooling.config.json'), JSON.stringify(config));
   writeFileSync(join(root, 'README.md'), 'base');
+  writeFileSync(join(root, '.gitignore'), '.repo-tooling/\n');
   git(root, 'add', '.');
   git(root, 'commit', '-m', 'base');
   git(root, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
@@ -45,7 +46,7 @@ test('CLI records complete clean passes, reuses them and rejects dirty/stale or 
   assert.match(result.stderr, /No pass recorded/);
   result = run(root, '--profile=ci', '--all', '--skip=format');
   assert.equal(result.status, 1);
-  const report = JSON.parse(readFileSync(join(root, '.git/repo-tooling/report/summary.json')));
+  const report = JSON.parse(readFileSync(join(root, '.repo-tooling/report/summary.json')));
   assert.equal(report.complete, false);
   assert.equal(report.results[0].status, 'excluded');
   assert.equal(run(root, '--profile=push', '--committed', '--all').status, 2);
@@ -78,7 +79,7 @@ test('plan is read-only and unknown flags/ids cannot silently pass', () => {
     JSON.parse(result.stdout).checks.map((c) => c.id),
     ['format'],
   );
-  assert.equal(existsSync(join(root, '.git/repo-tooling')), false);
+  assert.equal(existsSync(join(root, '.repo-tooling')), false);
   assert.equal(run(root, '--only=typo').status, 2);
   assert.equal(run(root, '--wat').status, 1);
   git(root, 'commit', '--allow-empty', '-m', 'next');

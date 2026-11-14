@@ -130,7 +130,16 @@ export async function execute(
         reason: `Missing tools: ${check.tools.filter((tool) => !executable(root, tool)).join(', ')}`,
       };
     else {
-      const devFiles = selection.profile === 'dev' && !broad && check.devCommand && check.devFiles;
+      const deleted =
+        selection.files !== 'all' &&
+        check.devAllCommand &&
+        selection.files.some(
+          (file) =>
+            check.devFiles?.some((pattern) => matches(file, pattern)) &&
+            !existsSync(inside(root, file)),
+        );
+      const devFiles =
+        selection.profile === 'dev' && !broad && !deleted && check.devCommand && check.devFiles;
       const files = devFiles
         ? selection.files.filter(
             (file) =>
@@ -144,7 +153,11 @@ export async function execute(
           reason: 'No remaining matching files (deleted files are checked by full profiles)',
         };
       else {
-        const command = devFiles ? check.devCommand : check.command;
+        const command = devFiles
+          ? check.devCommand
+          : selection.profile === 'dev'
+            ? (check.devAllCommand ?? check.command)
+            : check.command;
         console.log(
           `\n> ${check.id}: ${Array.isArray(command) ? command.join(' ') : command}${files.length ? ` (${files.length} files)` : ''}`,
         );
