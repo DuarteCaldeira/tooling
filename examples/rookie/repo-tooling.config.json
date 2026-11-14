@@ -43,7 +43,8 @@
   },
   "translations": {
     "directory": "frontend/src/i18n/locales",
-    "source": "pt-PT"
+    "source": "pt-PT",
+    "pluralExceptions": ["bingo.task.long", "bingo.short.long"]
   },
   "budgets": {
     "bundle": {

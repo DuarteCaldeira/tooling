@@ -175,6 +175,12 @@
         },
         "source": {
           "type": "string"
+        },
+        "pluralExceptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

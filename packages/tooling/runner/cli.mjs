@@ -82,6 +82,7 @@ async function run() {
   };
   const before = snapshot(root, context);
   const passPath = join(state, 'push-pass.json');
+  const checkKey = JSON.stringify(selection.checks.map((check) => check.id));
   let cached;
   try {
     cached = JSON.parse(readFileSync(passPath, 'utf8'));
@@ -92,6 +93,7 @@ async function run() {
     clean(root) &&
     cached?.fingerprint === before &&
     cached?.base === base &&
+    cached?.checks === checkKey &&
     !selection.excluded.length &&
     !list('only').length
   ) {
@@ -135,7 +137,7 @@ async function run() {
       return false;
     }
     mkdirSync(state, { recursive: true });
-    writeFileSync(passPath, JSON.stringify({ fingerprint: before, base }));
+    writeFileSync(passPath, JSON.stringify({ fingerprint: before, base, checks: checkKey }));
     console.log('Pass recorded');
   }
   return result.complete;

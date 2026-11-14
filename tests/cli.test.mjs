@@ -50,6 +50,26 @@ test('CLI records complete clean passes, reuses them and rejects dirty/stale or 
   assert.equal(report.results[0].status, 'excluded');
   assert.equal(run(root, '--profile=push', '--committed', '--all').status, 2);
 });
+
+test('a cached docs-only pass cannot authorize a subsequent full validation request', () => {
+  const root = fixture();
+  const path = join(root, 'repo-tooling.config.json');
+  const config = JSON.parse(readFileSync(path));
+  config.checks.app = {
+    command: ['node', '-e', 'process.exit(1)'],
+    groups: ['app'],
+    profiles: ['push', 'ci'],
+  };
+  writeFileSync(path, JSON.stringify(config));
+  git(root, 'add', '.');
+  git(root, 'commit', '-m', 'configure app check');
+  git(root, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+  writeFileSync(join(root, 'README.md'), 'docs edit');
+  git(root, 'add', '.');
+  git(root, 'commit', '-m', 'docs');
+  assert.equal(run(root, '--profile=push', '--changed').status, 0);
+  assert.equal(run(root, '--profile=push', '--all').status, 1);
+});
 test('plan is read-only and unknown flags/ids cannot silently pass', () => {
   const root = fixture();
   const result = run(root, '--all', '--plan');
