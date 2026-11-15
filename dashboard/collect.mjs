@@ -213,7 +213,6 @@ export async function build({ configPath, output, api }) {
   for (const file of ['index.html', 'styles.css', 'app.js'])
     await copyFile(join(here, file), join(output, file));
   await writeFile(join(output, 'data.json'), `${JSON.stringify(snapshot, null, 2)}\n`);
-  await writeFile(join(output, '.nojekyll'), '');
   return snapshot;
 }
 
