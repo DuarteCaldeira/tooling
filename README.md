@@ -33,4 +33,4 @@ MIT licensed. Public publishing requires GitHub/npm credentials or npm trusted p
 
 Opt-in architecture, rendered accessibility and dependency-consistency checks share the same runner. Use `tooling generate component --name=UserCard` or `tooling generate hook --name=useProfile` for typed scaffolds, and `tooling history` for recent validation performance. PR/release workflows publish an Actions summary with report artifacts.
 
-The [app release dashboard](docs/apps-dashboard.md) tracks application versions, tooling versions and release dates, with GitHub Pages hosting and release-driven updates. Manage its app list in [dashboard/apps.json](dashboard/apps.json).
+The [app release dashboard](docs/apps-dashboard.md) tracks application versions, tooling versions and release dates, with Vercel hosting and release-driven updates. Manage its app list in [dashboard/apps.json](dashboard/apps.json).
