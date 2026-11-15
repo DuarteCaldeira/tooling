@@ -4,10 +4,11 @@ import { join, resolve } from 'node:path';
 import { invoke } from './execute.mjs';
 
 const selection = JSON.parse(readFileSync(process.argv[2], 'utf8'));
-const ids = selection.checks.filter((c) => !c.excluded).map((c) => c.id);
-const tools = new Set(selection.checks.flatMap((c) => c.tools ?? []));
+const selected = selection.checks.filter((c) => !c.excluded);
+const ids = selected.map((c) => c.kind ?? c.id);
+const tools = new Set(selected.flatMap((c) => c.tools ?? []));
 const root = process.cwd();
-const bin = resolve('.repo-tooling/bin');
+const bin = resolve('.tooling/bin');
 mkdirSync(bin, { recursive: true });
 async function requirePass(command) {
   const result = await invoke(command, root);
@@ -38,14 +39,14 @@ if (tools.has('lhci')) {
     'npm',
     'install',
     '--prefix',
-    '.repo-tooling/tools',
+    '.tooling/tools',
     '--no-save',
     '@lhci/cli@0.15.1',
   ]);
   const path = join(bin, 'lhci');
   writeFileSync(
     path,
-    `#!/bin/sh\nexec node "${resolve('.repo-tooling/tools/node_modules/@lhci/cli/src/cli.js')}" "$@"\n`,
+    `#!/bin/sh\nexec node "${resolve('.tooling/tools/node_modules/@lhci/cli/src/cli.js')}" "$@"\n`,
   );
   chmodSync(path, 0o755);
 }

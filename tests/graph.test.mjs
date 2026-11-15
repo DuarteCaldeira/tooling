@@ -38,7 +38,7 @@ test('documentation, SCSS, translations and mixed PRs select exact unions', () =
     'package.json',
     'frontend/package.json',
     'package-lock.json',
-    'repo-tooling.config.json',
+    'tooling.config.json',
   ])
     assert.ok(selected([file]).includes('security'));
 });

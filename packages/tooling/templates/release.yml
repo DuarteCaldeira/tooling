@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    uses: DuarteCaldeira/repo-tooling/.github/workflows/release-validation.yml@REPLACE_WITH_TOOLING_COMMIT_SHA
+    uses: DuarteCaldeira/tooling/.github/workflows/release-validation.yml@REPLACE_WITH_TOOLING_COMMIT_SHA
     with:
       tooling-sha: REPLACE_WITH_TOOLING_COMMIT_SHA
       level: ${{ inputs.level }}
     secrets:
-      RELEASE_SIGNING_KEY: ${{ secrets.REPO_TOOLING_RELEASE_SIGNING_KEY }}
+      RELEASE_SIGNING_KEY: ${{ secrets.TOOLING_RELEASE_SIGNING_KEY }}

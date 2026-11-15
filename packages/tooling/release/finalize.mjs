@@ -8,10 +8,10 @@ if (!/^\d+$/.test(number ?? '')) throw new Error('Usage: finalize.mjs <release-p
 const { nameWithOwner } = JSON.parse(gh('repo', 'view', '--json', 'nameWithOwner'));
 const [owner, repo] = nameWithOwner.split('/');
 const publicKey =
-  process.env.REPO_TOOLING_RELEASE_PUBLIC_KEY ||
+  process.env.TOOLING_RELEASE_PUBLIC_KEY ||
   gh(
     'api',
-    `repos/${owner}/${repo}/actions/variables/REPO_TOOLING_RELEASE_PUBLIC_KEY`,
+    `repos/${owner}/${repo}/actions/variables/TOOLING_RELEASE_PUBLIC_KEY`,
     '--jq',
     '.value',
   );

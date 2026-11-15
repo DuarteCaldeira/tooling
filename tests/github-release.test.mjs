@@ -30,7 +30,7 @@ test('API release routing rejects stale bases, modified heads, wrong authors and
     head: { sha: candidate.head, repo: { full_name: candidate.repository } },
     base: { ref: 'main' },
     user: { login: 'github-actions[bot]', id: 41898282 },
-    body: `<!-- repo-tooling-evidence:${Buffer.from(JSON.stringify(envelope)).toString('base64')} -->`,
+    body: `<!-- tooling-evidence:${Buffer.from(JSON.stringify(envelope)).toString('base64')} -->`,
   };
   const base = { object: { sha: candidate.source } };
   const run = {

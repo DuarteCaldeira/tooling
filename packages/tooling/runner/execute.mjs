@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { delimiter, dirname, join, resolve } from 'node:path';
+import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { inside } from './config.mjs';
 import { matches } from './graph.mjs';
 
@@ -14,7 +14,16 @@ const bins = {
   lhci: '@lhci/cli',
 };
 
+export function packageManifest(root, name) {
+  for (let directory = resolve(root); ; directory = dirname(directory)) {
+    const manifest = join(directory, 'node_modules', name, 'package.json');
+    if (existsSync(manifest)) return manifest;
+    if (dirname(directory) === directory) return null;
+  }
+}
+
 export function executable(root, name) {
+  if (isAbsolute(name)) return existsSync(name) ? [name] : null;
   if (name === 'initdb' && process.env.PG_BIN) {
     const target = join(process.env.PG_BIN, process.platform === 'win32' ? 'initdb.exe' : 'initdb');
     if (existsSync(target)) return [target];
@@ -28,14 +37,15 @@ export function executable(root, name) {
     const cli = candidates.find((p) => p && /npm-cli\.js$/.test(p) && existsSync(p));
     if (cli) return [process.execPath, cli];
   }
-  const pkg = bins[name];
-  if (pkg) {
-    const manifest = join(root, 'node_modules', pkg, 'package.json');
+  const pkg = bins[name] ?? name;
+  for (let directory = resolve(root); ; directory = dirname(directory)) {
+    const manifest = join(directory, 'node_modules', pkg, 'package.json');
     if (existsSync(manifest)) {
       const { bin } = JSON.parse(readFileSync(manifest, 'utf8'));
       const entry = typeof bin === 'string' ? bin : bin?.[name];
       if (entry) return [process.execPath, resolve(dirname(manifest), entry)];
     }
+    if (dirname(directory) === directory) break;
   }
   const extensions = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
   for (const directory of (process.env.PATH ?? '').split(delimiter))
@@ -49,7 +59,7 @@ export function executable(root, name) {
 export function invoke(command, root, { cwd = root, extra = [], quiet = false, env = {} } = {}) {
   let file, args, shell;
   if (Array.isArray(command)) {
-    const binary = executable(root, command[0]);
+    const binary = executable(cwd, command[0]);
     if (!binary)
       return Promise.resolve({
         status: 'unavailable',
@@ -79,7 +89,7 @@ export function invoke(command, root, { cwd = root, extra = [], quiet = false, e
       env: {
         ...process.env,
         ...env,
-        PATH: `${join(root, 'node_modules/.bin')}${delimiter}${process.env.PATH}`,
+        PATH: `${join(cwd, 'node_modules/.bin')}${delimiter}${join(root, 'node_modules/.bin')}${delimiter}${process.env.PATH}`,
       },
     });
     child.once('error', (error) => finish({ status: 'unavailable', reason: error.message }));
@@ -96,93 +106,181 @@ export function invoke(command, root, { cwd = root, extra = [], quiet = false, e
 export async function execute(
   root,
   selection,
-  { bail = false, platform = process.platform, run = invoke } = {},
+  {
+    bail = false,
+    concurrency = bail ? 1 : 2,
+    platform = process.platform,
+    run = invoke,
+    cache,
+    toolCache = true,
+  } = {},
 ) {
-  const results = selection.excluded.map((id) => ({
-    id,
-    status: 'excluded',
-    reason: 'Required check intentionally excluded',
-  }));
-  const statuses = new Map();
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 16)
+    throw new Error('Concurrency must be an integer between 1 and 16');
+  const excluded = new Set([
+    ...selection.excluded,
+    ...selection.checks.filter((c) => c.excluded).map((c) => c.id),
+  ]);
+  const statuses = new Map([...excluded].map((id) => [id, 'excluded']));
+  const outcomes = new Map(
+    [...excluded].map((id) => [
+      id,
+      { id, status: 'excluded', reason: 'Required check intentionally excluded' },
+    ]),
+  );
+  const pending = selection.checks.filter((c) => !c.excluded);
+  const running = new Map();
+  const resources = new Set();
   let stopped = false;
-  const previousBuilt = process.env.REPO_TOOLING_BUILT;
-  delete process.env.REPO_TOOLING_BUILT;
   const broad = selection.groups.some((g) =>
     ['all', 'tooling', 'dependencies', 'unknown'].includes(g),
   );
-  for (const check of selection.checks) {
-    if (check.excluded) {
-      statuses.set(check.id, 'excluded');
-      continue;
-    }
-    let result;
-    if (stopped) result = { status: 'unavailable', reason: 'Not run after --bail' };
-    else if ((check.dependsOn ?? []).some((id) => statuses.get(id) !== 'passed'))
-      result = { status: 'unavailable', reason: 'Dependency did not pass' };
-    else if (check.platforms && !check.platforms.includes(platform))
-      result = {
+
+  async function perform(check) {
+    const cwd = inside(root, check.cwd ?? '.');
+    const selectedFiles = check.files ?? selection.files;
+    if (check.platforms && !check.platforms.includes(platform))
+      return {
         status: 'unavailable',
-        reason: `Requires ${check.platforms.join('/')}; use Linux via WSL or a container`,
+        reason: 'Requires ' + check.platforms.join('/') + '; use Linux via WSL or a container',
       };
-    else if (check.tools?.some((tool) => !executable(root, tool)))
-      result = {
-        status: 'unavailable',
-        reason: `Missing tools: ${check.tools.filter((tool) => !executable(root, tool)).join(', ')}`,
-      };
-    else {
-      const deleted =
-        selection.files !== 'all' &&
-        check.devAllCommand &&
-        selection.files.some(
+    const missing = (check.tools ?? []).filter((tool) => !executable(cwd, tool));
+    if (missing.length)
+      return { status: 'unavailable', reason: 'Missing tools: ' + missing.join(', ') };
+    const deleted =
+      selectedFiles !== 'all' &&
+      check.devAllCommand &&
+      selectedFiles.some(
+        (file) =>
+          check.devFiles?.some((pattern) => matches(file, pattern)) &&
+          !existsSync(inside(root, file)),
+      );
+    const devFiles =
+      selection.profile === 'dev' && !broad && !deleted && check.devCommand && check.devFiles;
+    const files = devFiles
+      ? selectedFiles.filter(
           (file) =>
-            check.devFiles?.some((pattern) => matches(file, pattern)) &&
-            !existsSync(inside(root, file)),
-        );
-      const devFiles =
-        selection.profile === 'dev' && !broad && !deleted && check.devCommand && check.devFiles;
-      const files = devFiles
-        ? selection.files.filter(
-            (file) =>
-              check.devFiles.some((pattern) => matches(file, pattern)) &&
-              existsSync(inside(root, file)),
-          )
-        : [];
-      if (devFiles && !files.length)
-        result = {
-          status: 'passed',
-          reason: 'No remaining matching files (deleted files are checked by full profiles)',
-        };
-      else {
-        const command = devFiles
-          ? check.devCommand
-          : selection.profile === 'dev'
-            ? (check.devAllCommand ?? check.command)
-            : check.command;
-        console.log(
-          `\n> ${check.id}: ${Array.isArray(command) ? command.join(' ') : command}${files.length ? ` (${files.length} files)` : ''}`,
-        );
-        result = await run(command, root, {
-          cwd: inside(root, check.cwd ?? '.'),
-          extra: files.map((file) => resolve(root, file)),
-          env:
-            ['e2e', 'visual'].includes(check.id) && process.env.REPO_TOOLING_REPORT_DIR
-              ? {
-                  PLAYWRIGHT_HTML_OUTPUT_DIR: join(process.env.REPO_TOOLING_REPORT_DIR, check.id),
-                  REPO_TOOLING_TEST_OUTPUT_DIR: join(
-                    process.env.REPO_TOOLING_REPORT_DIR,
-                    `${check.id}-results`,
-                  ),
-                }
-              : {},
-        });
-      }
+            check.devFiles.some((pattern) => matches(file, pattern)) &&
+            existsSync(inside(root, file)),
+        )
+      : [];
+    if (devFiles && !files.length)
+      return {
+        status: 'passed',
+        reason: 'No remaining matching files (deleted files are checked by full profiles)',
+      };
+    let command = devFiles
+      ? check.devCommand
+      : selection.profile === 'dev'
+        ? (check.devAllCommand ?? check.command)
+        : check.command;
+    if (!toolCache && Array.isArray(command) && command[0] === 'eslint') {
+      command = command.filter(
+        (value, index, args) =>
+          value !== '--cache' &&
+          value !== '--cache-strategy' &&
+          args[index - 1] !== '--cache-strategy',
+      );
     }
-    results.push({ id: check.id, ...result });
+    if (
+      !toolCache &&
+      Array.isArray(command) &&
+      command[0] === 'tsc' &&
+      command.includes('--build') &&
+      !command.includes('--force')
+    )
+      command = [...command, '--force'];
+    if (
+      Array.isArray(command) &&
+      command[0] === 'eslint' &&
+      command.includes('--cache') &&
+      !command.includes('--cache-location')
+    ) {
+      command = [...command];
+      const end = command.indexOf('--');
+      command.splice(
+        end === -1 ? command.length : end,
+        0,
+        '--cache-location',
+        join(root, '.tooling/cache/eslint', `${check.id}.cache`),
+      );
+    }
+    const cached = cache?.get(check, command, files);
+    if (cached) return cached;
+    console.log(
+      '\n> ' +
+        check.id +
+        ': ' +
+        (Array.isArray(command) ? command.join(' ') : command) +
+        (files.length ? ' (' + files.length + ' files)' : ''),
+    );
+    const env = {
+      TOOLING_ROOT: root,
+      TOOLING_CHECK_ID: check.id,
+      TOOLING_BUILT: (check.dependsOn ?? ['build']).some(
+        (id) =>
+          statuses.get(id) === 'passed' &&
+          selection.checks.some(
+            (candidate) => candidate.id === id && (candidate.kind ?? candidate.id) === 'build',
+          ),
+      )
+        ? '1'
+        : '',
+    };
+    if ((check.kind ?? check.id) === 'unit' && process.env.TOOLING_REPORT_DIR)
+      env.TOOLING_UNIT_OUTPUT_DIR = join(process.env.TOOLING_REPORT_DIR, `${check.id}-results`);
+    if (['e2e', 'visual'].includes(check.kind ?? check.id) && process.env.TOOLING_REPORT_DIR) {
+      env.PLAYWRIGHT_HTML_OUTPUT_DIR = join(process.env.TOOLING_REPORT_DIR, check.id);
+      env.TOOLING_TEST_OUTPUT_DIR = join(process.env.TOOLING_REPORT_DIR, check.id + '-results');
+    }
+    return run(command, root, { cwd, extra: files.map((file) => resolve(root, file)), env });
+  }
+
+  function record(check, result) {
+    outcomes.set(check.id, { id: check.id, kind: check.kind ?? check.id, ...result });
     statuses.set(check.id, result.status);
-    if (check.id === 'build' && result.status === 'passed') process.env.REPO_TOOLING_BUILT = '1';
     if (bail && result.status !== 'passed') stopped = true;
   }
-  if (previousBuilt === undefined) delete process.env.REPO_TOOLING_BUILT;
-  else process.env.REPO_TOOLING_BUILT = previousBuilt;
+
+  while (pending.length || running.size) {
+    for (let i = 0; i < pending.length;) {
+      const check = pending[i];
+      const deps = check.dependsOn ?? [];
+      if (stopped || deps.some((id) => statuses.has(id) && statuses.get(id) !== 'passed')) {
+        pending.splice(i, 1);
+        record(check, {
+          status: 'unavailable',
+          reason: stopped ? 'Not run after --bail' : 'Dependency did not pass',
+        });
+        continue;
+      }
+      if (
+        running.size >= concurrency ||
+        deps.some((id) => !statuses.has(id)) ||
+        (check.resources ?? []).some((key) => resources.has(key))
+      ) {
+        i++;
+        continue;
+      }
+      pending.splice(i, 1);
+      for (const key of check.resources ?? []) resources.add(key);
+      const task = Promise.resolve()
+        .then(() => perform(check))
+        .catch((error) => ({ status: 'unavailable', reason: error.message }))
+        .then((result) => {
+          record(check, result);
+          running.delete(check.id);
+          for (const key of check.resources ?? []) resources.delete(key);
+        });
+      running.set(check.id, task);
+    }
+    if (running.size) await Promise.race(running.values());
+    else if (pending.length) {
+      for (const check of pending.splice(0))
+        record(check, { status: 'unavailable', reason: 'Unresolved dependencies' });
+    }
+  }
+  const ids = [...new Set([...excluded, ...selection.checks.map((c) => c.id)])];
+  const results = ids.map((id) => outcomes.get(id));
   return { results, complete: results.every((r) => r.status === 'passed') };
 }

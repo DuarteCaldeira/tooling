@@ -30,7 +30,7 @@ const today = new Date().toISOString().slice(0, 10);
 const allow = new Map(
   JSON.parse(
     readFileSync(
-      resolve(process.cwd(), process.env.REPO_TOOLING_AUDIT_ALLOWLIST ?? 'audit-allowlist.json'),
+      resolve(process.cwd(), process.env.TOOLING_AUDIT_ALLOWLIST ?? 'audit-allowlist.json'),
       'utf8',
     ),
   ).advisories.map((a) => [a.id, a]),

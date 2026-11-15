@@ -21,7 +21,7 @@ const candidate = {
   head: git(root, 'rev-parse', 'HEAD'),
   tree: git(root, 'rev-parse', 'HEAD^{tree}'),
 };
-writeFileSync('.repo-tooling/candidate.json', JSON.stringify(candidate));
+writeFileSync('.tooling/candidate.json', JSON.stringify(candidate));
 if (process.env.GITHUB_OUTPUT)
   writeFileSync(process.env.GITHUB_OUTPUT, `head=${candidate.head}\nsource=${source}\n`, {
     flag: 'a',

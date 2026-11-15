@@ -10,11 +10,11 @@ The default GitHub token's PR creation does not trigger PR workflows. The genera
 
 ## Keys
 
-Generate an Ed25519 key pair outside the repository. Store the private PEM as the `REPO_TOOLING_RELEASE_SIGNING_KEY` Actions secret and the public PEM as the `REPO_TOOLING_RELEASE_PUBLIC_KEY` repository variable. The public key is not secret. No key is generated or committed by this project. Rotate keys by replacing both values; old envelopes will cease to verify.
+Generate an Ed25519 key pair outside the repository. Store the private PEM as the `TOOLING_RELEASE_SIGNING_KEY` Actions secret and the public PEM as the `TOOLING_RELEASE_PUBLIC_KEY` repository variable. The public key is not secret. No key is generated or committed by this project. Rotate keys by replacing both values; old envelopes will cease to verify.
 
 ## Merge, tag and publish
 
-Run `node node_modules/@dcaldeira/repo-tooling/release/finalize.mjs <pr-number>`. It verifies current signed evidence, uses a squash merge with `--match-head-commit` and no admin bypass, requires the resulting tree to equal the validated tree, creates the version tag and publishes the GitHub release. Deployment remains application-owned. Rules should require current validation and up-to-date base branches where available.
+Run `node node_modules/@dcaldeira/tooling/release/finalize.mjs <pr-number>`. It verifies current signed evidence, uses a squash merge with `--match-head-commit` and no admin bypass, requires the resulting tree to equal the validated tree, creates the version tag and publishes the GitHub release. Deployment remains application-owned. Rules should require current validation and up-to-date base branches where available.
 
 There is deliberately no “merge whichever release branch exists” fallback. Missing keys, unavailable API access, stale evidence or a different merged tree fail closed. Recovery after an interrupted tag/publication needs an explicit inspection of the existing tag/release; the finalizer never silently overwrites them.
 

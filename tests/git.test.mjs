@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { git, changedFiles, snapshot } from '../packages/tooling/runner/git.mjs';
 
 function repository() {
-  const root = mkdtempSync(join(tmpdir(), 'repo-tooling-test-'));
+  const root = mkdtempSync(join(tmpdir(), 'tooling-test-'));
   git(root, 'init', '--initial-branch=main');
   git(root, 'config', 'user.name', 'Test');
   git(root, 'config', 'user.email', 'test@example.com');
@@ -47,9 +47,9 @@ test('fingerprints invalidate edits, untracked files, commits, base, config, too
   const third = snapshot(root, context);
   assert.notEqual(third, second);
   assert.notEqual(snapshot(root, { ...context, base: 'HEAD' }), third);
-  process.env.REPO_TOOLING_TEST_INPUT = 'a';
-  const fourth = snapshot(root, { ...context, environment: ['REPO_TOOLING_TEST_INPUT'] });
-  process.env.REPO_TOOLING_TEST_INPUT = 'b';
-  assert.notEqual(snapshot(root, { ...context, environment: ['REPO_TOOLING_TEST_INPUT'] }), fourth);
-  delete process.env.REPO_TOOLING_TEST_INPUT;
+  process.env.TOOLING_TEST_INPUT = 'a';
+  const fourth = snapshot(root, { ...context, environment: ['TOOLING_TEST_INPUT'] });
+  process.env.TOOLING_TEST_INPUT = 'b';
+  assert.notEqual(snapshot(root, { ...context, environment: ['TOOLING_TEST_INPUT'] }), fourth);
+  delete process.env.TOOLING_TEST_INPUT;
 });

@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   CI:
-    uses: DuarteCaldeira/repo-tooling/.github/workflows/ci.yml@REPLACE_WITH_TOOLING_COMMIT_SHA
+    uses: DuarteCaldeira/tooling/.github/workflows/ci.yml@REPLACE_WITH_TOOLING_COMMIT_SHA
     with:
       tooling-sha: REPLACE_WITH_TOOLING_COMMIT_SHA
       pull-request-number: ${{ inputs.pull-request-number || '' }}

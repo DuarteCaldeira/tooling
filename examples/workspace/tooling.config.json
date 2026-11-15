@@ -1,0 +1,47 @@
+{
+  "$schema": "./node_modules/@dcaldeira/tooling/config.schema.json",
+  "schemaVersion": 1,
+  "execution": {
+    "concurrency": 2
+  },
+  "paths": {
+    "app": ["frontend/src/**", "shared/src/**"]
+  },
+  "workspaces": {
+    "app": {
+      "paths": ["frontend/**"],
+      "dependsOn": ["shared"]
+    },
+    "shared": {
+      "paths": ["shared/**"]
+    }
+  },
+  "checks": {
+    "format": {},
+    "lint": {
+      "cwd": "frontend",
+      "workspaces": ["app"]
+    },
+    "styles": false,
+    "types": {
+      "cwd": "frontend",
+      "workspaces": ["app"]
+    },
+    "unit": {
+      "cwd": "frontend",
+      "workspaces": ["app"]
+    },
+    "translations": false,
+    "build": {
+      "cwd": "frontend",
+      "workspaces": ["app"]
+    },
+    "size": false,
+    "deadcode": false,
+    "security": false,
+    "e2e": false,
+    "visual": false,
+    "lighthouse": false,
+    "workflows": false
+  }
+}

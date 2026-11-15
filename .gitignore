@@ -1,6 +1,7 @@
 node_modules/
+debug.log
 *.tgz
-.repo-tooling/
+.tooling/
 coverage/
 playwright-report/
 test-results/
