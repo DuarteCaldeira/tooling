@@ -1,14 +1,35 @@
 # App release dashboard
 
-The Vercel dashboard shows the latest published release of each configured app, the shared tooling used at that release, and its publication date (UTC). It includes prereleases. It does not treat a package version on main as a release, or guess a tooling version from a dependency range.
+The Vercel release hub replaces manual Product Owner update messages with a shareable release history for each app. Product changes come first; the application overview retains the latest version, shared tooling version and release date (UTC). It includes prereleases. It does not treat a package version on main as a release, or guess a tooling version from a dependency range.
+
+## Product release notes
+
+Choose an app to browse its releases, search changes or versions, and filter to product notes. Saudinha opens by default; the app selector updates the shareable URL (`?app=DuarteCaldeira%2Fsaudinha-pnn#release-notes`). All five apps remain available in the overview, and SwipeIt is excluded from collection and publication.
+
+`dashboard/release-notes.json` contains the supplied Portuguese summaries for Saudinha versions 1.17.1 through 1.21.1, keyed by repository and version without the `v` prefix. These summaries are shown only when a matching published GitHub release exists. Dates always come from the published release. Product notes preserve their original language.
+
+For automatic product notes on new releases, publish a top-level `Novidades` (Portuguese) or `Product updates` (English) section with plain-language bullet points in the GitHub release body:
+
+```markdown
+## Novidades
+
+- Consultas: novos lembretes antes da consulta
+- Pesquisa: encontra exames pelo local e pela data
+
+## Technical changes
+
+- Internal implementation details can remain here.
+```
+
+Collection reads those bullets at each refresh. An explicit summary in `release-notes.json` takes precedence. Releases without an edited summary or product section show an honest “Product summary not available” message and expandable original GitHub notes; the site does not invent or automatically translate summaries. Release bodies are rendered as inert text, including any Markdown or HTML in the original notes. The first ten releases appear initially; “Show older releases” loads more from the collected history.
 
 ## Apps
 
-Edit `dashboard/apps.json` to add or remove apps. The initial list includes Rookie, Billy, Dra. Gabriela Videira, Saudinha, SwipeIt and Despesas. Only explicitly listed repositories are published. Optional `packagePath`, `lockPath` and `workflowPath` support monorepos and custom CI locations; paths are relative to the repository root.
+Edit `dashboard/apps.json` to add or remove apps. The list includes Rookie, Billy, Dra. Gabriela Videira, Saudinha and Despesas. Only explicitly listed repositories are published. Optional `packagePath`, `lockPath` and `workflowPath` support monorepos and custom CI locations; paths are relative to the repository root.
 
 Collection resolves each release tag to its commit, then reads the manifest and npm lockfile at that commit. Tooling comes from `@dcaldeira/tooling` (or its previous package name), preferring the nearest workspace installation in `package-lock.json`. Exact manifest versions work without a lockfile. Unresolved ranges, non-npm lockfiles and moving workflow refs are labelled unresolved. Alternatively, a SHA-pinned reusable workflow in `.github/workflows/ci.yml` resolves to `packages/tooling/package.json` at that exact tooling revision. The revision appears below the version, since multiple commits can share a package version. Configure `workflowPath` if the app uses another workflow file.
 
-Apps without releases show “No releases yet”. Released apps without the package or a shared workflow show “Not adopted”. Access errors show “Unavailable”; tooling-only errors preserve the release and show a warning. If every repository is inaccessible, collection fails and leaves the previous deployment intact. A last-checked timestamp and overdue indicator make stale deployments visible. No repository code is executed during collection, and API responses, credentials and release bodies are excluded from the deployed data.
+Apps without releases show "No releases yet". Released apps without the package or a shared workflow show "Not adopted". Access errors show "Unavailable"; tooling-only errors preserve the release and show a warning. If every repository is inaccessible, collection fails and leaves the previous deployment intact. A last-checked timestamp and overdue indicator make stale deployments visible. No repository code is executed during collection. Only selected app metadata, published release notes and their edited summaries are deployed; credentials and source manifests are excluded.
 
 ## First deployment
 

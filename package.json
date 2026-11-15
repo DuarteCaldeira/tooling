@@ -10,7 +10,7 @@
     "pack:tooling": "npm pack -w packages/tooling",
     "check": "node --test tests/*.test.mjs",
     "format:check": "prettier --check .",
-    "test:browser": "node --test tests/a11y.integration.mjs"
+    "test:browser": "node --test tests/a11y.integration.mjs tests/dashboard.browser.mjs"
   },
   "engines": {
     "node": ">=22.13.0"

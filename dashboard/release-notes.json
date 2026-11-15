@@ -1,0 +1,101 @@
+{
+  "DuarteCaldeira/saudinha-pnn": {
+    "1.17.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Exames: “Carregar exame” abre logo os ficheiros do telemóvel, como nos outros menus (no iPhone continua a aparecer primeiro o menu da app)",
+        "Exames: ao carregar um relatório, o nome, a data, a hora, o local e quem prescreveu o exame são preenchidos sozinhos",
+        "Exames: novo campo “Conclusão”, preenchido a partir do relatório e que pode ser editado",
+        "Exames: “Médico” passa a chamar-se “Prescrito por”, como nas Análises",
+        "Exames: carregar outra vez o mesmo relatório atualiza o exame que já existe em vez de criar outro, e o que escreveu não é apagado",
+        "Análises: os resultados aparecem pela ordem do relatório e com os nomes das secções que o laboratório usa",
+        "Análises: as contagens de células mostram a unidade completa (x10⁹/L) e passam a ter barra"
+      ]
+    },
+    "1.18.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Exames: dá para carregar vários exames de uma vez (também vários ficheiros no iPhone)",
+        "Exames: a app lê relatórios de muitas mais clínicas e formatos, incluindo letra desenhada e conclusões que passam de uma página para outra",
+        "Exames: novo campo “Local”, lido do rodapé, do cabeçalho ou do logótipo do relatório",
+        "Exames: o “Relatório” aparece separado da conclusão e organizado por tema",
+        "Exames: a lista fica parecida com a das Consultas, com o dia à esquerda, o Local numa linha própria e sem o nome do ficheiro",
+        "Exames: a data do exame já nunca é a data em que o carregaste",
+        "Receitas: a app lê fotografias de receitas",
+        "Ficheiros carregados: a app avisa do que não conseguiu ler, lê páginas digitalizadas no meio de páginas de texto, e marca “por rever” o que leu de imagens",
+        "Análises: dia correto, ordem do documento, sem repetições e uma só unidade por valor",
+        "Carregar ficheiros funciona sem internet",
+        "A apresentação inicial da app ficou mais honesta",
+        "Já não ficam dados de saúde guardados na memória temporária"
+      ]
+    },
+    "1.18.1": {
+      "language": "pt-PT",
+      "changes": [
+        "A app já não pede para confirmar o texto que leu de uma imagem",
+        "Exames: leitura da Medicação, conclusão sem assinaturas nem rodapés, e nome correto quando o relatório tem vários exames",
+        "Separadores: ecrãs vazios mais úteis, com textos e comportamento iguais em todos",
+        "Exames: ficam guardados de forma a continuarem a abrir mesmo quando são muitos (Android)"
+      ]
+    },
+    "1.18.2": {
+      "language": "pt-PT",
+      "changes": [
+        "Acessibilidade: texto com mais contraste, tamanho mínimo legível e um ecrã de erro em vez de a app fechar"
+      ]
+    },
+    "1.19.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Consultas: lembretes antes da consulta",
+        "Ícone da app: carrega sem abrir a app para “Registar toma” ou “Adicionar análise”",
+        "Cópia de segurança: usa sempre a mais recente, uma cópia guardada conta logo, a gravação é verificada e só corre uma de cada vez",
+        "Exames: deixa de aparecer “Relatório” vazio, a informação clínica aparece em minúsculas normais e as assinaturas ficam fora da conclusão",
+        "Exames: quando uma tabela tem vários exames, o relatório diz quantos são",
+        "Exames: os filtros por Local funcionam pelo texto e a pesquisa procura também no relatório e no dia"
+      ]
+    },
+    "1.20.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Pesquisa geral: procura de uma só vez em análises, exames, medicação, consultas e documentos",
+        "Acessibilidade: animações mais suaves para quem as desativa, títulos, zoom do texto, botões maiores e foco melhor para quem usa leitor de ecrã",
+        "Cores: mais contraste nos fundos com degradé, com acertos no tema claro",
+        "Mais rápida: grava vários dados de uma vez, redesenha menos os ecrãs e os ficheiros exportados ficam mais leves",
+        "Mais segura: reforço da proteção ao importar ficheiros e do bloqueio da app"
+      ]
+    },
+    "1.20.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Pesquisa: o botão tem agora sombra e ícone de cor",
+        "Exames: a informação clínica deixa de aparecer misturada com a medicação quando o relatório tem duas colunas"
+      ]
+    },
+    "1.20.2": {
+      "language": "pt-PT",
+      "changes": [
+        "A app volta ao ecrã onde estavas quando a abres de novo",
+        "Cópia de segurança: mais leve de criar e avisa quando o espaço do telemóvel está quase cheio",
+        "Exames: valores lidos de imagens ficam assinalados para os rever"
+      ]
+    },
+    "1.21.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Vacinas: registo, lembretes e importação do boletim de vacinas do SNS",
+        "Ecrãs vazios mais simpáticos, sem botões de adicionar",
+        "Consultas: a pesquisa e os filtros passam a andar com a lista",
+        "Perfil, Saúde e Definições: ecrãs separados, com cabeçalho e barra de separadores, escolha do parentesco e pequenos acertos de aspeto",
+        "Análises: ao importar um resumo de urina, “Leucócitos” já não aparece duplicado"
+      ]
+    },
+    "1.21.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Cópia de segurança: novo cartão para guardar numa pasta",
+        "Análises: unidade dos Leucócitos corrigida e datas certas nos gráficos"
+      ]
+    }
+  }
+}

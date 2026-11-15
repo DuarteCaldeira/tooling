@@ -72,20 +72,37 @@ async function contents(api, repository, path, ref) {
   return Buffer.from(data.content, 'base64').toString('utf8');
 }
 
-export async function latestRelease(api, repository) {
+export async function releaseHistory(api, repository) {
   const releases = [];
   for (let page = 1; page <= 50; page++) {
     const batch = await api(`/repos/${repository}/releases?per_page=100&page=${page}`);
     if (!Array.isArray(batch)) throw new Error('Invalid release response');
     releases.push(...batch.filter((release) => !release.draft && release.published_at));
     if (batch.length < 100)
-      return (
-        releases.sort(
-          (a, b) => Date.parse(b.published_at) - Date.parse(a.published_at) || b.id - a.id,
-        )[0] ?? null
+      return releases.sort(
+        (a, b) => Date.parse(b.published_at) - Date.parse(a.published_at) || b.id - a.id,
       );
   }
   throw new Error('Release history exceeds pagination limit');
+}
+
+export async function latestRelease(api, repository) {
+  return (await releaseHistory(api, repository))[0] ?? null;
+}
+
+export function productNotes(body = '') {
+  if (typeof body !== 'string') return null;
+  const lines = body.split(/\r?\n/);
+  const start = lines.findIndex((line) => /^##\s+(Novidades|Product updates)\s*$/i.test(line));
+  if (start < 0) return null;
+  const next = lines.slice(start + 1).findIndex((line) => /^##\s/.test(line));
+  const section = lines.slice(start + 1, next < 0 ? undefined : start + 1 + next);
+  const changes = section
+    .filter((line) => /^\s*[-*]\s+/.test(line))
+    .map((line) => line.replace(/^\s*[-*]\s+/, '').trim());
+  return changes.length
+    ? { changes, language: /Novidades/i.test(lines[start]) ? 'pt-PT' : 'en' }
+    : null;
 }
 
 export async function toolingAtRelease(api, app, sha, toolingRepository) {
@@ -164,11 +181,33 @@ export async function collect(config, api, now = new Date()) {
       version: null,
       releasedAt: null,
       tooling: { version: null, status: 'unknown' },
+      releases: [],
     };
     try {
       // A missing release and a missing/private repository are different states.
       await api(`/repos/${app.repository}`);
-      const release = await latestRelease(api, app.repository);
+      const history = await releaseHistory(api, app.repository);
+      row.releases = history.map((item) => {
+        const override = app.releaseNotes?.[item.tag_name.replace(/^v/, '')];
+        const edited = override ?? productNotes(item.body);
+        if (
+          edited &&
+          (!Array.isArray(edited.changes) ||
+            edited.changes.some((change) => typeof change !== 'string'))
+        )
+          throw new Error('Invalid product release notes');
+        return {
+          version: item.tag_name,
+          releasedAt: item.published_at,
+          url: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(item.tag_name)}`,
+          prerelease: Boolean(item.prerelease),
+          notes: edited?.changes ?? [],
+          language: edited?.language ?? null,
+          source: override ? 'edited' : edited ? 'published' : 'github',
+          originalNotes: typeof item.body === 'string' ? item.body : '',
+        };
+      });
+      const release = history[0];
       if (!release) {
         apps.push({ ...row, status: 'unreleased' });
         continue;
@@ -200,6 +239,7 @@ export async function collect(config, api, now = new Date()) {
   return {
     schemaVersion: 1,
     title: config.title ?? 'App overview',
+    defaultApp: config.defaultApp ?? null,
     generatedAt: now.toISOString(),
     apps,
   };
@@ -207,6 +247,9 @@ export async function collect(config, api, now = new Date()) {
 
 export async function build({ configPath, output, api }) {
   const config = JSON.parse(await readFile(configPath, 'utf8'));
+  const notesPath = new URL('./release-notes.json', import.meta.url);
+  const notes = JSON.parse(await readFile(notesPath, 'utf8'));
+  for (const app of config.apps) app.releaseNotes = notes[app.repository] ?? {};
   const snapshot = await collect(config, api);
   await mkdir(output, { recursive: true });
   const here = dirname(fileURLToPath(import.meta.url));

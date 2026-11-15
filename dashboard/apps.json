@@ -1,12 +1,12 @@
 {
-  "title": "App overview",
+  "title": "Release hub",
+  "defaultApp": "DuarteCaldeira/saudinha-pnn",
   "toolingRepository": "DuarteCaldeira/tooling",
   "apps": [
     { "name": "Rookie", "repository": "DuarteCaldeira/exercise-app" },
     { "name": "Billy", "repository": "DuarteCaldeira/billy" },
     { "name": "Dra. Gabriela Videira", "repository": "DuarteCaldeira/dr-gabriela-videira" },
     { "name": "Saudinha", "repository": "DuarteCaldeira/saudinha-pnn" },
-    { "name": "SwipeIt", "repository": "DuarteCaldeira/swipeIt" },
     { "name": "Despesas", "repository": "DuarteCaldeira/despesas" }
   ]
 }
