@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/@dcaldeira/tooling/config.schema.json",
+  "schemaVersion": 1,
+  "execution": {
+    "concurrency": 2
+  },
+  "checks": {
+    "format": {},
+    "lint": {
+      "cwd": "."
+    },
+    "styles": false,
+    "types": {
+      "cwd": "."
+    },
+    "unit": {
+      "cwd": "."
+    },
+    "translations": false,
+    "build": {
+      "cwd": "."
+    },
+    "size": false,
+    "deadcode": false,
+    "security": false,
+    "e2e": false,
+    "visual": false,
+    "lighthouse": false,
+    "workflows": false
+  }
+}

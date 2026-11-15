@@ -1,5 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["**/coverage/**", "**/dist/**", "**/playwright-report/**", "**/test-results/**"],
+  "ignore": [
+    "**/coverage/**",
+    "**/dist/**",
+    "**/playwright-report/**",
+    "**/test-results/**",
+    "**/.tooling/**"
+  ],
   "entry": ["src/main.{ts,tsx}", "scripts/*.mjs"]
 }

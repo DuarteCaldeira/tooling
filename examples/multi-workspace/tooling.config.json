@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "workspaces": {
+    "web": {
+      "paths": ["apps/web/**"],
+      "dependsOn": ["ui"]
+    },
+    "admin": {
+      "paths": ["apps/admin/**"],
+      "dependsOn": ["ui"]
+    },
+    "ui": {
+      "paths": ["packages/ui/**"]
+    }
+  },
+  "checks": {
+    "format": {},
+    "lint": false,
+    "styles": false,
+    "types": false,
+    "unit": false,
+    "translations": false,
+    "build": false,
+    "size": false,
+    "deadcode": false,
+    "security": false,
+    "e2e": false,
+    "visual": false,
+    "lighthouse": false,
+    "workflows": false,
+    "web-lint": {
+      "extends": "lint",
+      "cwd": "apps/web",
+      "workspaces": ["web"]
+    },
+    "web-types": {
+      "extends": "types",
+      "cwd": "apps/web",
+      "workspaces": ["web"],
+      "resources": ["build-web"]
+    },
+    "web-unit": {
+      "extends": "unit",
+      "cwd": "apps/web",
+      "workspaces": ["web"]
+    },
+    "web-build": {
+      "extends": "build",
+      "cwd": "apps/web",
+      "workspaces": ["web"],
+      "resources": ["build-web"]
+    },
+    "admin-lint": {
+      "extends": "lint",
+      "cwd": "apps/admin",
+      "workspaces": ["admin"]
+    },
+    "admin-types": {
+      "extends": "types",
+      "cwd": "apps/admin",
+      "workspaces": ["admin"],
+      "resources": ["build-admin"]
+    },
+    "admin-unit": {
+      "extends": "unit",
+      "cwd": "apps/admin",
+      "workspaces": ["admin"]
+    },
+    "admin-build": {
+      "extends": "build",
+      "cwd": "apps/admin",
+      "workspaces": ["admin"],
+      "resources": ["build-admin"]
+    }
+  }
+}

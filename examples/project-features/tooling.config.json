@@ -1,0 +1,81 @@
+{
+  "$schema": "./node_modules/@dcaldeira/tooling/config.schema.json",
+  "schemaVersion": 1,
+  "execution": {
+    "concurrency": 2
+  },
+  "checks": {
+    "format": {},
+    "lint": {
+      "cwd": "."
+    },
+    "styles": false,
+    "types": {
+      "cwd": "."
+    },
+    "unit": {
+      "cwd": "."
+    },
+    "translations": false,
+    "build": {
+      "cwd": "."
+    },
+    "size": false,
+    "deadcode": false,
+    "security": false,
+    "e2e": false,
+    "visual": false,
+    "lighthouse": false,
+    "workflows": false,
+    "architecture": {},
+    "dependency-consistency": {},
+    "a11y": {}
+  },
+  "architecture": {
+    "include": ["src/**"],
+    "cycles": true,
+    "layers": [
+      {
+        "name": "features",
+        "paths": ["src/features/**"],
+        "allow": ["ui", "shared"]
+      },
+      {
+        "name": "ui",
+        "paths": ["src/components/**"],
+        "allow": ["shared"]
+      },
+      {
+        "name": "shared",
+        "paths": ["src/shared/**"],
+        "allow": []
+      }
+    ]
+  },
+  "dependencyConsistency": {
+    "strict": ["react", "react-dom"],
+    "singleVersion": ["react", "react-dom"]
+  },
+  "a11y": {
+    "baseURL": "http://127.0.0.1:4173",
+    "server": {
+      "command": ["npm", "run", "preview", "--", "--host", "127.0.0.1"]
+    },
+    "routes": [
+      {
+        "name": "Home",
+        "path": "/",
+        "waitFor": "main"
+      }
+    ]
+  },
+  "generators": {
+    "components": "src/components",
+    "hooks": "src/hooks"
+  },
+  "history": {
+    "enabled": true,
+    "limit": 200,
+    "regressionPercent": 25
+  }
+}

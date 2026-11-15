@@ -1,7 +1,7 @@
 import { cpSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 
-const [source = 'playwright-report', destination = '.repo-tooling/report/visual'] =
+const [source = 'playwright-report', destination = '.tooling/report/visual'] =
   process.argv.slice(2);
 if (!existsSync(join(source, 'index.html'))) {
   console.error(`Missing Playwright HTML report: ${source}`);

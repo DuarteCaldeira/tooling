@@ -1,16 +1,16 @@
 {
-  "name": "@dcaldeira/repo-tooling",
+  "name": "@dcaldeira/tooling",
   "version": "0.1.0",
   "description": "Shared checks and change detection for local development and GitHub Actions",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/DuarteCaldeira/repo-tooling.git",
+    "url": "https://github.com/DuarteCaldeira/tooling.git",
     "directory": "packages/tooling"
   },
   "bin": {
-    "repo-tooling": "runner/cli.mjs"
+    "tooling": "runner/cli.mjs"
   },
   "exports": {
     ".": "./runner/index.mjs",
@@ -24,6 +24,7 @@
     "checks",
     "runner",
     "release",
+    "templates",
     "config.schema.json"
   ],
   "engines": {
@@ -44,7 +45,10 @@
     "postcss-scss": ">=4 <5",
     "vitest": ">=3 <6",
     "@playwright/test": ">=1.50 <2",
-    "knip": ">=5 <7"
+    "knip": ">=5 <7",
+    "postcss": ">=8 <9",
+    "typescript": ">=5 <7",
+    "@axe-core/playwright": ">=4 <5"
   },
   "peerDependenciesMeta": {
     "prettier": {
@@ -79,6 +83,19 @@
     },
     "knip": {
       "optional": true
+    },
+    "postcss": {
+      "optional": true
+    },
+    "typescript": {
+      "optional": true
+    },
+    "@axe-core/playwright": {
+      "optional": true
     }
+  },
+  "dependencies": {
+    "es-module-lexer": "2.3.2",
+    "semver": "7.8.6"
   }
 }

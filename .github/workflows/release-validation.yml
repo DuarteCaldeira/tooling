@@ -29,9 +29,9 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          repository: DuarteCaldeira/repo-tooling
+          repository: DuarteCaldeira/tooling
           ref: ${{ inputs.tooling-sha }}
-          path: .repo-tooling/source
+          path: .tooling/source
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -45,28 +45,70 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          node .repo-tooling/source/packages/tooling/release/prepare.mjs
+          node .tooling/source/packages/tooling/release/prepare.mjs
       - name: Plan
-        run: node .repo-tooling/source/packages/tooling/runner/cli.mjs --all --plan > .repo-tooling/plan.json
+        run: node .tooling/source/packages/tooling/runner/cli.mjs --all --plan > .tooling/plan.json
+      - name: Inspect plan
+        id: plan-info
+        run: node .tooling/source/packages/tooling/runner/ci-plan.mjs .tooling/plan.json
+      - name: Restore tool caches
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.plan-info.outputs.tool-cache-paths }}
+          key: tooling-tools-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            tooling-tools-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}-
       - name: Prerequisites
-        run: node .repo-tooling/source/packages/tooling/runner/provision.mjs .repo-tooling/plan.json
+        run: node .tooling/source/packages/tooling/runner/provision.mjs .tooling/plan.json
+      - uses: actions/cache@v4
+        if: steps.plan-info.outputs.browsers == 'true'
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.plan-info.outputs.browser-key }}
       - name: Browsers
-        run: |
-          npx --no-install playwright install --with-deps chromium
-          node -e 'require("fs").appendFileSync(process.env.GITHUB_ENV, `CHROME_PATH=${require("@playwright/test").chromium.executablePath()}\n`)'
+        if: steps.plan-info.outputs.browsers == 'true'
+        run: node .tooling/source/packages/tooling/runner/browsers.mjs .tooling/plan.json
+      - name: Restore performance history
+        if: steps.plan-info.outputs.history == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .tooling/history/runs.json
+          key: tooling-history-${{ runner.os }}-${{ hashFiles('.nvmrc') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            tooling-history-${{ runner.os }}-${{ hashFiles('.nvmrc') }}-
       - name: Validate the prepared commit
-        run: node .repo-tooling/source/packages/tooling/runner/cli.mjs --profile=ci --all --output=.repo-tooling/report
+        run: node .tooling/source/packages/tooling/runner/cli.mjs --profile=ci --all --output=.tooling/report
       - name: Export the validated commit
-        run: git bundle create .repo-tooling/candidate.bundle HEAD
+        run: git bundle create .tooling/candidate.bundle HEAD
       - uses: actions/upload-artifact@v4
         with:
           name: release-candidate
           include-hidden-files: true
           path: |
-            .repo-tooling/candidate.bundle
-            .repo-tooling/candidate.json
-            .repo-tooling/report/summary.json
+            .tooling/candidate.bundle
+            .tooling/candidate.json
+            .tooling/report/summary.json
           retention-days: 3
+      - uses: actions/upload-artifact@v4
+        id: validation-artifacts
+        if: always()
+        with:
+          name: release-validation-${{ github.run_id }}
+          include-hidden-files: true
+          path: .tooling/report/
+          retention-days: 3
+      - name: Publish validation summary
+        if: always()
+        env:
+          TOOLING_ARTIFACT_URL: ${{ steps.validation-artifacts.outputs.artifact-url }}
+          TOOLING_EMPTY_PLAN: ${{ steps.plan-info.outputs.active == 'false' }}
+        run: node .tooling/source/packages/tooling/runner/summary.mjs .tooling/report
+      - name: Save performance history
+        if: always() && steps.plan-info.outputs.history == 'true' && hashFiles('.tooling/history/runs.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .tooling/history/runs.json
+          key: tooling-history-${{ runner.os }}-${{ hashFiles('.nvmrc') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
   open:
     needs: validate
     runs-on: ubuntu-24.04
@@ -77,7 +119,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: DuarteCaldeira/repo-tooling
+          repository: DuarteCaldeira/tooling
           ref: ${{ inputs.tooling-sha }}
           path: tooling
           persist-credentials: false
@@ -106,7 +148,7 @@ jobs:
             await exec.exec('git', ['-C', 'prepared', 'rev-parse', `${candidate.head}^{tree}`], { listeners: { stdout: b => tree += b } });
             if (tree.trim() !== candidate.tree) throw new Error('Prepared tree mismatch');
             let config = '';
-            await exec.exec('git', ['-C', 'prepared', 'show', `${candidate.head}:repo-tooling.config.json`], { listeners: { stdout: b => config += b } });
+            await exec.exec('git', ['-C', 'prepared', 'show', `${candidate.head}:tooling.config.json`], { listeners: { stdout: b => config += b } });
             const envelope = createEvidence({ ...candidate, report, repository: `${owner}/${repo}`, workflow: '.github/workflows/release.yml', runId: String(context.runId), configHash: digest(config) }, process.env.PRIVATE_KEY);
             delete process.env.PRIVATE_KEY;
             const branch = `release/validated-${context.runId}`;
@@ -114,6 +156,6 @@ jobs:
             const auth = Buffer.from(`x-access-token:${process.env.GITHUB_TOKEN}`).toString('base64');
             core.setSecret(auth);
             await exec.exec('git', ['-C', 'prepared', '-c', `http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}`, 'push', 'github', `${candidate.head}:refs/heads/${branch}`]);
-            const { data: pr } = await github.rest.pulls.create({ owner, repo, base: 'main', head: branch, title: 'Release validated version', body: `Validated prepared tree: ${candidate.tree}\n\n<!-- repo-tooling-evidence:${Buffer.from(JSON.stringify(envelope)).toString('base64')} -->` });
+            const { data: pr } = await github.rest.pulls.create({ owner, repo, base: 'main', head: branch, title: 'Release validated version', body: `Validated prepared tree: ${candidate.tree}\n\n<!-- tooling-evidence:${Buffer.from(JSON.stringify(envelope)).toString('base64')} -->` });
             core.notice(pr.html_url);
             await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: 'ci.yml', ref: branch, inputs: { 'pull-request-number': String(pr.number) } });
