@@ -4,6 +4,8 @@ import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { itemId, discussionManifest } from '../dashboard/release-items.mjs';
+import { createDiscussionService, createHandler } from '../dashboard/server/discussions.mjs';
 
 test(
   'release hub supports product reading, app selection, search, filters and accessible mobile layouts',
@@ -25,7 +27,8 @@ test(
           app.name === 'Saudinha' || app.name === 'Rookie' ? '2026-11-04T13:11:13Z' : null,
         tooling: { status: 'not-adopted', version: null },
         releases: Object.entries(notes[app.repository] ?? {})
-          .reverse()
+          .sort(([a], [b]) => b.localeCompare(a, undefined, { numeric: true }))
+          .slice(0, 10)
           .map(([version, note]) => ({
             version: `v${version}`,
             releasedAt: '2026-11-04T13:11:13Z',
@@ -33,6 +36,11 @@ test(
             language: note.language,
             source: 'edited',
             originalNotes: '',
+            items: note.changes.map((text, index) => ({
+              id: note.itemIds?.[index] ?? itemId(text),
+              text,
+            })),
+            technicalItems: [],
             url: `https://github.com/${app.repository}/releases/tag/v${version}`,
           })),
       })),
@@ -42,12 +50,14 @@ test(
       version: 'v1.0.0',
       releasedAt: '2026-01-01T00:00:00Z',
       notes: [],
+      items: [],
+      technicalItems: [],
       source: 'github',
       originalNotes: '<script>globalThis.injected = true</script>',
       url: 'https://github.com/DuarteCaldeira/saudinha-pnn/releases/tag/v1.0.0',
     });
     const files = { '/data.json': JSON.stringify(fixture) };
-    for (const name of ['index.html', 'styles.css', 'app.js'])
+    for (const name of ['index.html', 'styles.css', 'discussions.css', 'app.js', 'discussions.js'])
       files[`/${name}`] = await readFile(new URL(name, source), 'utf8');
     const browser = await chromium.launch({
       headless: true,
@@ -58,8 +68,46 @@ test(
     try {
       const context = await browser.newContext({ viewport: { width: 1440, height: 1050 } });
       const page = await context.newPage();
-      await page.route('https://tooling.test/**', async (route) => {
+      const saved = new Map();
+      const store = {
+        async create(path, value) {
+          if (saved.has(path)) return false;
+          saved.set(path, value);
+          return true;
+        },
+        async get(path) {
+          return saved.get(path) ?? null;
+        },
+        async list(prefix) {
+          return {
+            blobs: [...saved.keys()]
+              .filter((path) => path.startsWith(prefix))
+              .map((pathname) => ({ pathname, uploadedAt: saved.get(pathname).createdAt })),
+            hasMore: false,
+          };
+        },
+      };
+      const handler = createHandler(async () =>
+        createDiscussionService({ store, manifest: discussionManifest(fixture) }),
+      );
+      await context.route('https://tooling.test/**', async (route) => {
         const path = new URL(route.request().url()).pathname;
+        if (path === '/api/discussions') {
+          const original = route.request();
+          const response = await handler(
+            new Request(original.url(), {
+              method: original.method(),
+              headers: await original.allHeaders(),
+              ...(original.method() === 'POST' ? { body: original.postData() } : {}),
+            }),
+          );
+          await route.fulfill({
+            status: response.status,
+            headers: Object.fromEntries(response.headers),
+            body: await response.text(),
+          });
+          return;
+        }
         const file = path === '/' ? '/index.html' : path;
         await route.fulfill({
           status: files[file] ? 200 : 404,
@@ -113,9 +161,33 @@ test(
       }
       await page.locator('#load-more').click();
       assert.equal(await page.locator('.release-entry').count(), 11);
+      assert.equal(await page.locator('.technical-notes').last().getAttribute('open'), null);
+      await page.locator('.technical-notes').last().locator(':scope > summary').click();
       await page.locator('.original-notes summary').click();
       assert.match(await page.locator('.original-notes pre').textContent(), /<script>/);
       assert.equal(await page.evaluate(() => globalThis.injected), undefined);
+      await page
+        .locator('.release-entry')
+        .first()
+        .locator('.change-list .discuss-button')
+        .first()
+        .click();
+      await page.locator('input[name="author"]').fill('QA reviewer');
+      await page.locator('select[name="kind"]').selectOption('issue');
+      await page
+        .locator('textarea[name="body"]')
+        .fill('The imported date changes after saving. Expected the original day.');
+      await page.locator('.submit-comment').click();
+      await page.getByText('Comment posted', { exact: true }).waitFor();
+      assert.match(await page.locator('.comment-list').textContent(), /QA reviewer/);
+      const link = await page.locator('.discussion-toolbar a').getAttribute('href');
+      const another = await context.newPage();
+      await another.goto(link);
+      await another.locator('.comment-list .comment').waitFor();
+      assert.match(await another.locator('.comment-list').textContent(), /imported date changes/);
+      await another.close();
+      await scan();
+      await page.locator('.discussion-heading button').click();
       await page.locator('#product-only').check();
       assert.equal(await page.locator('.release-entry').count(), 10);
       await page.locator('#notes-search').fill('Vacinas');

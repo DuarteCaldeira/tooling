@@ -1,3 +1,6 @@
+import { createDiscussions } from './discussions.js';
+
+const discussions = createDiscussions();
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
@@ -198,7 +201,7 @@ function setupReleaseHub(apps, defaultApp) {
     const onlyProduct = document.querySelector('#product-only').checked;
     const matches = all.filter(
       (release) =>
-        (!onlyProduct || release.source !== 'github') &&
+        (!onlyProduct || release.notes.length > 0) &&
         `${release.version} ${release.releasedAt} ${release.notes.join(' ')} ${release.originalNotes}`
           .toLocaleLowerCase()
           .includes(search),
@@ -217,6 +220,8 @@ function setupReleaseHub(apps, defaultApp) {
             : '';
     const share = new URL(location.href);
     share.searchParams.set('app', selection.value);
+    share.searchParams.delete('release');
+    share.searchParams.delete('item');
     share.hash = 'release-notes';
     document.querySelector('#share-app').href = share.toString();
     for (const [index, release] of matches.slice(0, limit).entries()) {
@@ -241,31 +246,89 @@ function setupReleaseHub(apps, defaultApp) {
       if (release.notes.length) {
         const list = element('ul', undefined, 'change-list');
         list.lang = release.language ?? 'en';
-        for (const note of release.notes) {
+        for (const [noteIndex, note] of release.notes.entries()) {
           const item = element('li');
+          const copy = element('span', undefined, 'change-copy');
           const split = note.indexOf(': ');
           if (split > 0 && split < 45)
-            item.append(
+            copy.append(
               element('strong', note.slice(0, split + 1)),
               document.createTextNode(note.slice(split + 1)),
             );
-          else item.textContent = note;
+          else copy.textContent = note;
+          item.append(copy);
+          const id = release.items?.[noteIndex]?.id;
+          if (id)
+            item.append(
+              discussions.button({
+                repository: app.repository,
+                version: release.version,
+                item: id,
+                appName: app.name,
+                text: note,
+              }),
+            );
           list.append(item);
         }
         article.append(list);
       } else {
         article.append(
-          element('p', 'Product summary not available for this release.', 'source-note'),
+          element(
+            'p',
+            release.summaryContext ??
+              (release.source === 'github'
+                ? 'Product summary not available for this release.'
+                : 'Sem alterações funcionais descritas nesta versão. Consulte a manutenção técnica abaixo.'),
+            'source-note',
+          ),
         );
+      }
+      if (release.technicalItems?.length || release.originalNotes) {
+        const technical = element('details', undefined, 'technical-notes');
+        technical.append(
+          element(
+            'summary',
+            `🛠️ Technical details${release.technicalItems?.length ? ` (${release.technicalItems.length})` : ''}`,
+          ),
+        );
+        if (release.technicalItems?.length) {
+          const list = element('ul', undefined, 'change-list technical-list');
+          for (const entry of release.technicalItems) {
+            const item = element('li');
+            item.append(
+              element('span', entry.text, 'change-copy'),
+              discussions.button({
+                repository: app.repository,
+                version: release.version,
+                item: entry.id,
+                appName: app.name,
+                text: entry.text,
+              }),
+            );
+            list.append(item);
+          }
+          technical.append(list);
+        }
         const original = element('details', undefined, 'original-notes');
-        original.append(element('summary', 'Read original GitHub notes'));
+        original.append(element('summary', 'Read original changelog'));
         original.append(
           element('pre', release.originalNotes || 'No release notes were published.'),
         );
-        article.append(original);
+        technical.append(original);
+        article.append(technical);
       }
       const footer = element('div', undefined, 'release-footer');
       footer.append(
+        discussions.button(
+          {
+            repository: app.repository,
+            version: release.version,
+            item: 'release',
+            appName: app.name,
+            text: 'Release discussion and new findings',
+          },
+          '💬 Release discussion / new finding',
+        ),
         element(
           'span',
           release.source === 'github' ? 'GitHub notes · Not edited for product' : 'Product notes',
@@ -283,6 +346,8 @@ function setupReleaseHub(apps, defaultApp) {
     document.querySelector('#notes-search').value = '';
     const url = new URL(location.href);
     url.searchParams.set('app', selection.value);
+    url.searchParams.delete('release');
+    url.searchParams.delete('item');
     url.hash = 'release-notes';
     history.replaceState(null, '', url);
     updateHistory();
@@ -367,6 +432,8 @@ try {
   document.querySelector('#sort').addEventListener('change', update);
   renderActivity(apps);
   setupReleaseHub(apps, snapshot.defaultApp);
+  discussions.restoreLink(apps);
+  for (const app of apps) discussions.refreshSummary(app.repository);
   document.querySelector('a[href="#apps"]').addEventListener('click', () => {
     document.querySelector('#apps').open = true;
   });

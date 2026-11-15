@@ -1,6 +1,7 @@
 import { readFile, mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { itemId, changelogSections, technicalNotes } from './release-items.mjs';
 
 const repositoryPattern = /^[\w.-]+\/[\w.-]+$/;
 const exactVersion = /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/;
@@ -16,7 +17,7 @@ export function validateConfig(config) {
     const key = app.repository.toLowerCase();
     if (repositories.has(key)) throw new Error(`Duplicate repository: ${app.repository}`);
     repositories.add(key);
-    for (const key of ['packagePath', 'lockPath', 'workflowPath']) {
+    for (const key of ['packagePath', 'lockPath', 'workflowPath', 'changelogPath']) {
       const path = app[key];
       if (
         path !== undefined &&
@@ -203,6 +204,7 @@ export async function collect(config, api, now = new Date()) {
           url: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(item.tag_name)}`,
           prerelease: Boolean(item.prerelease),
           notes: edited?.changes ?? [],
+          summaryContext: edited?.context ?? null,
           language: edited?.language ?? null,
           source: override ? 'edited' : edited ? 'published' : 'github',
           originalNotes: typeof item.body === 'string' ? item.body : '',
@@ -217,6 +219,26 @@ export async function collect(config, api, now = new Date()) {
         `/repos/${app.repository}/commits/${encodeURIComponent(release.tag_name)}`,
       );
       if (!/^[a-f\d]{40}$/i.test(commit.sha)) throw new Error('Invalid release commit');
+      const changelog = await contents(
+        api,
+        app.repository,
+        app.changelogPath ?? 'CHANGELOG.md',
+        commit.sha,
+      );
+      const sections = changelogSections(changelog ?? '');
+      for (const entry of row.releases) {
+        const source = sections[entry.version.replace(/^v/, '')] ?? entry.originalNotes;
+        entry.originalNotes = source;
+        entry.technicalNotes = technicalNotes(source);
+        entry.items = entry.notes.map((text, index) => ({
+          id: app.releaseNotes?.[entry.version.replace(/^v/, '')]?.itemIds?.[index] ?? itemId(text),
+          text,
+        }));
+        entry.technicalItems = entry.technicalNotes.map((text) => ({
+          id: itemId(text, 'technical'),
+          text,
+        }));
+      }
       Object.assign(row, {
         version: release.tag_name,
         releasedAt: release.published_at,
@@ -250,11 +272,24 @@ export async function build({ configPath, output, api }) {
   const config = JSON.parse(await readFile(configPath, 'utf8'));
   const notesPath = new URL('./release-notes.json', import.meta.url);
   const notes = JSON.parse(await readFile(notesPath, 'utf8'));
+  for (const releases of Object.values(notes))
+    for (const note of Object.values(releases)) {
+      if (
+        !Array.isArray(note.changes) ||
+        note.changes.some((text) => typeof text !== 'string') ||
+        (note.itemIds &&
+          (!Array.isArray(note.itemIds) ||
+            note.itemIds.length !== note.changes.length ||
+            note.itemIds.some((id) => !/^product-[a-f\d]{20}$/.test(id)) ||
+            new Set(note.itemIds).size !== note.itemIds.length))
+      )
+        throw new Error('Invalid edited release notes or item IDs');
+    }
   for (const app of config.apps) app.releaseNotes = notes[app.repository] ?? {};
   const snapshot = await collect(config, api);
   await mkdir(output, { recursive: true });
   const here = dirname(fileURLToPath(import.meta.url));
-  for (const file of ['index.html', 'styles.css', 'app.js'])
+  for (const file of ['index.html', 'styles.css', 'discussions.css', 'app.js', 'discussions.js'])
     await copyFile(join(here, file), join(output, file));
   await writeFile(join(output, 'data.json'), `${JSON.stringify(snapshot, null, 2)}\n`);
   return snapshot;

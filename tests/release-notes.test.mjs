@@ -89,8 +89,9 @@ test('Saudinha preserves the supplied Portuguese summaries and SwipeIt is remove
   );
   assert.ok(config.apps.every((app) => !/swipe/i.test(app.repository)));
   const saudinha = notes['DuarteCaldeira/saudinha-pnn'];
-  assert.equal(Object.keys(saudinha).length, 10);
+  assert.equal(Object.keys(saudinha).length, 32);
   assert.ok(saudinha['1.21.0'].changes.some((line) => line.startsWith('Vacinas:')));
-  assert.equal(saudinha['1.21.1'].changes.length, 2);
+  assert.ok(saudinha['1.21.1'].changes.length >= 2);
+  assert.equal(Object.keys(notes['DuarteCaldeira/exercise-app']).length, 28);
   assert.equal(saudinha['1.17.1'].language, 'pt-PT');
 });

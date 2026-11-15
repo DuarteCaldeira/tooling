@@ -2,8 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "buildCommand": "node build.mjs",
-  "installCommand": "echo No dependencies to install",
+  "installCommand": "npm ci --ignore-scripts --omit=dev --workspaces=false",
   "outputDirectory": "dist",
+  "functions": {
+    "api/discussions.js": { "includeFiles": "server/discussion-manifest.json", "maxDuration": 30 }
+  },
   "headers": [
     {
       "source": "/data.json",

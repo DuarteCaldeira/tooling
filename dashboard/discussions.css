@@ -1,0 +1,222 @@
+.change-copy {
+  display: block;
+}
+.discuss-button {
+  border: 1px solid #dbe7df;
+  background: #f7faf7;
+  color: #416b50;
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: left;
+}
+.change-list .discuss-button {
+  margin-top: 8px;
+}
+.discuss-button:hover {
+  background: #eaf3eb;
+  border-color: #afcbb8;
+}
+.release-footer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+}
+.release-footer > .discuss-button {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-bottom: 3px;
+}
+.technical-notes {
+  border-top: 1px dashed #dfe7e1;
+  margin: 8px 0 18px;
+  padding-top: 16px;
+}
+.technical-notes > summary {
+  color: #486553;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.technical-list {
+  font-size: 12px;
+  margin-top: 18px;
+}
+.technical-notes .original-notes {
+  margin: 15px 0 0;
+}
+.discussion-dialog {
+  width: min(640px, calc(100vw - 28px));
+  max-height: 88dvh;
+  overflow-y: auto;
+  border: 1px solid #d1e1d5;
+  border-radius: 16px;
+  padding: 27px;
+  color: #2d4838;
+  box-shadow: 0 20px 80px #15322533;
+}
+.discussion-dialog::backdrop {
+  background: #132c2366;
+  backdrop-filter: blur(3px);
+}
+.discussion-heading,
+.discussion-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.discussion-heading h2 {
+  font-size: 20px;
+}
+.quiet-button {
+  border: 1px solid #dbe5dd;
+  border-radius: 6px;
+  background: #fff;
+  color: #486651;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+.discussion-context {
+  font-size: 12px;
+  color: #596f60;
+  margin: 12px 0;
+}
+.discussion-quote {
+  margin: 0 0 16px;
+  border-left: 3px solid #91b69c;
+  background: #f0f6ef;
+  padding: 13px 15px;
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.discussion-toolbar {
+  font-size: 11px;
+  margin: 0 0 15px;
+}
+.discussion-toolbar a {
+  color: #316a49;
+}
+.discussion-status {
+  color: #655322;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.comment-list {
+  padding: 0;
+  margin: 17px 0;
+  list-style: none;
+  display: grid;
+  gap: 13px;
+}
+.comment {
+  border: 1px solid #e0e8e1;
+  border-radius: 9px;
+  padding: 14px 16px;
+  background: #fbfcfa;
+}
+.comment-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  font-size: 12px;
+}
+.comment-heading strong {
+  font-weight: 600;
+}
+.comment-heading time {
+  color: #5d7163;
+  font-size: 10px;
+}
+.comment-kind {
+  color: #775117;
+  background: #fbf0df;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+.comment p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 10px 0 0;
+}
+.comment-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  border-top: 1px solid #dfe8e1;
+  padding-top: 20px;
+  margin-top: 22px;
+}
+.comment-form label {
+  font-size: 11px;
+  color: #425e4d;
+  font-weight: 550;
+  display: grid;
+  gap: 7px;
+}
+.comment-form input,
+.comment-form select,
+.comment-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cdded1;
+  border-radius: 6px;
+  background: #fff;
+  color: #2d4838;
+  padding: 10px;
+  font-size: 13px;
+}
+.comment-form textarea {
+  resize: vertical;
+  line-height: 1.7;
+}
+.comment-form label:nth-child(3),
+.identity-note {
+  grid-column: 1 / -1;
+}
+.identity-note {
+  font-size: 10px;
+  color: #5c7063;
+  line-height: 1.7;
+  margin: 0;
+}
+.submit-comment {
+  grid-column: 1 / -1;
+  justify-self: start;
+  border: 1px solid #1f6344;
+  background: #236d4c;
+  color: #fff;
+  border-radius: 7px;
+  padding: 10px 15px;
+  font-size: 12px;
+}
+.submit-comment:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+@media (max-width: 460px) {
+  .discussion-dialog {
+    padding: 21px 18px;
+    max-height: 92dvh;
+  }
+  .comment-form {
+    grid-template-columns: 1fr;
+  }
+  .comment-form > * {
+    grid-column: 1;
+  }
+  .discussion-heading h2 {
+    font-size: 18px;
+  }
+  .discussion-quote {
+    font-size: 12px;
+  }
+  .discussion-toolbar {
+    gap: 10px;
+    font-size: 10px;
+  }
+}

@@ -10,6 +10,15 @@
         "Exames: carregar outra vez o mesmo relatório atualiza o exame que já existe em vez de criar outro, e o que escreveu não é apagado",
         "Análises: os resultados aparecem pela ordem do relatório e com os nomes das secções que o laboratório usa",
         "Análises: as contagens de células mostram a unidade completa (x10⁹/L) e passam a ter barra"
+      ],
+      "itemIds": [
+        "product-c551e706f497108d8347",
+        "product-e199ddffa11f3d882253",
+        "product-976a44ebf67268c0b50f",
+        "product-60ad8fffa71ac14d46ef",
+        "product-2c568420ea504ef08bac",
+        "product-25e5e4b9d334624ba824",
+        "product-52b506786c81f0531353"
       ]
     },
     "1.18.0": {
@@ -27,6 +36,20 @@
         "Carregar ficheiros funciona sem internet",
         "A apresentação inicial da app ficou mais honesta",
         "Já não ficam dados de saúde guardados na memória temporária"
+      ],
+      "itemIds": [
+        "product-da06b871b6ca1343c077",
+        "product-60a3e60df25eafa65188",
+        "product-23666c1c0d58f7a658b3",
+        "product-9877a38476cafc772e11",
+        "product-dba444b3759db8add492",
+        "product-3247435ca5ef51638541",
+        "product-2939bb7df1fa438fb217",
+        "product-08f1a56730a74b285d60",
+        "product-2803a335b691a2948bb7",
+        "product-ca66356cdbc873a0695d",
+        "product-d63d281ac7bd884a61fa",
+        "product-117937b3d0b5448e4b0e"
       ]
     },
     "1.18.1": {
@@ -36,13 +59,20 @@
         "Exames: leitura da Medicação, conclusão sem assinaturas nem rodapés, e nome correto quando o relatório tem vários exames",
         "Separadores: ecrãs vazios mais úteis, com textos e comportamento iguais em todos",
         "Exames: ficam guardados de forma a continuarem a abrir mesmo quando são muitos (Android)"
+      ],
+      "itemIds": [
+        "product-ea2242f303dbdf531501",
+        "product-a9b596e6ac433e34b71a",
+        "product-f8e35f9ae2176df96152",
+        "product-0f507ce9111a31df15ac"
       ]
     },
     "1.18.2": {
       "language": "pt-PT",
       "changes": [
         "Acessibilidade: texto com mais contraste, tamanho mínimo legível e um ecrã de erro em vez de a app fechar"
-      ]
+      ],
+      "itemIds": ["product-828881b4738c8354d4c7"]
     },
     "1.19.0": {
       "language": "pt-PT",
@@ -53,6 +83,14 @@
         "Exames: deixa de aparecer “Relatório” vazio, a informação clínica aparece em minúsculas normais e as assinaturas ficam fora da conclusão",
         "Exames: quando uma tabela tem vários exames, o relatório diz quantos são",
         "Exames: os filtros por Local funcionam pelo texto e a pesquisa procura também no relatório e no dia"
+      ],
+      "itemIds": [
+        "product-12d1326f74dbe19a671f",
+        "product-62581a30acf6da69f9a9",
+        "product-b1e61bcb28b643ef73a2",
+        "product-ece2675db04bec02e46d",
+        "product-f02d72cd2ae55ea3cf63",
+        "product-802b19899f5fb23d4020"
       ]
     },
     "1.20.0": {
@@ -63,6 +101,13 @@
         "Cores: mais contraste nos fundos com degradé, com acertos no tema claro",
         "Mais rápida: grava vários dados de uma vez, redesenha menos os ecrãs e os ficheiros exportados ficam mais leves",
         "Mais segura: reforço da proteção ao importar ficheiros e do bloqueio da app"
+      ],
+      "itemIds": [
+        "product-50ecab3fbc09ab3af773",
+        "product-3d2904cbd62186a467a2",
+        "product-b98d4eff5fda550db7c6",
+        "product-7afa4ac9b0becadbd102",
+        "product-3f28b4b4389780415e63"
       ]
     },
     "1.20.1": {
@@ -70,7 +115,8 @@
       "changes": [
         "Pesquisa: o botão tem agora sombra e ícone de cor",
         "Exames: a informação clínica deixa de aparecer misturada com a medicação quando o relatório tem duas colunas"
-      ]
+      ],
+      "itemIds": ["product-9dd22703c2902105e1d5", "product-ed496d7efdfde8fdb76e"]
     },
     "1.20.2": {
       "language": "pt-PT",
@@ -78,6 +124,11 @@
         "A app volta ao ecrã onde estavas quando a abres de novo",
         "Cópia de segurança: mais leve de criar e avisa quando o espaço do telemóvel está quase cheio",
         "Exames: valores lidos de imagens ficam assinalados para os rever"
+      ],
+      "itemIds": [
+        "product-f89b0c535d5ffdad72e1",
+        "product-8825ef0fba2c3516db56",
+        "product-e78cebf756cc3ca09521"
       ]
     },
     "1.21.0": {
@@ -88,14 +139,614 @@
         "Consultas: a pesquisa e os filtros passam a andar com a lista",
         "Perfil, Saúde e Definições: ecrãs separados, com cabeçalho e barra de separadores, escolha do parentesco e pequenos acertos de aspeto",
         "Análises: ao importar um resumo de urina, “Leucócitos” já não aparece duplicado"
+      ],
+      "itemIds": [
+        "product-12dc280be333cf637af6",
+        "product-6744164833caf80b950c",
+        "product-31b9816d3cea140bc9ae",
+        "product-5522104817869a4345e2",
+        "product-ec5ce01f840c0270e368"
       ]
     },
     "1.21.1": {
       "language": "pt-PT",
       "changes": [
         "Cópia de segurança: novo cartão para guardar numa pasta",
-        "Análises: unidade dos Leucócitos corrigida e datas certas nos gráficos"
+        "Análises: unidade dos Leucócitos corrigida e datas certas nos gráficos",
+        "Perfil: escolha do grupo sanguíneo mais simples."
+      ],
+      "itemIds": [
+        "product-c40aa3f265e2a0ad18d7",
+        "product-6ed384c641348a25f583",
+        "product-c103cafd9cc6c4beaf1b"
       ]
+    },
+    "1.17.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Lembretes: ficam ativos depois de autorizar as notificações, com uma confirmação visível.",
+        "Análises: mantém os nomes e siglas do laboratório e lê todas as linhas do relatório, sem usar resultados antigos.",
+        "Perfil: novo campo para registar problemas de saúde."
+      ],
+      "itemIds": [
+        "product-3a7cdae7d58016f94366",
+        "product-3e71f6d93a320ae6d8f7",
+        "product-15729631be2e7ffba928"
+      ]
+    },
+    "1.16.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Exames: consultar, criar e editar exames numa área própria.",
+        "Documentos: abrir os ficheiros originais e ampliar imagens; apagar um registo também elimina os respetivos ficheiros.",
+        "Lembretes: mensagens mais simpáticas em cada toma.",
+        "Consultas: indicação dos dias até à consulta alinhada no Android."
+      ],
+      "itemIds": [
+        "product-a53cedb7d13fb0fbd158",
+        "product-fab7a91d046e50dc4e41",
+        "product-79b8f278527b2c520fdb",
+        "product-5ef8b93607e325ea6337"
+      ]
+    },
+    "1.15.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Importação: carregar vários ficheiros já não faz o ecrã piscar entre documentos.",
+        "Análises: reconhece quem requisitou o exame mesmo quando o nome aparece acima da legenda."
+      ],
+      "itemIds": ["product-f17fa4225a08f274e7e7", "product-2cf1696db1e22d925d0a"]
+    },
+    "1.15.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Medicação: notificações locais à hora das tomas.",
+        "Análises: percentagens das contagens na mesma linha e apresentação mais clara dos resultados.",
+        "Início: a fotografia do perfil mantém a mesma posição dos restantes separadores."
+      ],
+      "itemIds": [
+        "product-1a0587e97558179c2133",
+        "product-3244bbb3807abe6402a7",
+        "product-07a7ab05001c97f272ed"
+      ]
+    },
+    "1.14.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Análises: resultados agrupados por exame, com as contagens dos glóbulos brancos organizadas em conjunto.",
+        "Importação: identifica cada exame sem adivinhar valores que o relatório não apresenta.",
+        "Perfil: a fotografia fica guardada logo que é escolhida.",
+        "Apresentação: intervalos de referência e informação dos gráficos mais legíveis."
+      ],
+      "itemIds": [
+        "product-e5f9fe67ac3cf960c940",
+        "product-2dfe8da32fcdf0018916",
+        "product-017f1a424bf365808079",
+        "product-290742e9b181c266f41e"
+      ]
+    },
+    "1.13.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Consultas: marcar a próxima consulta a partir dos detalhes da atual.",
+        "Análises: lê mais formatos de relatório e fotografias, e mostra uma barra quando o resultado textual tem um índice associado.",
+        "Arranque: aplicação mais leve e ecrã inicial mais simples."
+      ],
+      "itemIds": [
+        "product-03f6bdeb0a509d855bd7",
+        "product-ff26cc92eedcbe391380",
+        "product-e0d958854703f642107a"
+      ]
+    },
+    "1.12.2": {
+      "language": "pt-PT",
+      "changes": [
+        "Análises: importa resultados, referências e quem requisitou o exame; usa a referência adequada ao sexo do perfil.",
+        "Análises: os detalhes mostram o estado em vez da hora.",
+        "Desempenho: pesquisa e abertura das listas mais rápidas quando existem muitos registos.",
+        "Gráficos: informação e controlos deixam de ficar cortados."
+      ],
+      "itemIds": [
+        "product-5b417cb347f6298c9dc8",
+        "product-d8e44a9f51db062d722f",
+        "product-4aae1a99bf52b996333f",
+        "product-11289ecce40a01624120"
+      ]
+    },
+    "1.12.1": {
+      "language": "pt-PT",
+      "changes": ["Análises: abertura mais rápida e painel dos resultados mais leve."],
+      "itemIds": ["product-61e45d69d0a544a1e0fb"]
+    },
+    "1.12.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Parâmetros: acompanhar a evolução de cada parâmetro num gráfico com os respetivos resultados.",
+        "Pesquisa: adicionar análises a partir da pesquisa de parâmetros e consultar os valores depois da importação.",
+        "Android: manter o acesso aos resultados mesmo quando são muitos.",
+        "Apresentação: painéis abrem com uma animação mais suave."
+      ],
+      "itemIds": [
+        "product-ba615774748c2bfd134b",
+        "product-7bde21002da55e7f7454",
+        "product-dd5a4e79a07c3982e9ba",
+        "product-9c333155d0e0431b7e0e"
+      ]
+    },
+    "1.11.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Desempenho: listas, importações e leitura de relatórios respondem mais depressa.",
+        "Análises: abre o documento original em vez de iniciar uma partilha.",
+        "Importação: o nome do ficheiro ajuda a identificar a análise ou exame."
+      ],
+      "itemIds": [
+        "product-505cc62276c99940bf3a",
+        "product-2ebb526f6a3de1a491ef",
+        "product-843477f24945808ac04b"
+      ]
+    },
+    "1.11.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Análises: leitura de relatórios PDF com duas colunas e reimportação mais segura.",
+        "Cópia de segurança: guarda até duas cópias na pasta e esconde as opções menos usadas em “Mais opções”.",
+        "Perfil: a fotografia importada aparece de imediato."
+      ],
+      "itemIds": [
+        "product-ffa74095f289ee3a8a52",
+        "product-354cf3c541d05d3187a6",
+        "product-f51f418bf42e6647119f"
+      ]
+    },
+    "1.10.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Análises: consultar e editar resultados, incluindo valores e entradas próprias no catálogo.",
+        "Parâmetros: catálogo inicial disponível para escolher os exames.",
+        "Consultas: a hora passa a ser obrigatória.",
+        "Perfil e cópias de segurança: nome, fotografia e organização mais claros."
+      ],
+      "itemIds": [
+        "product-9f55e1517b6cf697862e",
+        "product-280b46f37fb1415c6626",
+        "product-359e5dafed414ba18e55",
+        "product-74524f10ddba2bd508a0"
+      ]
+    },
+    "1.9.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Recuperação: iniciar a aplicação a partir de um ficheiro de cópia de segurança de uma conta antiga."
+      ],
+      "itemIds": ["product-8da996f46cfc5ac48f22"]
+    },
+    "1.8.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Cópia de segurança: mantém o nome do perfil.",
+        "Privacidade: escolher o bloqueio da aplicação no ecrã inicial."
+      ],
+      "itemIds": ["product-a09e240f0d96b8ede9c9", "product-986fa49a0606f4ff80ea"]
+    },
+    "1.8.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Análises: lista de resultados disponível.",
+        "Cópia de segurança: a primeira cópia automática é criada um dia depois de escolher a pasta.",
+        "Apresentação: movimentos mais suaves e melhorias de consistência entre ecrãs."
+      ],
+      "itemIds": [
+        "product-8485e2117c8312fd7956",
+        "product-824f5e075e0cc3498e53",
+        "product-2f8327f7ba1968680f56"
+      ]
+    },
+    "1.7.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Perfil: ativar o bloqueio da aplicação e configurar cópias automáticas numa pasta.",
+        "Medicação: deslizar para a direita conclui o registo.",
+        "Cópia de segurança: instruções mais curtas e claras."
+      ],
+      "itemIds": [
+        "product-689522a84fce4e1b85cc",
+        "product-970bf20a398150b39109",
+        "product-4b6618d6aa3e2678840b"
+      ]
+    },
+    "1.6.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Privacidade: os dados passam a ficar no telemóvel, sem precisar de conta.",
+        "Cópia de segurança: exportação manual e recuperação pelos mecanismos do dispositivo.",
+        "Contas antigas: importação dos dados existentes sem voltar a usar a conta."
+      ],
+      "itemIds": [
+        "product-b1cf9794f2be4baefda5",
+        "product-8aa03d45f117cd94699b",
+        "product-467d84f55540914c364a"
+      ]
+    },
+    "1.5.5": {
+      "language": "pt-PT",
+      "changes": [
+        "Arranque: sincronização do perfil mais rápida.",
+        "Navegação: deixa de aparecer um clarão entre páginas ao mudar de ecrã."
+      ],
+      "itemIds": ["product-b6671a3120fbc257721d", "product-d217b5ad54627537fba3"]
+    },
+    "1.5.4": {
+      "language": "pt-PT",
+      "changes": [
+        "Medicação e consultas: os painéis permitem deslocar o conteúdo quando não cabe no ecrã.",
+        "Medicação: concluir um tratamento define a data de fim.",
+        "Acesso: nesta versão era pedido iniciar sessão ao abrir a aplicação."
+      ],
+      "itemIds": [
+        "product-ed3d4e3b6eabb6598319",
+        "product-7846bd0d63283f86a83f",
+        "product-d942e2846008947198ef"
+      ]
+    },
+    "1.5.2": {
+      "language": "pt-PT",
+      "changes": [
+        "Medicação: menu de adicionar e gestos de deslizar mais consistentes.",
+        "Consultas: cartões com uma separação visual mais clara."
+      ],
+      "itemIds": ["product-11b2ad09b003e13ba00d", "product-d7c733962eff50cb9852"]
+    },
+    "1.5.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Datas: um toque seleciona o valor no seletor.",
+        "Listas: depois de cancelar uma ação, os gestos de deslizar voltam a funcionar."
+      ],
+      "itemIds": ["product-2800860293a8f4fe071f", "product-61c9080dc6b3e000ece1"]
+    },
+    "1.5.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Medicação: consultar os detalhes e editar os registos.",
+        "Receitas: carregar uma receita abre diretamente a escolha de ficheiros.",
+        "Sincronização: alterações feitas sem internet são enviadas quando a ligação regressa, na arquitetura desta versão.",
+        "Apresentação: correções no estado de espera, no carrossel e nas caixas de seleção."
+      ],
+      "itemIds": [
+        "product-b3948874bc1820f808e8",
+        "product-f1feff8df187219b6b18",
+        "product-d70b46ccc414b52bf342",
+        "product-b305ba93aff22d0b2c7c"
+      ]
+    }
+  },
+  "DuarteCaldeira/exercise-app": {
+    "1.27.2": {
+      "language": "pt-PT",
+      "changes": [
+        "A importação de saúde mantém o mesmo visual ao mostrar o ficheiro. Altera as datas para filtrar de imediato ou carrega outro ficheiro.",
+        "O menu de treinos abre mais depressa, com a seta sincronizada, e inclui um atalho para importar da RENPHO."
+      ],
+      "itemIds": ["product-5db0ed48bdb62d1c7308", "product-f933dc3bc9607905c6bc"]
+    },
+    "1.27.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Os percursos passam a sincronizar com a conta, por isso o mapa no telemóvel mostra os percursos importados noutro dispositivo.",
+        "Mudar um treino de dia leva o check-in do mapa com ele, por isso esse terreno continua revelado."
+      ],
+      "itemIds": ["product-cf666788dff53b35b12f", "product-14986e484f61c9f977b9"]
+    },
+    "1.27.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Mapa: os percursos, os check-ins e as alterações aos treinos atualizam o território explorado; o mapa fica ativo por predefinição, com opção para o desligar.",
+        "Importação: no Android, importar treinos, percursos e peso do Google Health; reconhecer treinos já existentes e completar dados sem os duplicar.",
+        "Exploração: mapa com percursos, freguesias reais, progresso da cidade e informação ao tocar nos pontos do trajeto.",
+        "Notificações: apagar uma ou todas as lidas, com opção para anular.",
+        "Apresentação: navegação, cabeçalhos, Progresso, Competir, Amigos, perfil e registo de treinos redesenhados para computador e telemóvel.",
+        "Treinos: mais nomes sugeridos e remoção dos campos de frequência cardíaca dos detalhes."
+      ],
+      "itemIds": [
+        "product-240eec159867b2357206",
+        "product-93f3ac590a41bf068257",
+        "product-5d76353951e8d4cd3cc7",
+        "product-f9a9b7536eb004fd9785",
+        "product-c28f53f208c8fb728eed",
+        "product-42213d692527ad794675"
+      ]
+    },
+    "1.26.0": {
+      "language": "pt-PT",
+      "changes": [
+        "O registo rápido guarda a duração real: 5 × 1:00 de prancha são 5 minutos, já não arredondados para 10. Continua a ganhar o XP de presença.",
+        "O Progresso tem cara nova: a semana mostra um traço por treino até ao objetivo (os extra brilham a dourado) ao lado das últimas 12 semanas, os números contam até ao valor e os recordes aparecem logo a seguir, em cartões que deslizas de lado (os desta semana com troféu dourado).",
+        "Competir tem cara nova: a tua liga aparece ao centro, num anel que enche até à próxima liga, com todas as ligas em fila por baixo, e as classificações, os desafios e os torneios passam a separadores (abre nos desafios quando tens um convite).",
+        "Quando sobes de liga recebes uma notificação (em Conquistas), em vez de um aviso no topo de Competir."
+      ],
+      "itemIds": [
+        "product-e2a90beddb9d24f0a8a9",
+        "product-b0d38dba0ece25db2b09",
+        "product-4dec264f1dd12393349e",
+        "product-abb92fb388f112d9d7c7"
+      ]
+    },
+    "1.25.1": {
+      "language": "pt-PT",
+      "changes": [
+        "As mensagens de feedback também têm um botão de emoji: escolhe um e ele entra onde estás a escrever.",
+        "Os treinos no feed mostram os números em grande, cada exercício com a sua figura, e as séries repetidas contadas uma vez (5× 1:00). Um treino com recorde brilha a dourado."
+      ],
+      "itemIds": ["product-d8f9c0ee991bab9b4296", "product-d8b70596d549fd083a74"]
+    },
+    "1.24.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Os comentários e as respostas ao feedback têm um botão de emoji: escolhe um e ele entra onde estás a escrever."
+      ],
+      "itemIds": ["product-13e4e28ab3d701d420e1"]
+    },
+    "1.24.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Cada grupo tem agora a sua página: o quadro da semana, uma meta semanal partilhada, os treinos e as competições do grupo, e um quadro de recordes opcional. Toca num grupo para o abrir.",
+        "Os gráficos de exercício e de corpo já dizem o que é cada ponto: passa o rato, toca ou clica num para ver a data e o valor.",
+        "Mais para registar: ténis de mesa, tecidos aéreos, andebol e outros desportos e aulas. Os desportos têm agora a sua própria categoria na lista de exercícios, e a corrida de trilho passa a chamar-se Trail.",
+        "Há uma nova página de Integrações na Conta. A RENPHO Health é a primeira: importa o ficheiro CSV para trazeres o histórico da tua balança, incluindo água corporal e gordura visceral e subcutânea.",
+        "Os gráficos do corpo ficam agora perto dos teus valores, para veres bem as pequenas variações.",
+        "As caminhadas dão agora 1 XP por minuto, menos do que corridas, bicicleta e outro cardio. As caminhadas já registadas foram recalculadas ao novo valor.",
+        "O Início é novo: a tua equipa no topo, com a semana de cada amigo e quem está online, um só cartão para a tua semana e uma corrida em direto com os teus amigos pelo XP da semana. O gráfico de XP passou para o Progresso."
+      ],
+      "itemIds": [
+        "product-1d4abad822ce73c9e5ff",
+        "product-4235b1b25cced06cfbaa",
+        "product-a4306fae0563c5c80bc9",
+        "product-4efe434220b48bc098dc",
+        "product-8815870c4992ea3bbe19",
+        "product-54af33b5517959bc0658",
+        "product-9ccb98311bbe6f9e4b4f"
+      ]
+    },
+    "1.23.2": {
+      "language": "pt-PT",
+      "changes": [
+        "As reações em comentários estão a um toque: há um botão em cada comentário, contam logo e quem comentou é avisado. O seletor de reações também já não sai do ecrã."
+      ],
+      "itemIds": ["product-1b4d82dfa5df25615934"]
+    },
+    "1.23.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Temporizador de descanso: ao repetir uma série, a contagem começa e avisa quando acabar. Escolhe a duração, ou desliga-o, em Preferências → Treino.",
+        "O squash já é um desporto que podes registar, e escrevê-lo já não vira Agachamento. Os treinos de squash importados da Saúde ou guardados com um tempo foram corrigidos.",
+        "Uma foto que adicionas a um treino já aparece logo, sem recarregar a página.",
+        "A página de um evento mostra agora o essencial de relance e diz-te qual é a próxima missão.",
+        "Um treino conta quando tem algo feito: séries em branco já não dão XP, e um treino vazio não entra no objetivo semanal nem na sequência. Os treinos antigos foram recalculados.",
+        "Se te esqueceres de terminar um treino, ele acaba na última série registada em vez de durar um dia inteiro, e já não bloqueia as atualizações da app.",
+        "Ao terminar sessão, o dispositivo deixa de receber as tuas notificações, e quem entrar a seguir já as pode ativar. Ao voltar, ativa-as de novo em Preferências.",
+        "Restaurar a mesma cópia duas vezes já não duplica treinos, e o ficheiro CSV exportado abre em segurança nas folhas de cálculo.",
+        "A exportação inclui agora tudo o que guardamos sobre ti: missões, torneios, eventos, notificações, bloqueios, dispositivos e detalhes das fotos.",
+        "Cada página tem o seu título no separador do navegador e nos leitores de ecrã, a app instalada roda com o telemóvel, e as licenças de código aberto estão em Preferências → Sobre."
+      ],
+      "itemIds": [
+        "product-975ab46cc2005ba28997",
+        "product-2aa6bbaa37b450d79904",
+        "product-4f381bd37ba9f154b7c5",
+        "product-dbf870ef981056111aa3",
+        "product-8932c6b4e67020ac1caf",
+        "product-37e42e73fd8a655f3cbe",
+        "product-cb69dd7ecc3dc9fddccb",
+        "product-579ae717898f7aa6e69f",
+        "product-a6ba291af324335ef325",
+        "product-1c89524a9de596618d20"
+      ]
+    },
+    "1.23.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Apagar uma foto de um treino volta a funcionar, e uma foto já não fica presa à espera de sincronizar depois de uma falha de ligação ou de ser apagada sem rede.",
+        "Entrar com outra conta no mesmo dispositivo traz agora todos os treinos dessa conta, não só os mais recentes.",
+        "Um treino importado que repete um que registaste já não aparece duas vezes no histórico, e o Início conta os treinos da semana como a tua sequência: os que estão por confirmar esperam até os confirmares.",
+        "Se o servidor recusar uma alteração, o resto dos teus treinos continua a sincronizar; só essa alteração e o que lhe pertence ficam à espera.",
+        "A contagem decrescente de um evento fica certa quando a hora muda.",
+        "Apontar para um dia no calendário do progresso mostra os treinos desse dia como estão agora, também logo depois de registares um.",
+        "Mostrares-te num ranking sem rede diz agora que a escolha fica guardada neste dispositivo e sincroniza depois."
+      ],
+      "itemIds": [
+        "product-f5c51fbccc63bca40cbe",
+        "product-f9beca9b3b2f17e6ec5c",
+        "product-1070b80c59b85b0cf17c",
+        "product-0431d9e7a92680728708",
+        "product-26243006e6219af1bdfb",
+        "product-84eae0af04b57119eeb5",
+        "product-72a110e04496a315b77d"
+      ]
+    },
+    "1.22.3": {
+      "language": "pt-PT",
+      "changes": [
+        "Os treinos longos de cardio (bicicleta, corrida, caminhada, natação) contam até 12 horas sem precisar de confirmação, e o “Confirmar” num treino por verificar passa a ficar gravado.",
+        "O ranking em Competir pede-te agora para entrares quando não estás listado: um toque mostra o teu nome e foto, sem ir às Preferências.",
+        "Se te escondeste dos rankings dos eventos, um botão no ranking do evento volta a mostrar-te, sem ir às Preferências."
+      ],
+      "itemIds": [
+        "product-ba3b7748ef9d7108f63f",
+        "product-40dfe3dadbbd548d008a",
+        "product-5911f5778283d9356cdd"
+      ]
+    },
+    "1.22.2": {
+      "language": "pt-PT",
+      "changes": [
+        "Os eventos têm página própria em Competir: cada evento com contagem decrescente, as missões e medalhas, e quanto falta para a medalha suprema. Sair de um evento agora pede confirmação."
+      ],
+      "itemIds": ["product-0645f152be2ccce0ce3f"]
+    },
+    "1.22.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Escolhe que campos da pesagem mostrar com o botão de definições no cartão de registo em Progresso → Corpo. Esconde os que não usas, como a hora do dia ou as condições; as entradas antigas mantêm os dados.",
+        "Os painéis que sobem do fundo fecham-se agora ao puxar para baixo a partir de qualquer ponto, e a pega é mais fácil de agarrar."
+      ],
+      "itemIds": ["product-bcd05266705afe5311ee", "product-5d4df8c94d3f0a6a7328"]
+    },
+    "1.22.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Corpo: gráficos mais legíveis no telemóvel e escalas com valores mais fáceis de interpretar.",
+        "Reações: ver quem reagiu ao passar o rato sobre uma reação.",
+        "Mascote: mantém o tamanho e a apresentação adequados ao nível normal."
+      ],
+      "itemIds": [
+        "product-88b9e32ab57e4fea1ed1",
+        "product-84f521e311820201019f",
+        "product-15e3f115eb4abfa83d41"
+      ]
+    },
+    "1.21.0": {
+      "language": "pt-PT",
+      "changes": [
+        "A tendência semanal em Progresso é agora uma linha, e tocar numa semana mostra o seu valor.",
+        "A importação do Apple Health tem um interruptor Selecionar tudo e avisa quando o ficheiro não tem nada para importar."
+      ],
+      "itemIds": ["product-1775c0f30a7f71f1379e", "product-aa86f60f894b96ddff5a"]
+    },
+    "1.20.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Os gráficos do corpo põem cada pesagem na data certa, e 1 ano mostra os últimos 12 meses.",
+        "As linhas da classificação mostram posição, nível e XP, com os pontos de liga em destaque.",
+        "As contas novas com 0 XP aparecem agora na classificação global.",
+        "O número do objetivo está agora centrado no anel do Início."
+      ],
+      "itemIds": [
+        "product-e38aac995213e96499d3",
+        "product-1da7d615bd0781fc5661",
+        "product-58de7a0848a9b1257335",
+        "product-3e7c88856d5f4d8cf743"
+      ]
+    },
+    "1.19.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Podes enviar quantas mensagens de feedback quiseres por dia.",
+        "O bónus do objetivo semanal conta agora no dia em que atingiste o objetivo.",
+        "As barras do gráfico de XP ficam agora alinhadas com os dias.",
+        "Registar passos rapidamente já não mostra um número de séries.",
+        "Uma mensagem de feedback concluída já não diz que aguarda resposta."
+      ],
+      "itemIds": [
+        "product-d827059c2c50e1671287",
+        "product-a6e5c410780c77ecdada",
+        "product-92534c1eddfeae9d66ab",
+        "product-e8a2e1761d7b23f4b97c",
+        "product-5aab9d4c7c3664a54722"
+      ]
+    },
+    "1.19.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Os painéis que sobem do fundo, como o Mais, fecham-se agora ao puxar a pega para baixo.",
+        "Um dia de passos no feed mostra o número de passos, sem «1 série» nem tempo.",
+        "Um treino não precisa de nome, e um botão nos detalhes sugere um nome engraçado.",
+        "No feed, os treinos dizem que recordes bateram, e os teus ficam destacados.",
+        "Novo ranking global em Competir: todos ordenados por XP, e só quem aderir mostra o nome e a foto. O «Quase lá» passou para o teu perfil, por cima das insígnias."
+      ],
+      "itemIds": [
+        "product-4cf03bcecb91ab1acb49",
+        "product-f12b99b52aaa4f4cac74",
+        "product-28b68c75a54d12c9d0f5",
+        "product-f4237cc40144fe448916",
+        "product-eb13ed0e48a1c0106b9e"
+      ]
+    },
+    "1.18.0": {
+      "language": "pt-PT",
+      "changes": ["Reage com qualquer emoji: o + nas reações abre-os todos, com pesquisa."],
+      "itemIds": ["product-98d660323478c211ef65"]
+    },
+    "1.16.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Os ecrãs vazios ganharam ilustrações novas e a página 404 agora deixa-te fazer repetições com o disco perdido.",
+        "Os treinos podem guardar a frequência cardíaca: as importações do Apple Health trazem a média e a máxima, e podes escrevê-las nos detalhes do treino. Só tu as vês.",
+        "As medições do corpo guardam agora a altura do dia e se foram feitas em jejum, à volta de uma refeição ou do ginásio. A app sugere-as pela hora e pelos teus treinos.",
+        "Um treino de um só exercício de um amigo diz agora o que fez, como Padel, em vez de “Atividade”.",
+        "As fotos nos comentários estão maiores, com o mesmo contorno do feed.",
+        "O fim de cada ecrã já fica acima da mascote e das decorações da época junto à barra de separadores.",
+        "O ecrã Registar perde o cartão “Começar um treino”: escreve uma linha, toca num exercício recente ou carrega em N no teclado."
+      ],
+      "itemIds": [
+        "product-c9c5f67bb73f68e66485",
+        "product-d20397a48e307add5a01",
+        "product-1a362bfd18c41e2c4102",
+        "product-8aa3a17924b646f39277",
+        "product-d539223fa44995eadf76",
+        "product-c314c2178b9b9f2cb472",
+        "product-668c0302f1e95ae653c1"
+      ]
+    },
+    "1.15.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Eventos: medalhas com ícones sazonais e marcos para treinos, sequências, recordes e participação social."
+      ],
+      "itemIds": ["product-da10ac2a445dd85bd329"]
+    },
+    "1.14.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Um tema de Halloween em Preferências → Aspeto, quando estiver ligado para a época: roxo escuro e laranja-abóbora, morcegos, névoa, teias de aranha, abóboras iluminadas e um chapéu de bruxa para a mascote.",
+        "Um tema de Natal em Preferências → Aspeto, quando estiver ligado para a época: cores natalícias, luzes, neve, presentes e um gorro de Pai Natal para a mascote. Os efeitos podem ser desligados."
+      ],
+      "itemIds": ["product-e3beaf4c72a1c3e1b500", "product-cc26ea4c715c22c19db0"]
+    },
+    "1.4.0": {
+      "language": "pt-PT",
+      "changes": [],
+      "itemIds": []
+    },
+    "1.3.2": {
+      "language": "pt-PT",
+      "changes": [],
+      "itemIds": []
+    },
+    "1.3.1": {
+      "language": "pt-PT",
+      "changes": [],
+      "itemIds": []
+    },
+    "1.3.0": {
+      "language": "pt-PT",
+      "changes": [],
+      "itemIds": []
+    },
+    "1.2.0": {
+      "language": "pt-PT",
+      "changes": ["Treino a dois: marca os amigos com quem treinaste.", "Diz onde foi um treino."],
+      "itemIds": ["product-c0759db8dd31e85b61ed", "product-26ae31012106575f172a"]
+    },
+    "1.1.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Registo rápido: escreve uma linha e ela vira séries.",
+        "Desafios entre grupos e torneios.",
+        "Um mapa dos músculos que treinaste em cada semana."
+      ],
+      "itemIds": [
+        "product-88162eb4f1cbf13fac6e",
+        "product-c8a6f2259a116594bb23",
+        "product-451f7908bbe876f4fae8"
+      ]
+    }
+  },
+  "DuarteCaldeira/design-system": {
+    "1.0.0": {
+      "language": "pt-PT",
+      "changes": [],
+      "context": "Primeira publicação no GitHub. O changelog desta versão não descreve alterações funcionais, pelo que não foram inventadas novidades.",
+      "itemIds": []
     }
   }
 }
