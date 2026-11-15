@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Release versions and shared tooling across your apps." />
+    <title>App overview · Tooling</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" type="module"></script>
+  </head>
+  <body>
+    <a class="skip" href="#apps">Skip to apps</a>
+    <div class="shell">
+      <header class="topbar">
+        <a class="brand" href="./"
+          ><span class="brand-icon" aria-hidden="true">t</span> tooling
+          <span class="divider">/</span> app overview</a
+        ><span class="live"><span aria-hidden="true"></span> Release monitor</span>
+      </header>
+      <main>
+        <section class="intro" aria-labelledby="title">
+          <p class="eyebrow">YOUR PROJECTS, AT A GLANCE</p>
+          <h1 id="title">Small details.<br /><span>The whole picture.</span></h1>
+          <p class="description">
+            Every app, its latest release, and the tooling behind it.<br class="desktop" />
+            One place to keep everything in view.
+          </p>
+          <p id="updated" class="updated">Loading release information…</p>
+        </section>
+        <section class="stats" aria-label="Release overview">
+          <div><span class="stat-label">Apps in view</span><strong id="total">—</strong></div>
+          <div><span class="stat-label">With a release</span><strong id="released">—</strong></div>
+          <div>
+            <span class="stat-label">Using shared tooling</span><strong id="adopted">—</strong>
+          </div>
+        </section>
+        <section id="apps" aria-labelledby="apps-title" tabindex="-1">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">THE LINEUP</p>
+              <h2 id="apps-title">Your apps</h2>
+            </div>
+            <label class="search"
+              ><span class="sr-only">Search apps</span
+              ><input id="search" type="search" placeholder="Find an app…" autocomplete="off"
+            /></label>
+          </div>
+          <p id="message" role="status" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table>
+              <caption class="sr-only">
+                Latest published app releases and tooling versions at those releases
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Application</th>
+                  <th scope="col">App version</th>
+                  <th scope="col">Tooling version</th>
+                  <th scope="col">Last release</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <p class="note">
+            Versions are read from the published release, including prereleases. Apps without a
+            release stay visible.
+          </p>
+          <noscript
+            ><p>
+              Enable JavaScript to view the release dashboard, or open
+              <a href="./data.json">the release data</a>.
+            </p></noscript
+          >
+        </section>
+      </main>
+      <footer>
+        <span>Built for the things you’re building.</span
+        ><span>Powered by GitHub Releases <span aria-hidden="true">↗</span></span>
+      </footer>
+    </div>
+  </body>
+</html>

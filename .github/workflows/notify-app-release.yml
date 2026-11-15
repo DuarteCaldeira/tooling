@@ -1,0 +1,22 @@
+name: Notify app dashboard
+on:
+  workflow_call:
+    secrets:
+      DASHBOARD_DISPATCH_TOKEN:
+        required: true
+permissions: {}
+jobs:
+  notify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Refresh app overview
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.DASHBOARD_DISPATCH_TOKEN }}
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: 'DuarteCaldeira',
+              repo: 'tooling',
+              event_type: 'app-released',
+            });
