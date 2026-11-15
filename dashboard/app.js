@@ -47,10 +47,7 @@ function renderCards(apps) {
     const card = element('article', undefined, 'app-card');
     const header = element('div', undefined, 'card-header');
     const identity = element('div', undefined, 'identity');
-    const tones = ['blue', 'violet', 'amber', 'rose', 'green'];
-    const tone =
-      [...app.repository].reduce((sum, char) => sum + char.charCodeAt(0), 0) % tones.length;
-    const avatar = element('span', app.name.slice(0, 1).toUpperCase(), `app-icon ${tones[tone]}`);
+    const avatar = element('span', app.emoji ?? '📦', 'app-icon');
     avatar.setAttribute('aria-hidden', 'true');
     const title = element('div');
     const heading = element('h3');
@@ -148,6 +145,27 @@ function setupReleaseHub(apps, defaultApp) {
     const option = element('option', app.name);
     option.value = app.repository;
     selection.append(option);
+    const choice = element('button', undefined, 'app-choice');
+    choice.type = 'button';
+    choice.dataset.app = app.repository;
+    choice.setAttribute('aria-pressed', 'false');
+    const icon = element('span', app.emoji ?? '📦', 'choice-emoji');
+    icon.setAttribute('aria-hidden', 'true');
+    const text = element('span');
+    text.append(
+      element('span', app.name, 'choice-name'),
+      element(
+        'span',
+        app.version ?? (app.status === 'unavailable' ? 'Unavailable' : 'No releases yet'),
+        'choice-version',
+      ),
+    );
+    choice.append(icon, text);
+    choice.addEventListener('click', () => {
+      selection.value = app.repository;
+      selection.dispatchEvent(new Event('change'));
+    });
+    document.querySelector('#app-nav').append(choice);
   }
   selection.value =
     apps.find((app) => app.repository === query)?.repository ??
@@ -157,6 +175,22 @@ function setupReleaseHub(apps, defaultApp) {
   let limit = 10;
   function updateHistory() {
     const app = apps.find((app) => app.repository === selection.value);
+    document.querySelector('#selected-emoji').textContent = app?.emoji ?? '📦';
+    document.querySelector('#selected-app-name').textContent = app?.name ?? 'Select an application';
+    document.querySelector('#selected-version').textContent =
+      app?.version ?? (app?.status === 'unavailable' ? 'Unavailable' : 'No releases yet');
+    document
+      .querySelector('#selected-date')
+      .replaceChildren(
+        app?.status === 'unavailable' && !app.releasedAt
+          ? element('span', 'Not available', 'value muted')
+          : releaseDate(app?.releasedAt),
+      );
+    document
+      .querySelector('#selected-tooling')
+      .replaceChildren(toolingValue(app?.tooling ?? { status: 'unknown' }));
+    for (const choice of document.querySelectorAll('[data-app]'))
+      choice.setAttribute('aria-pressed', String(choice.dataset.app === selection.value));
     const feed = document.querySelector('#release-feed');
     feed.replaceChildren();
     const all = app?.releases ?? [];
@@ -170,7 +204,7 @@ function setupReleaseHub(apps, defaultApp) {
           .includes(search),
     );
     document.querySelector('#notes-context').textContent = app
-      ? `${app.name} · ${all.length} published releases · Newest first`
+      ? `${all.length} published release${all.length === 1 ? '' : 's'}`
       : 'No application selected';
     document.querySelector('#notes-message').textContent = !app
       ? 'No apps configured yet.'
@@ -195,7 +229,9 @@ function setupReleaseHub(apps, defaultApp) {
       const heading = element('div', undefined, 'release-heading');
       const identity = element('div', undefined, 'release-identity');
       const title = element('h3', release.version, 'mono');
-      identity.append(element('span', '↗', 'release-icon'), title);
+      const rocket = element('span', '🚀', 'release-icon');
+      rocket.setAttribute('aria-hidden', 'true');
+      identity.append(rocket, title);
       if (index === 0 && !search && !onlyProduct)
         identity.append(element('span', 'Latest', 'badge badge-released'));
       if (release.prerelease) identity.append(element('span', 'Prerelease', 'badge'));

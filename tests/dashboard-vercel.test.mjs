@@ -84,7 +84,7 @@ test('Vercel build works from its project root without dependencies and publishe
       { cwd: root, env: environment, stdio: 'pipe' },
     );
     const data = await readFile(join(root, 'dist/data.json'), 'utf8');
-    assert.equal(JSON.parse(data).apps.length, 5);
+    assert.equal(JSON.parse(data).apps.length, 6);
     assert.ok(!data.includes('fixture-only-token'));
     const { readdir } = await import('node:fs/promises');
     assert.deepEqual((await readdir(join(root, 'dist'))).sort(), [

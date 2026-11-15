@@ -81,7 +81,12 @@ test('Saudinha preserves the supplied Portuguese summaries and SwipeIt is remove
   const notes = JSON.parse(
     await readFile(new URL('../dashboard/release-notes.json', import.meta.url), 'utf8'),
   );
-  assert.equal(config.apps.length, 5);
+  assert.equal(config.apps.length, 6);
+  assert.ok(
+    config.apps.some(
+      (app) => app.repository === 'DuarteCaldeira/design-system' && app.emoji === '🎨',
+    ),
+  );
   assert.ok(config.apps.every((app) => !/swipe/i.test(app.repository)));
   const saudinha = notes['DuarteCaldeira/saudinha-pnn'];
   assert.equal(Object.keys(saudinha).length, 10);

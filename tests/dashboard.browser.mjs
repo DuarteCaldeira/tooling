@@ -75,7 +75,7 @@ test(
       });
       await page.goto('https://tooling.test/');
       await page.waitForSelector('.release-entry');
-      assert.equal(await page.locator('#total').textContent(), '5');
+      assert.equal(await page.locator('#total').textContent(), '6');
       assert.equal(await page.locator('#release-app').inputValue(), saudinha.repository);
       assert.equal(await page.locator('.release-entry').count(), 10);
       assert.match(
@@ -83,7 +83,9 @@ test(
         /unidade dos Leucócitos/,
       );
       assert.equal(await page.locator('.change-list').first().getAttribute('lang'), 'pt-PT');
-      assert.equal(await page.locator('#release-app option').count(), 5);
+      assert.equal(await page.locator('#release-app option').count(), 6);
+      assert.equal(await page.locator('.release-icon').first().textContent(), '🚀');
+      assert.equal(await page.locator('#selected-emoji').textContent(), '💚');
       assert.ok(
         !(await page
           .locator('body')
@@ -129,12 +131,16 @@ test(
         /app=DuarteCaldeira%2Fbilly/,
       );
       await page.locator('#release-app').selectOption(saudinha.repository);
+      await page.locator('[data-app="DuarteCaldeira/design-system"]').click();
+      assert.equal(await page.locator('#selected-emoji').textContent(), '🎨');
+      assert.equal(await page.locator('#release-app').inputValue(), 'DuarteCaldeira/design-system');
+      await page.locator('[data-app="DuarteCaldeira/saudinha-pnn"]').click();
       await page.locator('#apps > summary').click();
-      assert.equal(await page.locator('.app-card').count(), 5);
+      assert.equal(await page.locator('.app-card').count(), 6);
       await page.locator('[data-filter="released"]').click();
       assert.equal(await page.locator('.app-card').count(), 2);
       await page.locator('[data-filter="unreleased"]').click();
-      assert.equal(await page.locator('.app-card').count(), 3);
+      assert.equal(await page.locator('.app-card').count(), 4);
       await page.locator('[data-filter="all"]').click();
       await page.locator('#search').fill('Rookie');
       assert.equal(await page.locator('.app-card').count(), 1);

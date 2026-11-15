@@ -4,7 +4,7 @@ The Vercel release hub replaces manual Product Owner update messages with a shar
 
 ## Product release notes
 
-Choose an app to browse its releases, search changes or versions, and filter to product notes. Saudinha opens by default; the app selector updates the shareable URL (`?app=DuarteCaldeira%2Fsaudinha-pnn#release-notes`). All five apps remain available in the overview, and SwipeIt is excluded from collection and publication.
+Choose an app from the emoji picker (or the selector on mobile) to browse its releases, search changes or versions, and filter to product notes. Saudinha opens by default; the app selector updates the shareable URL (`?app=DuarteCaldeira%2Fsaudinha-pnn#release-notes`). A compact summary shows the selected app's latest version, last release and tooling version. All six apps remain available in the overview, and SwipeIt is excluded from collection and publication. Releases keep the 🚀 emoji heading style.
 
 `dashboard/release-notes.json` contains the supplied Portuguese summaries for Saudinha versions 1.17.1 through 1.21.1, keyed by repository and version without the `v` prefix. These summaries are shown only when a matching published GitHub release exists. Dates always come from the published release. Product notes preserve their original language.
 
@@ -25,7 +25,7 @@ Collection reads those bullets at each refresh. An explicit summary in `release-
 
 ## Apps
 
-Edit `dashboard/apps.json` to add or remove apps. The list includes Rookie, Billy, Dra. Gabriela Videira, Saudinha and Despesas. Only explicitly listed repositories are published. Optional `packagePath`, `lockPath` and `workflowPath` support monorepos and custom CI locations; paths are relative to the repository root.
+Edit `dashboard/apps.json` to add or remove apps. The list includes Rookie, Billy, Dra. Gabriela Videira, Saudinha, Despesas and Design system (`DuarteCaldeira/design-system`). Each app can have an `emoji`. Only explicitly listed repositories are published; include each private repository in the read token's access list. Optional `packagePath`, `lockPath` and `workflowPath` support monorepos and custom CI locations; paths are relative to the repository root.
 
 Collection resolves each release tag to its commit, then reads the manifest and npm lockfile at that commit. Tooling comes from `@dcaldeira/tooling` (or its previous package name), preferring the nearest workspace installation in `package-lock.json`. Exact manifest versions work without a lockfile. Unresolved ranges, non-npm lockfiles and moving workflow refs are labelled unresolved. Alternatively, a SHA-pinned reusable workflow in `.github/workflows/ci.yml` resolves to `packages/tooling/package.json` at that exact tooling revision. The revision appears below the version, since multiple commits can share a package version. Configure `workflowPath` if the app uses another workflow file.
 
