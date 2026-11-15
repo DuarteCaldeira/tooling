@@ -1,0 +1,55 @@
+name: App dashboard
+on:
+  push:
+    branches: [main]
+    paths: ['dashboard/**', '.github/workflows/apps-dashboard.yml']
+  repository_dispatch:
+    types: [app-released]
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: apps-dashboard
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Collect released versions
+        env:
+          APPS_READ_TOKEN: ${{ secrets.APPS_READ_TOKEN }}
+        run: |
+          if [ -z "$APPS_READ_TOKEN" ]; then
+            echo '::error::Set APPS_READ_TOKEN with read access to the configured app repositories.'
+            exit 1
+          fi
+          node dashboard/collect.mjs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .tooling/dashboard-site
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy dashboard
+        id: deployment
+        uses: actions/deploy-pages@v4

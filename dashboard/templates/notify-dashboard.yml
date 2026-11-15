@@ -1,0 +1,12 @@
+# Copy to each app's .github/workflows/notify-dashboard.yml.
+name: Update app dashboard
+on:
+  release:
+    types: [published, edited, deleted]
+  workflow_dispatch:
+permissions: {}
+jobs:
+  notify:
+    uses: DuarteCaldeira/tooling/.github/workflows/notify-app-release.yml@REPLACE_WITH_DASHBOARD_COMMIT_SHA
+    secrets:
+      DASHBOARD_DISPATCH_TOKEN: ${{ secrets.DASHBOARD_DISPATCH_TOKEN }}
