@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api } from './lib/api.js';
+import { lockPageScroll } from './lib/scroll-lock.js';
 
 const EMPTY = Object.freeze({});
 
@@ -80,4 +81,23 @@ export function usePolling(callback, ms, enabled) {
 export function useQueryState(key, fallback) {
   const [value, setValue] = useState(() => new URLSearchParams(location.search).get(key) ?? fallback);
   return [value, setValue];
+}
+
+/** The scroll lock lasts exactly as long as the conversation panel is mounted. */
+export function useConversationOverlay(open, contentRef) {
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const previousFocus = document.activeElement;
+    const unlock = lockPageScroll();
+    // Drawer portals mount after their initial render; wait for the dialog to exist.
+    const frame = requestAnimationFrame(() => {
+      const dialog = contentRef.current?.closest('[role="dialog"]');
+      (dialog?.querySelector('button') ?? dialog)?.focus({ preventScroll: true });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      unlock();
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, [open, contentRef]);
 }

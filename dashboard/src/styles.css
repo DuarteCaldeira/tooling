@@ -1431,3 +1431,27 @@ button {
   white-space: nowrap;
   border: 0;
 }
+
+
+/* The drawer owns scrolling while the mobile page is fixed behind it. */
+.conversation-open [role='dialog'] {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+.conversation-open [class*='drawer__body'] {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: max(var(--ds-spacing-4), env(safe-area-inset-bottom));
+}
+.conversation-open [class*='drawer__header'] button {
+  min-width: 44px;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+.action-list label {
+  min-height: 44px;
+  touch-action: manipulation;
+}
