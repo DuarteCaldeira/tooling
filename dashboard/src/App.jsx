@@ -73,10 +73,14 @@ function Hero({ apps, app, onSelect }) {
         <span className="selected-emoji" aria-hidden="true">
           {app?.emoji ?? '📦'}
         </span>
+        <div className="selected-name">
+          <span className="selected-label">A acontecer em</span>
+          <h2>{app?.name ?? 'Escolha uma aplicação'}</h2>
+        </div>
         <div className="selected-picker">
           <SelectFilter
             id="release-app"
-            label="A acontecer em"
+            label="Mudar de aplicação"
             value={app?.repository ?? ''}
             options={apps.map((entry) => ({ value: entry.repository, label: entry.name }))}
             onChange={onSelect}
@@ -150,14 +154,22 @@ function ReviewOverview({ app, review }) {
       </Card>
       <div className="review-completion">
         <span className="progress-caption">
-          {loaded ? `${validated} de ${total} novidades validadas` : 'A carregar a revisão…'}
+          {loaded
+            ? `${validated} de ${total} novidades validadas`
+            : review.hasError(repository)
+              ? 'Revisão indisponível de momento'
+              : 'A carregar a revisão…'}
         </span>
         <Progress
           variant="primary"
           size="md"
           value={validated}
           max={total || 1}
-          label={loaded ? `${validated} de ${total} novidades validadas` : 'A carregar a revisão…'}
+          label={loaded
+            ? `${validated} de ${total} novidades validadas`
+            : review.hasError(repository)
+              ? 'Revisão indisponível de momento'
+              : 'A carregar a revisão…'}
         />
       </div>
     </div>

@@ -388,7 +388,9 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
                   ? fully
                     ? 'Tudo validado'
                     : `${checked}/${product.length} validadas`
-                  : 'A carregar revisão…'}
+                  : review.hasError(repository)
+                    ? 'Revisão indisponível'
+                    : 'A carregar revisão…'}
             </span>
           </span>
         </span>
