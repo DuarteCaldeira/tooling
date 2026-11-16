@@ -1,4 +1,4 @@
-import { readFile, mkdir, writeFile, copyFile } from 'node:fs/promises';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { itemId, changelogSections, technicalNotes } from './release-items.mjs';
@@ -288,16 +288,6 @@ export async function build({ configPath, output, api }) {
   for (const app of config.apps) app.releaseNotes = notes[app.repository] ?? {};
   const snapshot = await collect(config, api);
   await mkdir(output, { recursive: true });
-  const here = dirname(fileURLToPath(import.meta.url));
-  for (const file of [
-    'index.html',
-    'design-system.css',
-    'styles.css',
-    'discussions.css',
-    'app.js',
-    'discussions.js',
-  ])
-    await copyFile(join(here, file), join(output, file));
   await writeFile(join(output, 'data.json'), `${JSON.stringify(snapshot, null, 2)}\n`);
   return snapshot;
 }

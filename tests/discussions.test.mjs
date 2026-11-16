@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createDiscussionService, createHandler } from '../dashboard/server/discussions.mjs';
 import { changelogSections, technicalNotes, itemId } from '../dashboard/release-items.mjs';
-import { portugueseDate, itemTopics } from '../dashboard/discussions.js';
+import { portugueseDate, itemTopics } from '../dashboard/src/lib/topics.js';
 
 test('topic tags identify product areas and cross-cutting concerns without changing item IDs', () => {
   const text = 'Exames: importar relatórios fica mais rápido e com mais contraste.';

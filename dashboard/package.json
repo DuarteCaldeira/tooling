@@ -4,15 +4,24 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "dev": "vite",
+    "build": "vite build && node build.mjs",
+    "build:web": "vite build"
   },
   "engines": {
     "node": "22.x"
   },
   "dependencies": {
-    "@vercel/blob": "2.9.0"
+    "@vercel/blob": "2.9.0",
+    "@dcaldeira/design-system": "2.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "overrides": {
     "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "vite": "8.3.8",
+    "@vitejs/plugin-react": "6.3.0"
   }
 }
