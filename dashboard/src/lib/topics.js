@@ -61,6 +61,46 @@ const appAreas = [
   ['importacao', 'Importação', /importacao|carregar ficheiros|ficheiros carregados/],
   ['definicoes', 'Definições', /definicoes|preferencias/],
 ];
+// Every change gets at least one tag besides its area: when no theme matches, the kind of
+// change is used instead, so the same few tags can be reused across apps.
+const changeTypes = {
+  novidade: { id: 'novidade', label: 'Novidade', emoji: '🆕', kind: 'type' },
+  correcao: { id: 'correcao', label: 'Correção', emoji: '🐛', kind: 'type' },
+  melhoria: { id: 'melhoria', label: 'Melhoria', emoji: '📈', kind: 'type' },
+  manutencao: { id: 'manutencao', label: 'Manutenção', emoji: '🛠️', kind: 'neutral' },
+  testes: { id: 'testes', label: 'Testes', emoji: '🧪', kind: 'neutral' },
+  refatoracao: { id: 'refatoracao', label: 'Refatoração', emoji: '♻️', kind: 'neutral' },
+  documentacao: { id: 'documentacao', label: 'Documentação', emoji: '📝', kind: 'neutral' },
+};
+const commitTypes = {
+  feat: 'novidade',
+  fix: 'correcao',
+  perf: 'melhoria',
+  refactor: 'refatoracao',
+  test: 'testes',
+  tests: 'testes',
+  docs: 'documentacao',
+};
+function changeType(text, normalized, technical) {
+  if (technical) {
+    const prefix = /^(\w+)(?:\([^)]*\))?!?:/.exec(normalized)?.[1];
+    return changeTypes[commitTypes[prefix] ?? 'manutencao'];
+  }
+  if (
+    /corrig|erro|falha|bug|resolv|ja nao|deixa de|nunca e|sem repeticoes|cortad|volta a|em vez de/.test(
+      normalized,
+    )
+  )
+    return changeTypes.correcao;
+  if (
+    /nov[oa]s?|passa a|permite|marca |diz onde|consultar|criar|editar|lembretes|notificac|adicion|catalogo|disponivel|pagina propria|registar|mostra|mapa|ja (?:pode|aparece)/.test(
+      normalized,
+    )
+  )
+    return changeTypes.novidade;
+  return changeTypes.melhoria;
+}
+
 export function itemTopics(text, technical = false) {
   const normalized = text
     .normalize('NFD')
@@ -75,12 +115,8 @@ export function itemTopics(text, technical = false) {
   for (const [id, label, emoji, rule] of topicRules) {
     if (rule.test(normalized)) topics.push({ id, label, emoji, kind: id });
   }
-  if (!topics.length)
-    topics.push(
-      technical
-        ? { id: 'manutencao', label: 'Manutenção', emoji: '🛠️', kind: 'neutral' }
-        : { id: 'produto', label: 'Produto', emoji: '📦', kind: 'neutral' },
-    );
+  if (!topics.some((topic) => topic.kind !== 'area'))
+    topics.push(changeType(text, normalized, technical));
   return topics;
 }
 
