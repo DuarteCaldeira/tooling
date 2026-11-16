@@ -3,7 +3,24 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createDiscussionService, createHandler } from '../dashboard/server/discussions.mjs';
 import { changelogSections, technicalNotes, itemId } from '../dashboard/release-items.mjs';
-import { portugueseDate } from '../dashboard/discussions.js';
+import { portugueseDate, itemTopics } from '../dashboard/discussions.js';
+
+test('topic tags identify product areas and cross-cutting concerns without changing item IDs', () => {
+  const text = 'Exames: importar relatórios fica mais rápido e com mais contraste.';
+  const before = itemId(text);
+  const topics = itemTopics(text).map((topic) => topic.id);
+  assert.ok(topics.includes('exames'));
+  assert.ok(topics.includes('dados'));
+  assert.ok(topics.includes('performance'));
+  assert.ok(topics.includes('acessibilidade'));
+  assert.ok(
+    itemTopics('Privacidade: proteção ao importar ficheiros.').some(
+      (topic) => topic.label === 'Segurança',
+    ),
+  );
+  assert.equal(itemTopics('chore: update dependencies', true)[0].id, 'manutencao');
+  assert.equal(itemId(text), before);
+});
 
 test('technical changes do not accept validation and participant IDs distinguish identical names', async () => {
   const { service, input } = fixture();

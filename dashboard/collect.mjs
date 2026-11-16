@@ -289,7 +289,14 @@ export async function build({ configPath, output, api }) {
   const snapshot = await collect(config, api);
   await mkdir(output, { recursive: true });
   const here = dirname(fileURLToPath(import.meta.url));
-  for (const file of ['index.html', 'styles.css', 'discussions.css', 'app.js', 'discussions.js'])
+  for (const file of [
+    'index.html',
+    'design-system.css',
+    'styles.css',
+    'discussions.css',
+    'app.js',
+    'discussions.js',
+  ])
     await copyFile(join(here, file), join(output, file));
   await writeFile(join(output, 'data.json'), `${JSON.stringify(snapshot, null, 2)}\n`);
   return snapshot;

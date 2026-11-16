@@ -12,6 +12,78 @@ export function portugueseDate(value) {
   return `${part('day')} de ${part('month')}, ${part('year')} ${part('hour')}:${part('minute')}`;
 }
 
+const topicRules = [
+  [
+    'acessibilidade',
+    'Acessibilidade',
+    '♿',
+    /acessib|contraste|leitor de ecra|zoom|texto.*legivel|foco|botoes maiores|movimento reduzido/,
+  ],
+  [
+    'seguranca',
+    'Segurança',
+    '🔐',
+    /seguran|protec|privacidade|bloqueio|encript|autentic|dados.*(?:temporar|memoria)/,
+  ],
+  [
+    'performance',
+    'Performance',
+    '⚡',
+    /rapid|desempenho|performance|mais leve|otimiz|redesenha|depressa|lentidao|grava varios/,
+  ],
+  [
+    'dados',
+    'Dados',
+    '🗂️',
+    /import|export|ficheiro|relatorio|dados|leitura|backup|copia de seguranca|sincron|guard|sns/,
+  ],
+  [
+    'ux',
+    'UX',
+    '✨',
+    /aspeto|visual|apresenta|menu|layout|ecra|separador|botao|cartao|navega|lista|filtro|pesquisa|formulario|interface|seta/,
+  ],
+];
+const appAreas = [
+  ['exames', 'Exames', /\bexames?\b/],
+  ['analises', 'Análises', /\banalises?\b|leucocitos|laboratorio/],
+  ['consultas', 'Consultas', /\bconsultas?\b/],
+  ['medicacao', 'Medicação', /medicacao|receitas|registar toma/],
+  ['vacinas', 'Vacinas', /vacin/],
+  ['perfil', 'Perfil', /perfil|parentesco|grupo sanguineo/],
+  ['treinos', 'Treinos', /treinos?|workout|renpho/],
+  ['exploracao', 'Exploração', /explora|percursos?|mapa|freguesias/],
+  ['progresso', 'Progresso', /progresso|recordes?|graficos/],
+  ['competicao', 'Competição', /competir|competicao|liga|classificacao/],
+  ['nutricao', 'Nutrição', /nutricao|alimentacao|refeicoes/],
+  ['pesquisa', 'Pesquisa', /pesquisa/],
+  ['backup', 'Cópia de segurança', /copia de seguranca|backup/],
+  ['importacao', 'Importação', /importacao|carregar ficheiros|ficheiros carregados/],
+  ['definicoes', 'Definições', /definicoes|preferencias/],
+];
+export function itemTopics(text, technical = false) {
+  const normalized = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-PT');
+  const prefix = normalized.split(':')[0];
+  const area =
+    appAreas.find(([, , rule]) => rule.test(prefix)) ??
+    appAreas.find(([, , rule]) => rule.test(normalized));
+  const topics = [];
+  if (area) topics.push({ id: area[0], label: area[1], emoji: '📍', kind: 'area' });
+  for (const [id, label, emoji, rule] of topicRules) {
+    if (rule.test(normalized)) topics.push({ id, label, emoji, kind: id });
+  }
+  if (!topics.length)
+    topics.push(
+      technical
+        ? { id: 'manutencao', label: 'Manutenção', emoji: '🛠️', kind: 'neutral' }
+        : { id: 'produto', label: 'Produto', emoji: '📦', kind: 'neutral' },
+    );
+  return topics;
+}
+
 const node = (tag, text, className) => {
   const value = document.createElement(tag);
   if (text !== undefined) value.textContent = text;
@@ -382,7 +454,7 @@ export function createDiscussions() {
         'button',
         current.count
           ? `💬 ${current.count} · ${current.closed ? 'Resolvida' : 'Em aberto'}`
-          : '💬 Iniciar conversa',
+          : '💬 Comentar',
         'conversation-link',
       );
       conversation.type = 'button';
@@ -392,7 +464,25 @@ export function createDiscussions() {
       feedback.setAttribute('role', 'status');
       if (!context.technical) actions.append(validate);
       actions.append(conversation);
-      item.append(trigger, actions, feedback);
+      const tags = node('div', undefined, 'item-topics');
+      for (const topic of itemTopics(context.text, context.technical)) {
+        const tag = node(
+          'button',
+          topic.emoji + ' ' + topic.label,
+          'topic-tag topic-' + topic.kind,
+        );
+        tag.type = 'button';
+        tag.setAttribute('aria-label', 'Filtrar por ' + topic.label);
+        tag.setAttribute(
+          'aria-pressed',
+          String(document.querySelector('#topic-filter')?.value === topic.id),
+        );
+        tag.addEventListener('click', () =>
+          document.dispatchEvent(new CustomEvent('topic-filter', { detail: topic.id })),
+        );
+        tags.append(tag);
+      }
+      item.append(tags, trigger, actions, feedback);
       return item;
     },
     button(context, label = '💬 Conversar') {

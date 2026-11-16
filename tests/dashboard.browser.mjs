@@ -62,7 +62,14 @@ test(
       url: 'https://github.com/DuarteCaldeira/saudinha-pnn/releases/tag/v1.0.0',
     });
     const files = { '/data.json': JSON.stringify(fixture) };
-    for (const name of ['index.html', 'styles.css', 'discussions.css', 'app.js', 'discussions.js'])
+    for (const name of [
+      'index.html',
+      'design-system.css',
+      'styles.css',
+      'discussions.css',
+      'app.js',
+      'discussions.js',
+    ])
       files[`/${name}`] = await readFile(new URL(name, source), 'utf8');
     const browser = await chromium.launch({
       headless: true,
@@ -158,6 +165,17 @@ test(
           [],
         );
       };
+      assert.equal(await page.locator('#notes-context').count(), 0);
+      assert.equal(await page.locator('.interaction-hint').count(), 0);
+      assert.equal(await page.locator('#share-app').count(), 0);
+      await page.getByRole('button', { name: 'Filtrar por Dados', exact: true }).first().click();
+      assert.equal(await page.locator('#topic-filter').inputValue(), 'dados');
+      assert.match(page.url(), /topic-filter=dados/);
+      assert.equal(
+        await page.locator('.topic-tag[aria-pressed=true]').count(),
+        await page.locator('.change-item').count(),
+      );
+      await page.locator('#clear-filters').click();
       await scan();
       if (process.env.TOOLING_DASHBOARD_SCREENSHOTS) {
         await mkdir(process.env.TOOLING_DASHBOARD_SCREENSHOTS, { recursive: true });
@@ -315,10 +333,7 @@ test(
         /Ainda não há versões publicadas/,
       );
       assert.match(page.url(), /app=DuarteCaldeira%2Fbilly/);
-      assert.match(
-        await page.locator('#share-app').getAttribute('href'),
-        /app=DuarteCaldeira%2Fbilly/,
-      );
+      assert.equal(await page.locator('#share-app').count(), 0);
       await page.locator('#release-app').selectOption(saudinha.repository);
       await page.locator('[data-app="DuarteCaldeira/design-system"]').click();
       assert.equal(await page.locator('#selected-emoji').textContent(), '🎨');
@@ -337,6 +352,28 @@ test(
       await page.locator('#sort').selectOption('name');
       assert.match(await page.locator('.app-card').first().textContent(), /Billy/);
       await page.locator('#apps > summary').click();
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+      );
+      await page.setViewportSize({ width: 1024, height: 900 });
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+      );
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      assert.equal(
+        await page.locator('#selected-emoji').evaluate((el) => getComputedStyle(el).animationName),
+        'none',
+      );
+      assert.equal(
+        await page
+          .locator('.topic-tag')
+          .first()
+          .evaluate((el) => getComputedStyle(el).transitionDuration),
+        '0s',
+      );
       await page.setViewportSize({ width: 390, height: 844 });
       await page.evaluate(() => window.scrollTo(0, 0));
       assert.equal(

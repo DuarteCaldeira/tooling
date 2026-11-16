@@ -6,6 +6,7 @@
     <meta name="color-scheme" content="light" />
     <meta name="description" content="As novidades das suas aplicações, prontas para rever." />
     <title>Novidades | Tooling</title>
+    <link rel="stylesheet" href="./design-system.css" />
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./discussions.css" />
     <script src="./app.js" type="module"></script>
@@ -54,7 +55,6 @@
                   <select id="release-app" aria-label="Histórico de versões da aplicação"></select>
                 </div>
               </div>
-              <a id="share-app" class="share-link" href="#release-notes">🔗 Partilhar</a>
             </div>
             <dl class="selected-metrics">
               <div>
@@ -89,7 +89,6 @@
           <div class="notes-heading">
             <div>
               <h2 id="notes-title">Histórico de versões</h2>
-              <p id="notes-context" class="subtitle">A carregar as versões…</p>
             </div>
             <span class="order-label">Mais recentes primeiro ↓</span>
           </div>
@@ -103,6 +102,11 @@
               />
             </label>
             <div class="review-controls">
+              <label
+                >Tema<select id="topic-filter">
+                  <option value="all">Todos os temas</option>
+                </select></label
+              >
               <label
                 >Conteúdo<select id="content-filter">
                   <option value="all">Produto e técnica</option>
@@ -134,9 +138,6 @@
             </div>
           </div>
           <div class="feed-toolbar">
-            <p class="interaction-hint">
-              Abra uma versão para rever as novidades. Só o produto precisa de validação.
-            </p>
             <div class="section-actions">
               <button id="expand-all" type="button" class="text-button">Expandir tudo</button
               ><button id="collapse-all" type="button" class="text-button">Recolher tudo</button>

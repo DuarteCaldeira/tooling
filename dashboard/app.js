@@ -1,4 +1,4 @@
-import { createDiscussions, portugueseDate } from './discussions.js';
+import { createDiscussions, portugueseDate, itemTopics } from './discussions.js';
 
 const discussions = createDiscussions();
 const element = (tag, text, className) => {
@@ -120,7 +120,34 @@ function setupReleaseHub(apps, defaultApp) {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLocaleLowerCase('pt-PT');
-  const filterIds = ['notes-search', 'review-filter', 'discussion-filter', 'content-filter'];
+  const filterIds = [
+    'notes-search',
+    'review-filter',
+    'discussion-filter',
+    'content-filter',
+    'topic-filter',
+  ];
+  const topicSelect = document.querySelector('#topic-filter');
+  const initialApp = apps.find((app) => app.repository === selection.value);
+  function updateTopics(app) {
+    const current = topicSelect.value;
+    const available = new Map();
+    for (const release of app?.releases ?? [])
+      for (const item of [...(release.items ?? []), ...(release.technicalItems ?? [])])
+        for (const topic of itemTopics(item.text, item.id.startsWith('technical-')))
+          available.set(topic.id, topic);
+    topicSelect.replaceChildren(element('option', 'Todos os temas'));
+    topicSelect.firstChild.value = 'all';
+    for (const topic of [...available.values()].sort((a, b) =>
+      a.label.localeCompare(b.label, 'pt-PT'),
+    )) {
+      const option = element('option', topic.emoji + ' ' + topic.label);
+      option.value = topic.id;
+      topicSelect.append(option);
+    }
+    topicSelect.value = available.has(current) ? current : 'all';
+  }
+  updateTopics(initialApp);
   const initial = new URLSearchParams(location.search);
   for (const id of filterIds) {
     const input = document.getElementById(id);
@@ -131,6 +158,7 @@ function setupReleaseHub(apps, defaultApp) {
     )
       input.value = value;
   }
+  let viewUrl = new URL(location.href);
   function updateHistory() {
     const focusKey = document.activeElement?.dataset.focusKey;
     const app = apps.find((app) => app.repository === selection.value);
@@ -151,9 +179,10 @@ function setupReleaseHub(apps, defaultApp) {
     const filter = document.querySelector('#review-filter').value;
     const conversation = document.querySelector('#discussion-filter').value;
     const content = document.querySelector('#content-filter').value;
+    const topic = topicSelect.value;
     const loaded = discussions.isLoaded(app?.repository);
     const filtering = Boolean(
-      search || filter !== 'all' || conversation !== 'all' || content !== 'all',
+      search || filter !== 'all' || conversation !== 'all' || content !== 'all' || topic !== 'all',
     );
     const needsState = filter !== 'all' || conversation !== 'all';
     const matchesText = (text) =>
@@ -163,9 +192,13 @@ function setupReleaseHub(apps, defaultApp) {
       (loaded && state.count > 0 && (conversation === 'open' ? !state.closed : state.closed));
     const itemMatches = (release, item, technical = false) => {
       if (technical && filter !== 'all') return false;
+      const topics = itemTopics(item.text, technical);
+      if (topic !== 'all' && !topics.some((entry) => entry.id === topic)) return false;
       const state = discussions.state(context(app, release, item.id, item.text));
       return (
-        matchesText(`${release.version} ${portugueseDate(release.releasedAt)} ${item.text}`) &&
+        matchesText(
+          `${release.version} ${portugueseDate(release.releasedAt)} ${item.text} ${topics.map((entry) => entry.label).join(' ')}`,
+        ) &&
         matchesConversation(state) &&
         (filter === 'all' ||
           (loaded && (filter === 'pending' ? !state.validated : state.validated)))
@@ -183,6 +216,7 @@ function setupReleaseHub(apps, defaultApp) {
             : (release.technicalItems ?? []).filter((item) => itemMatches(release, item, true));
         const releaseState = discussions.state(context(app, release, 'release', ''));
         const releaseMatch =
+          topic === 'all' &&
           content === 'all' &&
           filter === 'all' &&
           conversation !== 'all' &&
@@ -190,6 +224,7 @@ function setupReleaseHub(apps, defaultApp) {
           matchesText(`${release.version} ${release.summaryContext ?? ''}`);
         const emptyMatch =
           !needsState &&
+          topic === 'all' &&
           content === 'all' &&
           !release.items?.length &&
           !release.technicalItems?.length &&
@@ -229,7 +264,6 @@ function setupReleaseHub(apps, defaultApp) {
     document.querySelector('#review-caption').textContent = loaded
       ? `${validated} de ${totalItems.length} novidades validadas`
       : 'A carregar a revisão…';
-    document.querySelector('#notes-context').textContent = `${all.length} versões publicadas`;
     const resultCount = matches.reduce(
       (count, entry) => count + entry.items.length + entry.technical.length,
       0,
@@ -260,7 +294,7 @@ function setupReleaseHub(apps, defaultApp) {
     share.searchParams.delete('release');
     share.searchParams.delete('item');
     share.hash = 'release-notes';
-    document.querySelector('#share-app').href = share.toString();
+    viewUrl = share;
     for (const { release, items, technical } of matches.slice(0, limit)) {
       const key = `${app.repository}/${release.version}`;
       const product = release.items ?? [];
@@ -366,6 +400,7 @@ function setupReleaseHub(apps, defaultApp) {
     for (const id of filterIds)
       document.getElementById(id).value = id === 'notes-search' ? '' : 'all';
     expanded.clear();
+    updateTopics(apps.find((app) => app.repository === selection.value));
     const url = new URL(location.href);
     url.searchParams.set('app', selection.value);
     url.searchParams.delete('release');
@@ -382,13 +417,17 @@ function setupReleaseHub(apps, defaultApp) {
     if (document.querySelector('#content-filter').value === 'technical')
       document.querySelector('#review-filter').value = 'all';
     updateHistory();
-    const url = new URL(document.querySelector('#share-app').href);
+    const url = viewUrl;
     history.replaceState(null, '', url);
   }
   for (const id of filterIds)
     document
       .getElementById(id)
       .addEventListener(id === 'notes-search' ? 'input' : 'change', filtersChanged);
+  document.addEventListener('topic-filter', (event) => {
+    topicSelect.value = event.detail;
+    filtersChanged();
+  });
   document.querySelector('#clear-filters').addEventListener('click', () => {
     for (const id of filterIds)
       document.getElementById(id).value = id === 'notes-search' ? '' : 'all';
