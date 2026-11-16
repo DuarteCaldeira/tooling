@@ -144,6 +144,7 @@ export const builtins = {
     resources: ['browser'],
   }),
   workflows: check(['actionlint', '-color'], ['workflows'], { tools: ['actionlint'] }),
+  sass: check(script('sass'), ['styles', 'app'], { profiles: all }),
   architecture: check(script('architecture'), ['app', 'functions'], { profiles: all }),
   'dependency-consistency': check(script('dependencies'), ['app', 'functions', 'dependencies']),
   a11y: check(script('a11y'), ['app'], {
@@ -154,6 +155,7 @@ export const builtins = {
 };
 
 const optIn = {
+  sass: 'sass',
   architecture: 'architecture',
   'dependency-consistency': 'dependencyConsistency',
   a11y: 'a11y',
