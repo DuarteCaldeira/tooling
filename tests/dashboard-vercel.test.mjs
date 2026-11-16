@@ -57,7 +57,7 @@ test('Vercel refresh reports HTTP/network failures without leaking credential UR
   );
 });
 
-test('Vercel build works from its project root without dependencies and publishes only static files', async () => {
+test('Vercel data build writes only data.json; the web bundle comes from the preceding vite build', async () => {
   const root = await mkdtemp(join(tmpdir(), 'tooling-vercel-'));
   try {
     const source = new URL('../dashboard/', import.meta.url);
@@ -67,17 +67,11 @@ test('Vercel build works from its project root without dependencies and publishe
       'release-items.mjs',
       'apps.json',
       'release-notes.json',
-      'app.js',
-      'discussions.js',
-      'discussions.css',
-      'design-system.css',
-      'styles.css',
-      'index.html',
       'vercel.json',
     ])
       await cp(new URL(name, source), join(root, name));
     const settings = JSON.parse(await readFile(join(root, 'vercel.json'), 'utf8'));
-    assert.equal(settings.buildCommand, 'node build.mjs');
+    assert.equal(settings.buildCommand, 'vite build && node build.mjs');
     assert.equal(settings.framework, null);
     assert.equal(settings.outputDirectory, 'dist');
     const mock = `globalThis.fetch = async (url) => ({ok:true,status:200,json:async()=>String(url).includes('/releases?')?[]:{id:1}});`;
@@ -91,15 +85,7 @@ test('Vercel build works from its project root without dependencies and publishe
     assert.equal(JSON.parse(data).apps.length, 6);
     assert.ok(!data.includes('fixture-only-token'));
     const { readdir } = await import('node:fs/promises');
-    assert.deepEqual((await readdir(join(root, 'dist'))).sort(), [
-      'app.js',
-      'data.json',
-      'design-system.css',
-      'discussions.css',
-      'discussions.js',
-      'index.html',
-      'styles.css',
-    ]);
+    assert.deepEqual((await readdir(join(root, 'dist'))).sort(), ['data.json']);
     delete environment.APPS_READ_TOKEN;
     const missing = spawnSync(process.execPath, ['build.mjs'], {
       cwd: root,

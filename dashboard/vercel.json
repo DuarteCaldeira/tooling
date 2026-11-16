@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "node build.mjs",
-  "installCommand": "npm ci --ignore-scripts --omit=dev --workspaces=false",
+  "buildCommand": "vite build && node build.mjs",
+  "installCommand": "npm ci --ignore-scripts --workspaces=false",
   "outputDirectory": "dist",
   "functions": {
     "api/discussions.js": { "includeFiles": "server/discussion-manifest.json", "maxDuration": 30 }

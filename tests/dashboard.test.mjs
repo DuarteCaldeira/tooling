@@ -227,7 +227,7 @@ test('dashboard API client keeps credentials in headers, handles 404 and retries
   await assert.rejects(missing('/missing'), /404/);
 });
 
-test('dashboard build emits only static files and safe normalized data', async () => {
+test('dashboard data build emits safe normalized data', async () => {
   const output = await mkdtemp(join(tmpdir(), 'tooling-dashboard-'));
   try {
     await build({
@@ -238,8 +238,6 @@ test('dashboard build emits only static files and safe normalized data', async (
     });
     const data = await readFile(join(output, 'data.json'), 'utf8');
     assert.ok(!data.includes('must-not-be-published'));
-    assert.ok((await readFile(join(output, 'index.html'), 'utf8')).includes('./app.js'));
-    assert.ok((await readFile(join(output, 'app.js'), 'utf8')).includes('textContent'));
   } finally {
     await rm(output, { recursive: true, force: true });
   }
