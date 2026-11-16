@@ -13,9 +13,11 @@ export function peer(name, cwd = process.cwd()) {
   }
 }
 export function sourceFiles(root, patterns, exclude = []) {
-  return git(root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z')
-    .split('\0')
-    .filter(
+  return [
+    ...new Set(
+      git(root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z').split('\0'),
+    ),
+  ].filter(
       (file) =>
         file &&
         existsSync(join(root, file)) &&

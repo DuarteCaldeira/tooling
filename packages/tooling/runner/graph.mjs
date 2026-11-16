@@ -203,13 +203,16 @@ export function plan(config, { files = 'all', profile = 'ci', only = [], skip = 
       .map(([id]) => id),
   );
   const wanted = new Set(only.length ? only : required);
+  const expanded = new Set();
   const visit = (id, chain = []) => {
     if (!checks[id]) throw new Error(`Missing dependency: ${id}`);
     if (chain.includes(id)) throw new Error(`Cyclic checks: ${[...chain, id].join(' -> ')}`);
+    if (expanded.has(id)) return;
     for (const dep of checks[id].dependsOn ?? []) {
       wanted.add(dep);
       visit(dep, [...chain, id]);
     }
+    expanded.add(id);
   };
   [...wanted].forEach((id) => visit(id));
   const ordered = [];

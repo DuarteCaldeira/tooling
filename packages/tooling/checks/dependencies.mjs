@@ -198,6 +198,16 @@ export function analyseDependencies(root, settings = {}, manifests, lock, files,
         ),
       ]),
     );
+    const resolutionCaches = new Map(
+      packages.map((pkg) => [
+        pkg,
+        ts.createModuleResolutionCache(
+          root,
+          (file) => (ts.sys.useCaseSensitiveFileNames ? file : file.toLowerCase()),
+          options.get(pkg),
+        ),
+      ]),
+    );
     for (const file of files.filter((file) => /\.[cm]?[jt]sx?$/.test(file))) {
       const from = owner(file);
       if (!from) continue;
@@ -210,6 +220,7 @@ export function analyseDependencies(root, settings = {}, manifests, lock, files,
           join(root, file),
           options.get(from),
           ts.sys,
+          resolutionCaches.get(from),
         ).resolvedModule;
         const target =
           internal?.[1] ??
