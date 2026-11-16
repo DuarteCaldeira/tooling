@@ -51,7 +51,12 @@ test(
       releasedAt: '2026-01-01T00:00:00Z',
       notes: [],
       items: [],
-      technicalItems: [],
+      technicalItems: [
+        {
+          id: itemId('Dependências: bibliotecas atualizadas.', 'technical'),
+          text: 'Dependências: bibliotecas atualizadas.',
+        },
+      ],
       source: 'github',
       originalNotes: '<script>globalThis.injected = true</script>',
       url: 'https://github.com/DuarteCaldeira/saudinha-pnn/releases/tag/v1.0.0',
@@ -161,15 +166,37 @@ test(
       }
       await page.locator('#load-more').click();
       assert.equal(await page.locator('.release-entry').count(), 11);
+      assert.equal(
+        await page.locator('.release-entry').first().locator('.technical-notes').count(),
+        0,
+      );
       assert.equal(await page.locator('.technical-notes').last().getAttribute('open'), null);
       await page.locator('.technical-notes').last().locator(':scope > summary').click();
-      await page.locator('.original-notes summary').click();
-      assert.match(await page.locator('.original-notes pre').textContent(), /<script>/);
+      assert.equal(await page.locator('.original-notes').count(), 0);
+      assert.equal(await page.getByText('Read original changelog').count(), 0);
+      assert.equal(await page.locator('html').getAttribute('lang'), 'pt-PT');
+      assert.equal(
+        await page.locator('.release-heading time').first().textContent(),
+        '4 de novembro, 2026 13:11',
+      );
+      assert.ok(
+        (await page
+          .locator('.change-copy')
+          .first()
+          .evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 16,
+      );
+      const originalTotal = await page.locator('.change-item').count();
+      await page.locator('.validation-button').first().click();
+      await page.locator('.validation-button[aria-pressed="true"]').waitFor();
+      await page.locator('#review-filter').selectOption('pending');
+      assert.equal(await page.locator('.validation-button[aria-pressed="true"]').count(), 0);
+      assert.ok((await page.locator('.change-item').count()) < originalTotal);
+      await page.locator('#review-filter').selectOption('all');
       assert.equal(await page.evaluate(() => globalThis.injected), undefined);
       await page
         .locator('.release-entry')
         .first()
-        .locator('.change-list .discuss-button')
+        .locator('.change-list .item-trigger')
         .first()
         .click();
       await page.locator('input[name="author"]').fill('QA reviewer');
@@ -178,25 +205,45 @@ test(
         .locator('textarea[name="body"]')
         .fill('The imported date changes after saving. Expected the original day.');
       await page.locator('.submit-comment').click();
-      await page.getByText('Comment posted', { exact: true }).waitFor();
+      await page.getByText('Comentário enviado', { exact: true }).waitFor();
       assert.match(await page.locator('.comment-list').textContent(), /QA reviewer/);
       const link = await page.locator('.discussion-toolbar a').getAttribute('href');
       const another = await context.newPage();
       await another.goto(link);
       await another.locator('.comment-list .comment').waitFor();
       assert.match(await another.locator('.comment-list').textContent(), /imported date changes/);
+      assert.equal(await another.locator('.validation-button[aria-pressed="true"]').count(), 1);
       await another.close();
       await scan();
+      await page.getByRole('button', { name: 'Marcar como resolvida', exact: true }).click();
+      await page.getByText('Conversa resolvida', { exact: true }).waitFor();
       await page.locator('.discussion-heading button').click();
+      await page.locator('#review-filter').selectOption('discussions');
+      assert.equal(await page.locator('.release-entry').count(), 0);
+      await page.locator('#review-filter').selectOption('all');
+      await page.locator('.item-trigger').first().click();
+      await page.getByRole('button', { name: 'Reabrir conversa', exact: true }).click();
+      await page.getByText('Conversa reaberta', { exact: true }).waitFor();
+      await page.locator('.discussion-heading button').click();
+      await page.locator('#review-filter').selectOption('discussions');
+      assert.equal(await page.locator('.release-entry').count(), 1);
+      assert.equal(await page.locator('.change-item').count(), 1);
+      await page.locator('#review-filter').selectOption('all');
       await page.locator('#product-only').check();
       assert.equal(await page.locator('.release-entry').count(), 10);
       await page.locator('#notes-search').fill('Vacinas');
       assert.equal(await page.locator('.release-entry').count(), 1);
       await page.locator('#notes-search').fill('nothing-matches');
       assert.equal(await page.locator('.release-entry').count(), 0);
-      assert.match(await page.locator('#notes-message').textContent(), /No releases match/);
+      assert.match(
+        await page.locator('#notes-message').textContent(),
+        /Nenhuma alteração corresponde/,
+      );
       await page.locator('#release-app').selectOption('DuarteCaldeira/billy');
-      assert.match(await page.locator('#notes-message').textContent(), /No published releases yet/);
+      assert.match(
+        await page.locator('#notes-message').textContent(),
+        /Ainda não há versões publicadas/,
+      );
       assert.match(page.url(), /app=DuarteCaldeira%2Fbilly/);
       assert.match(
         await page.locator('#share-app').getAttribute('href'),
@@ -226,7 +273,13 @@ test(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         true,
       );
+      await page.locator('.item-trigger').first().click();
       await scan();
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+      );
+      await page.locator('.discussion-heading button').click();
       if (process.env.TOOLING_DASHBOARD_SCREENSHOTS)
         await page.screenshot({
           path: join(process.env.TOOLING_DASHBOARD_SCREENSHOTS, 'dashboard-mobile.png'),

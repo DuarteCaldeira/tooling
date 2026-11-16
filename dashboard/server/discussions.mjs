@@ -10,6 +10,8 @@ const digest = (text) => createHash('sha256').update(text).digest('hex').slice(0
 const appPrefix = (repository) => `discussions/v1/${digest(repository)}/`;
 const threadPrefix = ({ repository, version, item }) =>
   `${appPrefix(repository)}${digest(version)}/${item}/comments/`;
+const statePrefix = ({ repository, version, item }) =>
+  `${appPrefix(repository)}${digest(version)}/${item}/state/`;
 const uuidPattern = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
 
 async function readBody(request) {
@@ -23,7 +25,7 @@ async function readBody(request) {
     size += part.value.byteLength;
     if (size > 32000) {
       await reader.cancel();
-      throw new DiscussionError(413, 'Comment request is too large');
+      throw new DiscussionError(413, 'O comentário é demasiado longo');
     }
     chunks.push(part.value);
   }
@@ -45,12 +47,12 @@ export function createDiscussionService({
   function target(input) {
     const { repository, version, item = 'release' } = input;
     if (!Object.hasOwn(manifest, repository ?? ''))
-      throw new DiscussionError(404, 'Application not found');
+      throw new DiscussionError(404, 'Aplicação não encontrada');
     if (
       !Object.hasOwn(manifest[repository], version ?? '') ||
       !manifest[repository][version].includes(item)
     )
-      throw new DiscussionError(404, 'Release or change not found');
+      throw new DiscussionError(404, 'Versão ou alteração não encontrada');
     return { repository, version, item };
   }
   async function metadata(prefix) {
@@ -60,7 +62,7 @@ export function createDiscussionService({
       const page = await store.list(prefix, cursor);
       all.push(...page.blobs);
       if (all.length > 20000)
-        throw new DiscussionError(413, 'Discussion archive is too large to load');
+        throw new DiscussionError(413, 'Esta conversa é demasiado extensa para carregar');
       cursor = page.hasMore ? page.cursor : undefined;
     } while (cursor);
     return all;
@@ -68,23 +70,69 @@ export function createDiscussionService({
   return {
     async summary(repository) {
       if (!Object.hasOwn(manifest, repository ?? ''))
-        throw new DiscussionError(404, 'Application not found');
+        throw new DiscussionError(404, 'Aplicação não encontrada');
       const blobs = await metadata(appPrefix(repository));
       const summary = {};
+      const states = {};
       for (const [version, items] of Object.entries(manifest[repository])) {
         summary[version] = {};
+        states[version] = {};
         for (const item of items) {
-          const prefix = threadPrefix({ repository, version, item });
-          summary[version][item] = blobs.filter((blob) => blob.pathname.startsWith(prefix)).length;
+          const context = { repository, version, item };
+          const comments = blobs.filter((blob) => blob.pathname.startsWith(threadPrefix(context)));
+          summary[version][item] = comments.length;
+          states[version][item] = { validated: false, closed: false };
+          for (const field of ['validated', 'closed']) {
+            const events = blobs
+              .filter((blob) => blob.pathname.startsWith(`${statePrefix(context)}${field}/`))
+              .sort(
+                (a, b) =>
+                  new Date(b.uploadedAt) - new Date(a.uploadedAt) ||
+                  b.pathname.localeCompare(a.pathname),
+              );
+            if (!events.length) continue;
+            states[version][item][field] = events[0].pathname.endsWith('.true.json');
+            if (
+              field === 'closed' &&
+              comments.some(
+                (comment) => new Date(comment.uploadedAt) > new Date(events[0].uploadedAt),
+              )
+            )
+              states[version][item].closed = false;
+          }
         }
       }
-      return { summary };
+      return { summary, states };
+    },
+    async setState(input) {
+      const context = target(input);
+      if (!['validated', 'closed'].includes(input.field) || typeof input.value !== 'boolean')
+        throw new DiscussionError(400, 'Estado de revisão inválido');
+      if (context.item === 'release' && input.field === 'validated')
+        throw new DiscussionError(400, 'Valide cada alteração individualmente');
+      const id = input.requestId;
+      if (!uuidPattern.test(id ?? '')) throw new DiscussionError(400, 'Pedido de revisão inválido');
+      const path = `${statePrefix(context)}${input.field}/${id}.${input.value}.json`;
+      if (await store.get(`${statePrefix(context)}${input.field}/${id}.${!input.value}.json`))
+        throw new DiscussionError(409, 'Este pedido já foi utilizado');
+      const event = {
+        ...context,
+        field: input.field,
+        value: input.value,
+        createdAt: now().toISOString(),
+      };
+      if (!(await store.create(path, event))) {
+        const saved = await store.get(path);
+        if (saved?.value !== input.value)
+          throw new DiscussionError(409, 'Este pedido já foi utilizado');
+      }
+      return { saved: true };
     },
     async list(input) {
       const context = target(input);
       const offset = Number(input.cursor ?? 0);
       if (!Number.isSafeInteger(offset) || offset < 0 || offset > 20000)
-        throw new DiscussionError(400, 'Invalid comment cursor');
+        throw new DiscussionError(400, 'Página de comentários inválida');
       const blobs = (await metadata(threadPrefix(context))).sort(
         (a, b) =>
           new Date(b.uploadedAt) - new Date(a.uploadedAt) || b.pathname.localeCompare(a.pathname),
@@ -113,18 +161,18 @@ export function createDiscussionService({
       const body = typeof input.body === 'string' ? input.body.trim() : '';
       const kind = input.kind ?? 'comment';
       if (author.length < 2 || author.length > 60)
-        throw new DiscussionError(400, 'Use a display name between 2 and 60 characters');
+        throw new DiscussionError(400, 'Indique um nome entre 2 e 60 caracteres');
       if (!body || body.length > 4000)
-        throw new DiscussionError(400, 'Write a comment of up to 4,000 characters');
+        throw new DiscussionError(400, 'Escreva um comentário com até 4 000 caracteres');
       if (!['comment', 'question', 'issue'].includes(kind))
-        throw new DiscussionError(400, 'Invalid comment type');
+        throw new DiscussionError(400, 'Tipo de comentário inválido');
       const id = input.requestId ?? uuid();
-      if (!uuidPattern.test(id)) throw new DiscussionError(400, 'Invalid comment request');
+      if (!uuidPattern.test(id)) throw new DiscussionError(400, 'Pedido de comentário inválido');
       const path = `${threadPrefix(context)}${id}.json`;
       const existing = await store.get(path);
       if (existing) {
         if (existing.author !== author || existing.body !== body || existing.kind !== kind)
-          throw new DiscussionError(409, 'This request was already used for another comment');
+          throw new DiscussionError(409, 'Este pedido já foi utilizado para outro comentário');
         return existing;
       }
       const time = now();
@@ -141,12 +189,15 @@ export function createDiscussionService({
         }
       }
       if (!allowed)
-        throw new DiscussionError(429, 'Too many comments. Please wait a minute and try again');
+        throw new DiscussionError(
+          429,
+          'Demasiados comentários. Aguarde um minuto e tente novamente',
+        );
       const comment = { id, ...context, author, body, kind, createdAt: time.toISOString() };
       if (!(await store.create(path, comment))) {
         const saved = await store.get(path);
         if (saved?.author === author && saved?.body === body && saved?.kind === kind) return saved;
-        throw new DiscussionError(409, 'This request was already used');
+        throw new DiscussionError(409, 'Este pedido já foi utilizado');
       }
       if (store.remove) {
         try {
@@ -206,7 +257,7 @@ export function createHandler(serviceFactory) {
     try {
       const url = new URL(request.url);
       if (!['GET', 'POST'].includes(request.method))
-        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        return new Response(JSON.stringify({ error: 'Método não permitido' }), {
           status: 405,
           headers: { ...headers, Allow: 'GET, POST' },
         });
@@ -215,21 +266,28 @@ export function createHandler(serviceFactory) {
           request.headers.get('origin') !== url.origin ||
           !/^application\/json(?:;|$)/i.test(request.headers.get('content-type') ?? '')
         )
-          throw new DiscussionError(403, 'Use the discussion form on this site');
+          throw new DiscussionError(403, 'Use o formulário de conversa deste painel');
         const text = await readBody(request);
         let input;
         try {
           input = JSON.parse(text);
         } catch {
-          throw new DiscussionError(400, 'Invalid comment request');
+          throw new DiscussionError(400, 'Pedido de comentário inválido');
         }
         if (!input || typeof input !== 'object' || Array.isArray(input))
-          throw new DiscussionError(400, 'Invalid comment request');
+          throw new DiscussionError(400, 'Pedido de comentário inválido');
         const service = await serviceFactory();
         const client =
           request.headers.get('x-vercel-forwarded-for') ??
           request.headers.get('x-forwarded-for') ??
           'workspace';
+        if (input.action === 'state')
+          return new Response(JSON.stringify(await service.setState(input)), {
+            status: 200,
+            headers,
+          });
+        if (input.action && input.action !== 'comment')
+          throw new DiscussionError(400, 'Ação inválida');
         const comment = await service.post(input, client);
         return new Response(JSON.stringify({ comment }), { status: 201, headers });
       }
@@ -247,7 +305,7 @@ export function createHandler(serviceFactory) {
         JSON.stringify({
           error:
             status === 503
-              ? 'Shared discussions are temporarily unavailable. Your draft has not been sent'
+              ? 'As conversas estão temporariamente indisponíveis. O seu rascunho não foi enviado'
               : error.message,
         }),
         { status, headers },

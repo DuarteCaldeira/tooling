@@ -3,6 +3,58 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createDiscussionService, createHandler } from '../dashboard/server/discussions.mjs';
 import { changelogSections, technicalNotes, itemId } from '../dashboard/release-items.mjs';
+import { portugueseDate } from '../dashboard/discussions.js';
+
+test('Portuguese dates include release time and follow Lisbon daylight saving time', () => {
+  assert.equal(portugueseDate('2026-11-15T23:47:00Z'), '15 de novembro, 2026 23:47');
+  assert.equal(portugueseDate('2026-07-15T23:47:00Z'), '16 de julho, 2026 00:47');
+});
+
+test('validation and resolved conversations are shared, reversible and scoped to each item', async () => {
+  const { store, manifest, input } = fixture();
+  let clock = 0;
+  const service = createDiscussionService({
+    store,
+    manifest,
+    now: () => new Date(1794786000000 + clock++ * 1000),
+  });
+  const state = (field, value) =>
+    service.setState({ ...input, field, value, requestId: randomUUID() });
+  assert.equal(
+    (await service.summary(input.repository)).states[input.version][input.item].validated,
+    false,
+  );
+  await state('validated', true);
+  await service.post(input);
+  await state('closed', true);
+  const another = createDiscussionService({ store, manifest });
+  let result = await another.summary(input.repository);
+  assert.deepEqual(result.states[input.version][input.item], { validated: true, closed: true });
+  assert.equal(result.summary[input.version][input.item], 1);
+  assert.equal(result.states['v2.0.0'][input.item].validated, false);
+  await service.post({ ...input, body: 'A new finding reopens the conversation' }, 'another');
+  result = await another.summary(input.repository);
+  assert.equal(result.states[input.version][input.item].closed, false);
+  await state('validated', false);
+  assert.equal(
+    (await another.summary(input.repository)).states[input.version][input.item].validated,
+    false,
+  );
+  await assert.rejects(
+    service.setState({
+      ...input,
+      item: '../../escape',
+      field: 'validated',
+      value: true,
+      requestId: randomUUID(),
+    }),
+    (error) => error.status === 404,
+  );
+  await assert.rejects(
+    service.setState({ ...input, field: 'other', value: true, requestId: randomUUID() }),
+    (error) => error.status === 400,
+  );
+});
 
 function fixture() {
   const data = new Map();
@@ -86,8 +138,8 @@ test('unknown apps, releases and item IDs cannot write to storage', async () => 
   for (const change of [{ repository: 'other/app' }, { version: 'v9' }, { item: '../../outside' }])
     await assert.rejects(service.post({ ...input, ...change }), (error) => error.status === 404);
   assert.equal(data.size, 0);
-  await assert.rejects(service.post({ ...input, author: '' }), /display name/);
-  await assert.rejects(service.post({ ...input, body: 'x'.repeat(4001) }), /4,000/);
+  await assert.rejects(service.post({ ...input, author: '' }), /nome/);
+  await assert.rejects(service.post({ ...input, body: 'x'.repeat(4001) }), /4 000/);
 });
 
 test('rate limit is shared across service instances and does not discard saved comments', async () => {
@@ -149,7 +201,7 @@ test('HTTP storage failures do not reveal secrets or pretend a comment was saved
   assert.equal(response.status, 503);
   const text = await response.text();
   assert.ok(!text.includes('private-storage-token'));
-  assert.match(text, /draft has not been sent/);
+  assert.match(text, /rascunho não foi enviado/);
 });
 
 test('oversized requests are stopped before parsing or touching shared storage', async () => {

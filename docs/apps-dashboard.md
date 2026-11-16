@@ -1,14 +1,18 @@
 # App release dashboard
 
-The Vercel release hub replaces manual Product Owner update messages with a shareable release history for each app. Product changes come first; the application overview retains the latest version, shared tooling version and release date (UTC). It includes prereleases. It does not treat a package version on main as a release, or guess a tooling version from a dependency range.
+The Vercel release hub replaces manual Product Owner update messages with a shareable release history for each app. Product changes come first; the application overview retains the latest version, shared tooling version and release date and time in Europe/Lisbon (including daylight saving time). It includes prereleases. It does not treat a package version on main as a release, or guess a tooling version from a dependency range.
 
 ## Product release notes
+
+The report uses Portuguese UI and full dates such as `15 de novembro, 2026 23:47`. Click a change card to open its conversation in a side panel. Mark individual product or technical items as validated; the `Por validar` filter shows only remaining items. `Com conversas em aberto` shows items or release-level conversations with comments that have not been resolved. Resolve or reopen a conversation in its panel; a later comment reopens it. Review counters cover all releases for the selected app, while filters affect the displayed items.
+
+Validation and conversation status are shared through immutable private Blob events, scoped to the app, release and stable item ID. Their boolean values are encoded in event metadata filenames so summary reads do not download each event body. No personal browser state is used as the shared validation source.
 
 Choose an app from the emoji picker (or the selector on mobile) to browse its releases, search changes or versions, and filter to product notes. Saudinha opens by default; the app selector updates the shareable URL (`?app=DuarteCaldeira%2Fsaudinha-pnn#release-notes`). A compact summary shows the selected app's latest version, last release and tooling version. All six apps remain available in the overview, and SwipeIt is excluded from collection and publication. Releases keep the 🚀 emoji heading style.
 
 `dashboard/release-notes.json` contains reviewed Portuguese summaries for all 32 published Saudinha versions and 28 published Rookie versions, including 1.27.2. Saudinha's source is its versioned `CHANGELOG.md`; Rookie's versioned in-app changelog and Portuguese translations were checked as well as GitHub release notes, because some GitHub releases contain cumulative older changes. Design system 1.0.0 has no published changelog detail and is labelled accordingly. Summaries are shown only when a matching published release exists. Dates come from GitHub and historical behaviours remain tied to their own version.
 
-Technical maintenance is separated into a **Technical details** section, collapsed by default. The original changelog is available inside it. Routine dependency, test, build and release-script updates stay out of the main product summary. No AI provider is called at build time; new app-authored `Novidades` sections are imported automatically, and reviewed summaries can be edited in the file.
+Technical maintenance appears in **Detalhes técnicos**, collapsed by default, only when technical items exist. The original-changelog expander is omitted. Routine dependency, test, build and release-script updates stay out of the main product summary. No AI provider is called at build time; new app-authored `Novidades` sections are imported automatically, and reviewed summaries can be edited in the file.
 
 For automatic product notes on new releases, publish a top-level `Novidades` (Portuguese) or `Product updates` (English) section with plain-language bullet points in the GitHub release body:
 
@@ -23,7 +27,7 @@ For automatic product notes on new releases, publish a top-level `Novidades` (Po
 - Internal implementation details can remain here.
 ```
 
-Collection reads those bullets at each refresh. An explicit summary in `release-notes.json` takes precedence. Releases without an edited summary or product section show an honest “Product summary not available” message and expandable original GitHub notes; the site does not invent or automatically translate summaries. Release bodies are rendered as inert text, including any Markdown or HTML in the original notes. The first ten releases appear initially; “Show older releases” loads more from the collected history.
+Collection reads those bullets at each refresh. An explicit summary in `release-notes.json` takes precedence. Releases without an edited summary or product section show an honest “Product summary not available” message and expandable original GitHub notes; the site does not invent or automatically translate summaries. Visible notes and comments are rendered as inert text; original release bodies remain available through GitHub. The first ten releases appear initially; “Show older releases” loads more from the collected history.
 
 ## Apps
 

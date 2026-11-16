@@ -1,4 +1,4 @@
-import { createDiscussions } from './discussions.js';
+import { createDiscussions, portugueseDate } from './discussions.js';
 
 const discussions = createDiscussions();
 const element = (tag, text, className) => {
@@ -7,40 +7,29 @@ const element = (tag, text, className) => {
   if (className) node.className = className;
   return node;
 };
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' });
-const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-  timeZone: 'UTC',
-});
 function githubLink(text, url, className) {
   const link = element('a', text, className);
   if (typeof url === 'string' && url.startsWith('https://github.com/')) link.href = url;
   return link;
 }
 function releaseDate(value) {
-  if (!value) return element('span', 'No release yet', 'value muted');
-  const time = element('time', dateFormat.format(new Date(value)), 'value');
+  if (!value) return element('span', 'Sem publicação', 'value muted');
+  const time = element('time', portugueseDate(value), 'value');
   time.dateTime = value;
-  time.title = `${dateTimeFormat.format(new Date(value))} UTC`;
+  time.title = 'Hora de Portugal continental · Europe/Lisbon';
   return time;
 }
 function toolingValue(tooling) {
   const block = element('div');
-  if (tooling.version) {
-    block.append(element('span', tooling.version, 'value mono'));
-    if (tooling.revision)
-      block.append(element('small', tooling.revision.slice(0, 7), 'detail mono'));
-  } else {
-    const labels = {
-      'not-adopted': 'Not adopted',
-      unresolved: 'Unresolved',
-      unknown: 'Not available',
-    };
-    block.append(element('span', labels[tooling.status] ?? 'Not available', 'value muted'));
-    if (tooling.declared)
-      block.append(element('small', `Declared: ${tooling.declared}`, 'detail mono'));
-  }
+  const labels = {
+    'not-adopted': 'Não utilizado',
+    unresolved: 'Por resolver',
+    unknown: 'Indisponível',
+  };
+  block.append(
+    element('span', tooling.version ?? labels[tooling.status] ?? 'Indisponível', 'value'),
+  );
+  if (tooling.revision) block.append(element('small', tooling.revision.slice(0, 7), 'detail mono'));
   return block;
 }
 function renderCards(apps) {
@@ -48,74 +37,23 @@ function renderCards(apps) {
   cards.replaceChildren();
   for (const app of apps) {
     const card = element('article', undefined, 'app-card');
-    const header = element('div', undefined, 'card-header');
     const identity = element('div', undefined, 'identity');
-    const avatar = element('span', app.emoji ?? '📦', 'app-icon');
-    avatar.setAttribute('aria-hidden', 'true');
-    const title = element('div');
     const heading = element('h3');
     heading.append(githubLink(app.name, app.repositoryUrl));
-    title.append(heading, element('p', app.repository.split('/')[1], 'repo-name'));
-    identity.append(avatar, title);
-    header.append(identity);
-    const state =
-      app.status === 'unavailable' || app.status === 'partial'
-        ? 'Needs attention'
-        : app.prerelease
-          ? 'Prerelease'
-          : app.version
-            ? 'Released'
-            : 'Unreleased';
-    const status = element(
-      'span',
-      state,
-      `badge ${state === 'Released' ? 'badge-released' : state === 'Needs attention' ? 'badge-warning' : ''}`,
-    );
-    const versionBlock = element('div', undefined, 'version-block');
-    const versionHeading = element('div', undefined, 'version-heading');
-    versionHeading.append(element('span', 'APP VERSION', 'metric-label'), status);
-    versionBlock.append(
-      versionHeading,
-      app.version
-        ? githubLink(app.version, app.releaseUrl, 'app-version mono')
-        : element(
-            'p',
-            app.status === 'unreleased' ? 'No releases yet' : 'Unavailable',
-            'app-version no-version',
-          ),
-    );
+    identity.append(element('span', app.emoji ?? '📦', 'app-icon'), heading);
+    card.append(identity, element('p', app.version ?? 'Sem versão publicada', 'app-version mono'));
     const metrics = element('dl', undefined, 'card-metrics');
-    const tooling = element('div');
-    const toolingData = element('dd');
-    toolingData.append(toolingValue(app.tooling));
-    tooling.append(element('dt', 'Tooling version'), toolingData);
-    const date = element('div');
-    const dateData = element('dd');
-    dateData.append(releaseDate(app.releasedAt));
-    date.append(element('dt', 'Last release'), dateData);
-    metrics.append(tooling, date);
-    const footer = element('div', undefined, 'card-footer');
-    footer.append(
-      element(
-        'span',
-        app.tooling.version
-          ? 'Shared tooling tracked'
-          : app.status === 'partial'
-            ? 'Tooling check failed'
-            : app.version
-              ? 'Published on GitHub'
-              : 'Waiting for a first release',
-        'card-note',
-      ),
-    );
-    const link = githubLink(
-      app.version ? 'View release' : 'Repository',
-      app.version ? app.releaseUrl : app.repositoryUrl,
-      'card-link',
-    );
-    link.append(element('span', ' ↗'));
-    footer.append(link);
-    card.append(header, versionBlock, metrics, footer);
+    for (const [label, value] of [
+      ['🧰 Tooling', toolingValue(app.tooling)],
+      ['🗓️ Publicação', releaseDate(app.releasedAt)],
+    ]) {
+      const field = element('div');
+      const data = element('dd');
+      data.append(value);
+      field.append(element('dt', label), data);
+      metrics.append(field);
+    }
+    card.append(metrics);
     cards.append(card);
   }
 }
@@ -127,20 +65,15 @@ function renderActivity(apps) {
   list.replaceChildren();
   for (const app of releases) {
     const item = element('li');
-    const dot = element('span', undefined, 'timeline-dot');
-    dot.setAttribute('aria-hidden', 'true');
-    const content = element('div');
-    content.append(
-      element('p', app.name, 'activity-name'),
-      githubLink(app.version, app.releaseUrl, 'activity-version mono'),
+    item.append(
+      element('strong', app.name),
+      githubLink(app.version, app.releaseUrl, 'activity-version'),
       releaseDate(app.releasedAt),
     );
-    item.append(dot, content);
     list.append(item);
   }
   document.querySelector('#activity-empty').hidden = releases.length > 0;
 }
-
 function setupReleaseHub(apps, defaultApp) {
   const selection = document.querySelector('#release-app');
   const query = new URLSearchParams(location.search).get('app');
@@ -151,19 +84,16 @@ function setupReleaseHub(apps, defaultApp) {
     const choice = element('button', undefined, 'app-choice');
     choice.type = 'button';
     choice.dataset.app = app.repository;
-    choice.setAttribute('aria-pressed', 'false');
-    const icon = element('span', app.emoji ?? '📦', 'choice-emoji');
-    icon.setAttribute('aria-hidden', 'true');
     const text = element('span');
     text.append(
       element('span', app.name, 'choice-name'),
       element(
         'span',
-        app.version ?? (app.status === 'unavailable' ? 'Unavailable' : 'No releases yet'),
+        app.version ?? (app.status === 'unavailable' ? 'Indisponível' : 'Sem publicações'),
         'choice-version',
       ),
     );
-    choice.append(icon, text);
+    choice.append(element('span', app.emoji ?? '📦', 'choice-emoji'), text);
     choice.addEventListener('click', () => {
       selection.value = app.repository;
       selection.dispatchEvent(new Event('change'));
@@ -176,19 +106,20 @@ function setupReleaseHub(apps, defaultApp) {
     apps[0]?.repository ??
     '';
   let limit = 10;
+  const context = (app, release, item, text) => ({
+    repository: app.repository,
+    version: release.version,
+    item,
+    text,
+    appName: app.name,
+  });
   function updateHistory() {
     const app = apps.find((app) => app.repository === selection.value);
     document.querySelector('#selected-emoji').textContent = app?.emoji ?? '📦';
-    document.querySelector('#selected-app-name').textContent = app?.name ?? 'Select an application';
+    document.querySelector('#selected-app-name').textContent = app?.name ?? 'Escolha uma aplicação';
     document.querySelector('#selected-version').textContent =
-      app?.version ?? (app?.status === 'unavailable' ? 'Unavailable' : 'No releases yet');
-    document
-      .querySelector('#selected-date')
-      .replaceChildren(
-        app?.status === 'unavailable' && !app.releasedAt
-          ? element('span', 'Not available', 'value muted')
-          : releaseDate(app?.releasedAt),
-      );
+      app?.version ?? (app?.status === 'unavailable' ? 'Indisponível' : 'Sem publicações');
+    document.querySelector('#selected-date').replaceChildren(releaseDate(app?.releasedAt));
     document
       .querySelector('#selected-tooling')
       .replaceChildren(toolingValue(app?.tooling ?? { status: 'unknown' }));
@@ -197,144 +128,144 @@ function setupReleaseHub(apps, defaultApp) {
     const feed = document.querySelector('#release-feed');
     feed.replaceChildren();
     const all = app?.releases ?? [];
-    const search = document.querySelector('#notes-search').value.toLocaleLowerCase().trim();
+    const search = document.querySelector('#notes-search').value.toLocaleLowerCase('pt-PT').trim();
     const onlyProduct = document.querySelector('#product-only').checked;
-    const matches = all.filter(
-      (release) =>
-        (!onlyProduct || release.notes.length > 0) &&
-        `${release.version} ${release.releasedAt} ${release.notes.join(' ')} ${release.originalNotes}`
-          .toLocaleLowerCase()
-          .includes(search),
-    );
-    document.querySelector('#notes-context').textContent = app
-      ? `${all.length} published release${all.length === 1 ? '' : 's'}`
-      : 'No application selected';
-    document.querySelector('#notes-message').textContent = !app
-      ? 'No apps configured yet.'
-      : app.status === 'unavailable'
-        ? 'Release history is unavailable. Please try again after the next sync.'
+    const filter = document.querySelector('#review-filter').value;
+    const loaded = discussions.isLoaded(app?.repository);
+    const itemMatches = (release, item) => {
+      const state = discussions.state(context(app, release, item.id, item.text));
+      const matchesSearch = `${release.version} ${portugueseDate(release.releasedAt)} ${item.text}`
+        .toLocaleLowerCase('pt-PT')
+        .includes(search);
+      return (
+        matchesSearch &&
+        (filter === 'all' ||
+          (loaded && (filter === 'pending' ? !state.validated : state.count > 0 && !state.closed)))
+      );
+    };
+    const matches = all
+      .map((release) => {
+        const items = (release.items ?? release.notes.map((text) => ({ text }))).filter((item) =>
+          itemMatches(release, item),
+        );
+        const technical = onlyProduct
+          ? []
+          : (release.technicalItems ?? []).filter((item) => itemMatches(release, item));
+        const releaseState = discussions.state(context(app, release, 'release', ''));
+        const releaseMatch =
+          filter === 'discussions' &&
+          loaded &&
+          releaseState.count > 0 &&
+          !releaseState.closed &&
+          `${release.version} ${release.summaryContext ?? ''}`
+            .toLocaleLowerCase('pt-PT')
+            .includes(search);
+        const emptyMatch =
+          filter === 'all' &&
+          !onlyProduct &&
+          !release.notes.length &&
+          !release.technicalItems?.length &&
+          `${release.version} ${release.summaryContext ?? ''}`
+            .toLocaleLowerCase('pt-PT')
+            .includes(search);
+        return {
+          release,
+          items,
+          technical,
+          visible: items.length || technical.length || releaseMatch || emptyMatch,
+        };
+      })
+      .filter((entry) => entry.visible);
+    const totalItems = all.flatMap((release) => [
+      ...(release.items ?? []),
+      ...(release.technicalItems ?? []),
+    ]);
+    let validated = 0,
+      open = 0;
+    for (const release of all) {
+      for (const item of [...(release.items ?? []), ...(release.technicalItems ?? [])]) {
+        const state = discussions.state(context(app, release, item.id, item.text));
+        if (state.validated) validated++;
+        if (state.count && !state.closed) open++;
+      }
+      const state = discussions.state(context(app, release, 'release', ''));
+      if (state.count && !state.closed) open++;
+    }
+    document.querySelector('#review-total').textContent = totalItems.length;
+    document.querySelector('#review-pending').textContent = loaded
+      ? totalItems.length - validated
+      : '—';
+    document.querySelector('#review-open').textContent = loaded ? open : '—';
+    const progress = document.querySelector('#review-progress');
+    progress.value = validated;
+    progress.max = totalItems.length || 1;
+    document.querySelector('#review-caption').textContent = loaded
+      ? `${validated} de ${totalItems.length} alterações validadas`
+      : 'A carregar o estado de revisão…';
+    document.querySelector('#notes-context').textContent =
+      `${all.length} versões publicadas · ${matches.length} nesta vista`;
+    document.querySelector('#notes-message').textContent =
+      app?.status === 'unavailable'
+        ? 'Não foi possível consultar esta aplicação. Tente novamente após a próxima atualização.'
         : !all.length
-          ? 'No published releases yet. Updates will appear here after the first release.'
-          : !matches.length
-            ? 'No releases match your search.'
-            : '';
+          ? 'Ainda não há versões publicadas. As novidades vão aparecer aqui.'
+          : filter !== 'all' && !loaded
+            ? discussions.hasError(app?.repository)
+              ? 'Não foi possível carregar os estados. Tente atualizar a revisão.'
+              : 'A carregar validações e conversas…'
+            : !matches.length
+              ? 'Nenhuma alteração corresponde aos filtros.'
+              : '';
     const share = new URL(location.href);
     share.searchParams.set('app', selection.value);
     share.searchParams.delete('release');
     share.searchParams.delete('item');
     share.hash = 'release-notes';
     document.querySelector('#share-app').href = share.toString();
-    for (const [index, release] of matches.slice(0, limit).entries()) {
-      const article = element(
-        'article',
-        undefined,
-        `release-entry ${release.source === 'github' ? 'source-entry' : ''}`,
-      );
+    for (const { release, items, technical } of matches.slice(0, limit)) {
+      const article = element('article', undefined, 'release-entry');
       article.id = `release-${release.version.replace(/[^a-z\d.-]/gi, '-')}`;
       const heading = element('div', undefined, 'release-heading');
       const identity = element('div', undefined, 'release-identity');
-      const title = element('h3', release.version, 'mono');
-      const rocket = element('span', '🚀', 'release-icon');
-      rocket.setAttribute('aria-hidden', 'true');
-      identity.append(rocket, title);
-      if (index === 0 && !search && !onlyProduct)
-        identity.append(element('span', 'Latest', 'badge badge-released'));
-      if (release.prerelease) identity.append(element('span', 'Prerelease', 'badge'));
-      const date = releaseDate(release.releasedAt);
-      heading.append(identity, date);
+      const icon = element('span', '🚀', 'release-icon');
+      icon.setAttribute('aria-hidden', 'true');
+      identity.append(icon, element('h3', release.version, 'mono'));
+      if (release === all[0])
+        identity.append(element('span', 'Mais recente', 'badge badge-released'));
+      if (release.prerelease) identity.append(element('span', 'Pré-lançamento', 'badge'));
+      heading.append(identity, releaseDate(release.releasedAt));
       article.append(heading);
-      if (release.notes.length) {
+      if (items.length) {
         const list = element('ul', undefined, 'change-list');
-        list.lang = release.language ?? 'en';
-        for (const [noteIndex, note] of release.notes.entries()) {
-          const item = element('li');
-          const copy = element('span', undefined, 'change-copy');
-          const split = note.indexOf(': ');
-          if (split > 0 && split < 45)
-            copy.append(
-              element('strong', note.slice(0, split + 1)),
-              document.createTextNode(note.slice(split + 1)),
-            );
-          else copy.textContent = note;
-          item.append(copy);
-          const id = release.items?.[noteIndex]?.id;
-          if (id)
-            item.append(
-              discussions.button({
-                repository: app.repository,
-                version: release.version,
-                item: id,
-                appName: app.name,
-                text: note,
-              }),
-            );
-          list.append(item);
-        }
+        list.lang = release.language ?? 'pt-PT';
+        for (const item of items)
+          list.append(discussions.item(context(app, release, item.id, item.text)));
         article.append(list);
-      } else {
+      } else if (!technical.length && filter === 'all') {
         article.append(
           element(
             'p',
-            release.summaryContext ??
-              (release.source === 'github'
-                ? 'Product summary not available for this release.'
-                : 'Sem alterações funcionais descritas nesta versão. Consulte a manutenção técnica abaixo.'),
+            release.summaryContext ?? 'Esta versão não tem alterações funcionais descritas.',
             'source-note',
           ),
         );
       }
-      if (release.technicalItems?.length || release.originalNotes) {
-        const technical = element('details', undefined, 'technical-notes');
-        technical.append(
-          element(
-            'summary',
-            `🛠️ Technical details${release.technicalItems?.length ? ` (${release.technicalItems.length})` : ''}`,
-          ),
-        );
-        if (release.technicalItems?.length) {
-          const list = element('ul', undefined, 'change-list technical-list');
-          for (const entry of release.technicalItems) {
-            const item = element('li');
-            item.append(
-              element('span', entry.text, 'change-copy'),
-              discussions.button({
-                repository: app.repository,
-                version: release.version,
-                item: entry.id,
-                appName: app.name,
-                text: entry.text,
-              }),
-            );
-            list.append(item);
-          }
-          technical.append(list);
-        }
-        const original = element('details', undefined, 'original-notes');
-        original.append(element('summary', 'Read original changelog'));
-        original.append(
-          element('pre', release.originalNotes || 'No release notes were published.'),
-        );
-        technical.append(original);
-        article.append(technical);
+      if (technical.length) {
+        const details = element('details', undefined, 'technical-notes');
+        details.append(element('summary', `🛠️ Detalhes técnicos · ${technical.length}`));
+        const list = element('ul', undefined, 'change-list technical-list');
+        for (const item of technical)
+          list.append(discussions.item(context(app, release, item.id, item.text)));
+        details.append(list);
+        article.append(details);
       }
       const footer = element('div', undefined, 'release-footer');
       footer.append(
         discussions.button(
-          {
-            repository: app.repository,
-            version: release.version,
-            item: 'release',
-            appName: app.name,
-            text: 'Release discussion and new findings',
-          },
-          '💬 Release discussion / new finding',
+          context(app, release, 'release', 'Conversa sobre esta versão e novas descobertas'),
+          '💬 Conversa da versão',
         ),
-        element(
-          'span',
-          release.source === 'github' ? 'GitHub notes · Not edited for product' : 'Product notes',
-          'source-label',
-        ),
-        githubLink('View on GitHub ↗', release.url, 'text-link'),
+        githubLink('Ver no GitHub ↗', release.url, 'text-link'),
       );
       article.append(footer);
       feed.append(article);
@@ -351,8 +282,9 @@ function setupReleaseHub(apps, defaultApp) {
     url.hash = 'release-notes';
     history.replaceState(null, '', url);
     updateHistory();
+    discussions.refreshSummary(selection.value);
   });
-  for (const id of ['notes-search', 'product-only'])
+  for (const id of ['notes-search', 'product-only', 'review-filter'])
     document.getElementById(id).addEventListener(id === 'notes-search' ? 'input' : 'change', () => {
       limit = 10;
       updateHistory();
@@ -361,14 +293,19 @@ function setupReleaseHub(apps, defaultApp) {
     limit += 10;
     updateHistory();
   });
+  document
+    .querySelector('#refresh-review')
+    .addEventListener('click', () => discussions.refreshSummary(selection.value));
+  document.addEventListener('review-changed', (event) => {
+    if (event.detail === selection.value) updateHistory();
+  });
   updateHistory();
 }
 try {
   const response = await fetch('./data.json', { cache: 'no-store' });
-  if (!response.ok) throw new Error('Release data unavailable');
+  if (!response.ok) throw new Error();
   const snapshot = await response.json();
-  if (snapshot.schemaVersion !== 1 || !Array.isArray(snapshot.apps))
-    throw new Error('Unsupported release data');
+  if (snapshot.schemaVersion !== 1 || !Array.isArray(snapshot.apps)) throw new Error();
   const apps = snapshot.apps;
   const released = apps.filter((app) => app.version).length;
   const adopted = apps.filter((app) => app.tooling.version).length;
@@ -384,40 +321,30 @@ try {
   document.querySelector('#adoption-percent').textContent = `${percent}%`;
   document.querySelector('#adoption-progress').value = percent;
   document.querySelector('#adoption-note').textContent =
-    `${adopted} of ${apps.length} apps have a resolved tooling version at their latest release.`;
-  const checked = new Date(snapshot.generatedAt);
-  const stale = Date.now() - checked.getTime() > 2 * 60 * 60 * 1000;
+    `${adopted} de ${apps.length} aplicações têm uma versão de tooling identificada na última publicação.`;
   document.querySelector('#updated').textContent =
-    `${dateTimeFormat.format(checked)} UTC${stale ? ' · Refresh overdue' : ''}`;
-  if (stale) document.querySelector('#updated').classList.add('attention');
-  const message = document.querySelector('#message');
-  const problems = apps.filter((app) => ['unavailable', 'partial'].includes(app.status)).length;
-  const warning = problems
-    ? `${problems} app${problems === 1 ? '' : 's'} could not be fully checked.`
-    : '';
+    portugueseDate(snapshot.generatedAt) +
+    (Date.now() - Date.parse(snapshot.generatedAt) > 7200000 ? ' · Atualização em atraso' : '');
   let filter = 'all';
   function update() {
-    const query = document.querySelector('#search').value.toLocaleLowerCase().trim();
+    const query = document.querySelector('#search').value.toLocaleLowerCase('pt-PT').trim();
     const visible = apps.filter(
       (app) =>
-        `${app.name} ${app.repository}`.toLocaleLowerCase().includes(query) &&
+        `${app.name} ${app.repository}`.toLocaleLowerCase('pt-PT').includes(query) &&
         (filter === 'all' ||
           (filter === 'released' ? Boolean(app.version) : app.status === 'unreleased')),
     );
     visible.sort(
       document.querySelector('#sort').value === 'name'
-        ? (a, b) => a.name.localeCompare(b.name)
-        : (a, b) =>
-            (Date.parse(b.releasedAt) || 0) - (Date.parse(a.releasedAt) || 0) ||
-            a.name.localeCompare(b.name),
+        ? (a, b) => a.name.localeCompare(b.name, 'pt-PT')
+        : (a, b) => (Date.parse(b.releasedAt) || 0) - (Date.parse(a.releasedAt) || 0),
     );
     renderCards(visible);
-    message.textContent = !apps.length
-      ? 'No apps configured yet.'
-      : !visible.length
-        ? 'No apps match your filters.'
-        : warning;
-    message.classList.toggle('empty', visible.length === 0);
+    document.querySelector('#message').textContent = !visible.length
+      ? 'Nenhuma aplicação corresponde aos filtros.'
+      : apps.some((app) => app.status === 'unavailable')
+        ? 'Algumas aplicações estão indisponíveis. Verifique o acesso aos repositórios.'
+        : '';
   }
   for (const button of document.querySelectorAll('[data-filter]'))
     button.addEventListener('click', () => {
@@ -439,9 +366,7 @@ try {
   });
   update();
 } catch {
-  document.querySelector('#updated').textContent = 'Release information unavailable';
+  document.querySelector('#updated').textContent = 'Informação indisponível';
   document.querySelector('#message').textContent =
-    'We couldn’t load the release data. Please try again shortly.';
-  document.querySelector('#activity-empty').hidden = false;
-  document.querySelector('#adoption-note').textContent = 'Tooling information unavailable.';
+    'Não foi possível carregar as versões. Tente novamente dentro de instantes.';
 }
