@@ -112,6 +112,11 @@ export function loadConfig(root, path = process.env.TOOLING_CONFIG_PATH ?? 'tool
   const config = validateConfig(JSON.parse(raw));
   const paths = [
     ...(config.inputs ?? []),
+    ...(config.sass?.entrypoints ?? []),
+    ...(config.sass?.include ?? []),
+    ...(config.sass?.exclude ?? []),
+    ...(config.sass?.importantExceptions ?? []),
+    ...(config.sass?.source ? [config.sass.source] : []),
     ...(config.execution?.typeScriptBuildInfo ?? []),
     ...(config.architecture?.include ?? []),
     ...(config.architecture?.exclude ?? []),
