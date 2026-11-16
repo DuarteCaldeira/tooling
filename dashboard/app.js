@@ -1,4 +1,4 @@
-import { createDiscussions, portugueseDate, itemTopics } from './discussions.js';
+import { createDiscussions, portugueseDate, itemTopics, chevronIcon } from './discussions.js';
 
 const discussions = createDiscussions();
 const element = (tag, text, className) => {
@@ -157,6 +157,57 @@ function setupReleaseHub(apps, defaultApp) {
       (id === 'notes-search' || [...input.options].some((option) => option.value === value))
     )
       input.value = value;
+  }
+  function renderGroups(items, app, release, key, technical, loaded, filtering) {
+    const groups = new Map();
+    for (const item of items) {
+      const area = itemTopics(item.text, technical).find((topic) => topic.kind === 'area') ?? {
+        id: technical ? 'manutencao' : 'geral',
+        label: technical ? 'Manutenção' : 'Geral',
+        emoji: technical ? '🛠️' : '📦',
+      };
+      if (!groups.has(area.id)) groups.set(area.id, { area, items: [] });
+      groups.get(area.id).items.push(item);
+    }
+    const ordered = [...groups.values()].sort(
+      (a, b) =>
+        (a.area.id === 'geral') - (b.area.id === 'geral') ||
+        a.area.label.localeCompare(b.area.label, 'pt-PT'),
+    );
+    const wrapper = element('div', undefined, 'area-groups');
+    wrapper.lang = release.language ?? 'pt-PT';
+    for (const { area, items: group } of ordered) {
+      const groupKey = `${key}/area/${area.id}`;
+      const checked = technical
+        ? 0
+        : group.filter(
+            (item) => discussions.state(context(app, release, item.id, item.text)).validated,
+          ).length;
+      const done = !technical && loaded && checked === group.length;
+      const details = element('details', undefined, `area-group${done ? ' area-done' : ''}`);
+      details.open = expanded.get(groupKey) ?? (filtering || ordered.length === 1 || !done);
+      const summary = element('summary', undefined, 'area-heading');
+      summary.addEventListener('click', () => expanded.set(groupKey, !details.open));
+      summary.append(
+        element('span', area.emoji, 'area-emoji'),
+        element('span', area.label, 'area-title'),
+        element(
+          'span',
+          technical || !loaded ? `${group.length}` : `${checked}/${group.length} validadas`,
+          'area-count',
+        ),
+      );
+      const arrow = chevronIcon();
+      summary.append(arrow);
+      const list = element('ul', undefined, 'change-list');
+      for (const item of group)
+        list.append(
+          discussions.item({ ...context(app, release, item.id, item.text), technical, inGroup: true, areaLabel: area.label }),
+        );
+      details.append(summary, list);
+      wrapper.append(details);
+    }
+    return wrapper;
   }
   let viewUrl = new URL(location.href);
   function updateHistory() {
@@ -336,17 +387,14 @@ function setupReleaseHub(apps, defaultApp) {
           `release-review${fullyValidated ? ' complete' : ''}`,
         ),
       );
-      const chevron = element('span', '⌄', 'release-chevron');
+      const chevron = element('span', undefined, 'release-chevron');
+      chevron.append(chevronIcon());
       chevron.setAttribute('aria-hidden', 'true');
       heading.append(identity, meta, chevron);
       article.append(heading);
       const body = element('div', undefined, 'release-body');
       if (items.length) {
-        const list = element('ul', undefined, 'change-list');
-        list.lang = release.language ?? 'pt-PT';
-        for (const item of items)
-          list.append(discussions.item(context(app, release, item.id, item.text)));
-        body.append(list);
+        body.append(renderGroups(items, app, release, key, false, loaded, filtering));
       } else if (!technical.length && !needsState)
         body.append(
           element(
@@ -364,19 +412,14 @@ function setupReleaseHub(apps, defaultApp) {
         const summary = element('summary', `🛠️ Detalhes técnicos · ${technical.length}`);
         summary.addEventListener('click', () => expanded.set(technicalKey, !details.open));
         details.append(summary);
-        const list = element('ul', undefined, 'change-list technical-list');
-        for (const item of technical)
-          list.append(
-            discussions.item({ ...context(app, release, item.id, item.text), technical: true }),
-          );
-        details.append(list);
+        details.append(renderGroups(technical, app, release, technicalKey, true, loaded, filtering));
         body.append(details);
       }
       const footer = element('div', undefined, 'release-footer');
       footer.append(
         discussions.button(
           context(app, release, 'release', 'Conversa sobre esta versão e novas descobertas'),
-          '💬 Conversa da versão',
+          '🐛 Reportar bug',
         ),
         githubLink('Ver no GitHub ↗', release.url, 'text-link'),
       );
