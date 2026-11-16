@@ -91,6 +91,25 @@ const node = (tag, text, className) => {
   return value;
 };
 
+export function chevronIcon(className = 'chevron') {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 20 20');
+  svg.setAttribute('width', '20');
+  svg.setAttribute('height', '20');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('class', className);
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M5 7.5l5 5 5-5');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '1.75');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  svg.append(path);
+  return svg;
+}
+
 export function createDiscussions() {
   let participantId = crypto.randomUUID();
   try {
@@ -112,6 +131,7 @@ export function createDiscussions() {
   close.addEventListener('click', () => dialog.close());
   heading.append(title, close);
   const contextLabel = node('p', undefined, 'discussion-context');
+  const topicRow = node('div', undefined, 'discussion-topics');
   const quote = node('blockquote', undefined, 'discussion-quote');
   const status = node('p', undefined, 'discussion-status');
   status.setAttribute('role', 'status');
@@ -142,20 +162,39 @@ export function createDiscussions() {
   more.hidden = true;
   const form = node('form', undefined, 'comment-form');
   const nameLabel = node('label', 'O seu nome');
-  const author = node('input');
+  const author = node('input', undefined, 'ds-input');
   author.name = 'author';
   author.required = true;
   author.minLength = 2;
   author.maxLength = 60;
   author.autocomplete = 'nickname';
   nameLabel.append(author);
+  const nameRow = node('p', undefined, 'comment-as');
+  const nameValue = node('strong');
+  const changeName = node('button', 'Alterar', 'text-button');
+  changeName.type = 'button';
+  nameRow.append('A comentar como ', nameValue, ' · ', changeName);
+  const syncName = () => {
+    const known = author.value.trim().length >= 2 && !editingName;
+    nameLabel.hidden = known;
+    nameRow.hidden = !known;
+    nameValue.textContent = author.value.trim();
+  };
+  let editingName = false;
+  changeName.addEventListener('click', () => {
+    editingName = true;
+    syncName();
+    author.focus();
+    author.select();
+  });
   try {
     author.value = localStorage.getItem('tooling-discussion-name') ?? '';
   } catch {
     /* Storage can be disabled. */
   }
+  syncName();
   const kindLabel = node('label', 'Tipo de comentário');
-  const kind = node('select');
+  const kind = node('select', undefined, 'ds-select');
   kind.name = 'kind';
   for (const [value, text] of [
     ['comment', '💬 Comentário'],
@@ -168,7 +207,7 @@ export function createDiscussions() {
   }
   kindLabel.append(kind);
   const bodyLabel = node('label', 'Comentário');
-  const body = node('textarea');
+  const body = node('textarea', undefined, 'ds-textarea');
   body.name = 'body';
   body.required = true;
   body.maxLength = 4000;
@@ -183,8 +222,8 @@ export function createDiscussions() {
     'Os seus comentários aparecem como «Tu» neste navegador. Os nomes são indicados pelos participantes.',
     'identity-note',
   );
-  form.append(nameLabel, kindLabel, bodyLabel, identityNote, submit);
-  dialog.append(heading, contextLabel, quote, toolbar, status, list, more, form);
+  form.append(nameRow, nameLabel, kindLabel, bodyLabel, identityNote, submit);
+  dialog.append(heading, contextLabel, topicRow, quote, toolbar, status, list, more, form);
   document.body.append(dialog);
 
   let active;
@@ -332,6 +371,14 @@ export function createDiscussions() {
     contextLabel.textContent = `${context.appName} · ${context.version}`;
     resolve.textContent = state(context).closed ? 'Reabrir conversa' : 'Marcar como resolvida';
     quote.textContent = context.text;
+    topicRow.replaceChildren(
+      ...(context.item === 'release'
+        ? []
+        : itemTopics(context.text, context.technical).map((topic) =>
+            node('span', topic.emoji + ' ' + topic.label, 'topic-tag topic-' + topic.kind),
+          )),
+    );
+    topicRow.hidden = !topicRow.children.length;
     const draft = drafts.get(keyOf(context));
     request = draft?.request ?? null;
     body.value = draft?.body ?? '';
@@ -385,6 +432,8 @@ export function createDiscussions() {
       } catch {
         /* The comment is already saved on the server. */
       }
+      editingName = false;
+      syncName();
       drafts.delete(keyOf(context));
       if (current === generation) {
         comments.set(result.comment.id, result.comment);
@@ -417,14 +466,26 @@ export function createDiscussions() {
       trigger.setAttribute('aria-label', 'Abrir conversa: ' + context.text);
       const copy = node('span', undefined, 'change-copy');
       const split = context.text.indexOf(': ');
-      if (split > 0 && split < 45)
+      const plain = (value) =>
+        value
+          .normalize('NFD')
+          .replace(/[̀-ͯ]/g, '')
+          .toLocaleLowerCase('pt-PT');
+      if (
+        context.inGroup &&
+        split > 0 &&
+        plain(context.text.slice(0, split)) === plain(context.areaLabel ?? '')
+      )
+        copy.textContent = context.text.slice(split + 2);
+      else if (split > 0 && split < 45)
         copy.append(
           node('strong', context.text.slice(0, split + 1)),
           document.createTextNode(context.text.slice(split + 1)),
         );
       else copy.textContent = context.text;
-      const arrow = node('span', '↗', 'item-arrow');
+      const arrow = node('span', undefined, 'item-arrow');
       arrow.setAttribute('aria-hidden', 'true');
+      arrow.append(chevronIcon());
       trigger.append(copy, arrow);
       trigger.addEventListener('click', () => open(context));
       const actions = node('div', undefined, 'item-actions');
@@ -466,6 +527,7 @@ export function createDiscussions() {
       actions.append(conversation);
       const tags = node('div', undefined, 'item-topics');
       for (const topic of itemTopics(context.text, context.technical)) {
+        if (context.inGroup && topic.kind === 'area') continue;
         const tag = node(
           'button',
           topic.emoji + ' ' + topic.label,
@@ -482,7 +544,9 @@ export function createDiscussions() {
         );
         tags.append(tag);
       }
-      item.append(tags, trigger, actions, feedback);
+      const meta = node('div', undefined, 'item-meta');
+      meta.append(...(tags.children.length ? [tags] : []), actions);
+      item.append(trigger, meta, feedback);
       return item;
     },
     button(context, label = '💬 Conversar') {

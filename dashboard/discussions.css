@@ -8,8 +8,8 @@
   display: grid;
 }
 .change-item {
-  padding: 0;
   margin: 0;
+  padding: var(--ds-spacing-5);
   border-bottom: 1px solid var(--color-border);
 }
 .change-item:last-child {
@@ -20,64 +20,63 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--ds-spacing-4);
-  padding: var(--ds-spacing-4) var(--ds-spacing-2) var(--ds-spacing-2);
-  margin-inline: calc(var(--ds-spacing-2) * -1);
-  width: calc(100% + var(--ds-spacing-4));
+  width: 100%;
+  min-height: 0;
+  padding: 0;
   border: 0;
-  border-radius: var(--ds-radius-xl);
   background: transparent;
   color: var(--color-text);
   text-align: left;
-  font-size: 17px;
-  line-height: 1.7;
-  transition: background-color var(--ds-duration-base) var(--ds-ease-default);
+  font-size: 16px;
+  line-height: 1.65;
 }
-.item-trigger:hover {
-  background: var(--color-primary-subtle);
+.item-trigger:hover .change-copy {
+  color: var(--color-primary-active);
 }
 .change-copy {
   display: block;
+  max-width: 68ch;
   overflow-wrap: anywhere;
+  transition: color var(--ds-duration-base) var(--ds-ease-default);
 }
 .change-copy strong {
   font-weight: 700;
 }
 .item-arrow {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
   width: 28px;
   height: 28px;
-  display: grid;
-  place-items: center;
-  margin-top: 2px;
   border-radius: var(--ds-radius-full);
-  font-size: 16px;
   color: var(--color-text-subtle);
   background: var(--color-bg-subtle);
-  opacity: 0;
-  transform: translate(-4px, 4px);
+  transform: rotate(-90deg);
   transition:
-    opacity var(--ds-duration-base) var(--ds-ease-default),
+    background-color var(--ds-duration-base) var(--ds-ease-default),
+    color var(--ds-duration-base) var(--ds-ease-default),
     transform var(--ds-duration-moderate) var(--ds-ease-drawer);
 }
 .item-trigger:hover .item-arrow,
 .item-trigger:focus-visible .item-arrow {
-  opacity: 1;
-  transform: none;
   color: var(--color-primary-active);
   background: var(--ds-color-primary-100);
+  transform: rotate(-90deg) translateY(2px);
 }
-@media (hover: none) {
-  .item-arrow {
-    opacity: 1;
-    transform: none;
-  }
+.item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-spacing-3) var(--ds-spacing-5);
+  margin-top: var(--ds-spacing-3);
 }
 .item-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--ds-spacing-2) var(--ds-spacing-4);
-  padding: 0 0 var(--ds-spacing-3);
+  gap: var(--ds-spacing-2) var(--ds-spacing-3);
+  margin-left: auto;
 }
 .validation-button {
   display: inline-flex;
@@ -140,25 +139,6 @@
 .discuss-button:hover {
   background: var(--ds-color-primary-100);
 }
-.technical-notes {
-  margin: var(--ds-spacing-4) 0;
-  padding: var(--ds-spacing-3) var(--ds-spacing-4);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--ds-radius-2xl);
-  background: var(--color-bg);
-}
-.technical-notes > summary {
-  color: var(--color-text-muted);
-  font-size: 15px;
-  font-weight: 500;
-}
-.technical-list {
-  margin-top: var(--ds-spacing-3);
-}
-.technical-list .item-trigger {
-  font-size: 16px;
-}
-
 /* ───────── Conversation drawer ───────── */
 .discussion-dialog {
   position: fixed;
@@ -301,7 +281,7 @@
 }
 .comment-form {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: var(--ds-spacing-4);
   margin-top: var(--ds-spacing-6);
   padding-top: var(--ds-spacing-5);
@@ -314,40 +294,31 @@
   font-weight: 600;
   color: var(--color-text-muted);
 }
-.comment-form input,
-.comment-form select,
-.comment-form textarea {
-  width: 100%;
-  min-width: 0;
-  padding: var(--ds-spacing-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--ds-radius-lg);
-  background: var(--color-surface);
-  color: var(--color-text);
+/* Inputs use the shared .ds-input / .ds-select / .ds-textarea styles. */
+.comment-form .ds-input,
+.comment-form .ds-select,
+.comment-form .ds-textarea {
   font-size: 16px;
-  font-weight: 400;
-  box-shadow: var(--shadow-field-shell);
-  transition:
-    border-color var(--ds-duration-base) var(--ds-ease-default),
-    box-shadow var(--ds-duration-moderate) var(--ds-ease-default);
 }
-.comment-form input:hover,
-.comment-form select:hover,
-.comment-form textarea:hover {
-  border-color: var(--color-border-strong);
+.comment-as {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ds-spacing-1);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
 }
-.comment-form input:focus-visible,
-.comment-form select:focus-visible,
-.comment-form textarea:focus-visible {
-  outline: none;
-  border-color: var(--ds-color-primary-300);
-  box-shadow: var(--shadow-field-focus);
+.comment-as strong {
+  color: var(--color-text);
 }
-.comment-form textarea {
-  resize: vertical;
-  line-height: 1.7;
+.discussion-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-spacing-2);
+  margin: 0 0 var(--ds-spacing-4);
 }
-.comment-form label:nth-child(3),
 .identity-note {
   grid-column: 1 / -1;
 }

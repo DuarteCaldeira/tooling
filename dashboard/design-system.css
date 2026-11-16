@@ -157,3 +157,73 @@
   --shadow-button-primary-active: 0 1px 2px rgb(0 0 0 / 0.1);
   --shadow-button-secondary-hover: 0 2px 4px rgb(0 0 0 / 0.08);
 }
+
+/* Form controls mirroring @dcaldeira/design-system Input, Select and Textarea
+ * (Input.module.scss, Select.module.scss, Textarea.module.scss, control-field mixins). */
+:root {
+  --control-height: 2.875rem;
+  --control-padding-inline: var(--ds-spacing-3);
+  --ds-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7280' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5l5 5 5-5'/%3E%3C/svg%3E");
+}
+.ds-input,
+.ds-select,
+.ds-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding-inline: var(--control-padding-inline);
+  border: 1px solid var(--color-border);
+  border-radius: var(--ds-radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+  box-shadow: var(--shadow-field-shell);
+  transition:
+    border-color var(--ds-duration-base) var(--ds-ease-default),
+    box-shadow var(--ds-duration-base) var(--ds-ease-default);
+}
+.ds-input,
+.ds-select {
+  height: var(--control-height);
+  min-height: var(--control-height);
+}
+.ds-select {
+  padding-inline-end: var(--ds-spacing-10);
+  background-image: var(--ds-select-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--ds-spacing-3) center;
+  background-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+.ds-textarea {
+  min-height: 6rem;
+  padding-block: var(--ds-spacing-2);
+  line-height: 1.5;
+  resize: vertical;
+}
+.ds-input::placeholder,
+.ds-textarea::placeholder {
+  color: var(--color-text-subtle);
+  opacity: 1;
+}
+.ds-input:hover:not(:disabled):not(:focus),
+.ds-select:hover:not(:disabled):not(:focus),
+.ds-textarea:hover:not(:disabled):not(:focus) {
+  border-color: var(--color-border-strong);
+}
+.ds-input:focus,
+.ds-select:focus,
+.ds-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-field-focus);
+}
+.ds-input:disabled,
+.ds-select:disabled,
+.ds-textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--color-bg-subtle);
+}
