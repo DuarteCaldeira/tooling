@@ -64,8 +64,13 @@ test('Vercel build works from its project root without dependencies and publishe
     for (const name of [
       'build.mjs',
       'collect.mjs',
+      'release-items.mjs',
       'apps.json',
+      'release-notes.json',
       'app.js',
+      'discussions.js',
+      'discussions.css',
+      'design-system.css',
       'styles.css',
       'index.html',
       'vercel.json',
@@ -89,6 +94,9 @@ test('Vercel build works from its project root without dependencies and publishe
     assert.deepEqual((await readdir(join(root, 'dist'))).sort(), [
       'app.js',
       'data.json',
+      'design-system.css',
+      'discussions.css',
+      'discussions.js',
       'index.html',
       'styles.css',
     ]);

@@ -1,84 +1,234 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-PT">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="description" content="Release versions and shared tooling across your apps." />
-    <title>App overview · Tooling</title>
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="As novidades das suas aplicações, prontas para rever." />
+    <title>Novidades | Tooling</title>
+    <link rel="stylesheet" href="./design-system.css" />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./discussions.css" />
     <script src="./app.js" type="module"></script>
   </head>
   <body>
-    <a class="skip" href="#apps">Skip to apps</a>
-    <div class="shell">
-      <header class="topbar">
-        <a class="brand" href="./"
-          ><span class="brand-icon" aria-hidden="true">t</span> tooling
-          <span class="divider">/</span> app overview</a
-        ><span class="live"><span aria-hidden="true"></span> Release monitor</span>
-      </header>
-      <main>
-        <section class="intro" aria-labelledby="title">
-          <p class="eyebrow">YOUR PROJECTS, AT A GLANCE</p>
-          <h1 id="title">Small details.<br /><span>The whole picture.</span></h1>
-          <p class="description">
-            Every app, its latest release, and the tooling behind it.<br class="desktop" />
-            One place to keep everything in view.
-          </p>
-          <p id="updated" class="updated">Loading release information…</p>
-        </section>
-        <section class="stats" aria-label="Release overview">
-          <div><span class="stat-label">Apps in view</span><strong id="total">—</strong></div>
-          <div><span class="stat-label">With a release</span><strong id="released">—</strong></div>
-          <div>
-            <span class="stat-label">Using shared tooling</span><strong id="adopted">—</strong>
-          </div>
-        </section>
-        <section id="apps" aria-labelledby="apps-title" tabindex="-1">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">THE LINEUP</p>
-              <h2 id="apps-title">Your apps</h2>
+    <a class="skip" href="#release-notes">Saltar para as novidades</a>
+    <header class="site-header">
+      <div class="header-content">
+        <a href="./" class="brand"
+          ><span aria-hidden="true">🧰</span> tooling <span class="brand-divider">/</span
+          ><span class="brand-section">novidades</span></a
+        ><a class="header-link" href="https://github.com/DuarteCaldeira/tooling"
+          >GitHub <span aria-hidden="true">↗</span></a
+        >
+      </div>
+    </header>
+    <main class="workspace">
+      <aside class="app-sidebar" aria-label="Aplicações">
+        <div class="sidebar-heading">
+          <h2>As suas aplicações</h2>
+          <span id="nav-count" class="count">—</span>
+        </div>
+        <nav id="app-nav" aria-label="Escolher uma aplicação"></nav>
+        <a class="overview-link" href="#apps"
+          >📦 Visão geral das aplicações <span aria-hidden="true">↗</span></a
+        >
+        <div class="sync-info">
+          <span>Última atualização</span>
+          <p id="updated">A carregar as versões…</p>
+        </div>
+      </aside>
+      <div class="main-area">
+        <div class="page-heading">
+          <p class="eyebrow">DO LANÇAMENTO À VALIDAÇÃO</p>
+          <h1>Novidades<span class="title-dot">.</span></h1>
+          <p class="subtitle">Cada novidade, uma conversa. Cada detalhe, no seu lugar. ✨</p>
+        </div>
+        <section id="release-notes" aria-labelledby="selected-app-name">
+          <div class="selected-app">
+            <div class="selected-app-heading">
+              <div class="selected-identity">
+                <span id="selected-emoji" class="selected-emoji" aria-hidden="true">📦</span>
+                <div>
+                  <label for="release-app">A ACONTECER EM</label>
+                  <h2 id="selected-app-name" class="sr-only">Escolha uma aplicação</h2>
+                  <select id="release-app" aria-label="Histórico de versões da aplicação"></select>
+                </div>
+              </div>
             </div>
-            <label class="search"
-              ><span class="sr-only">Search apps</span
-              ><input id="search" type="search" placeholder="Find an app…" autocomplete="off"
-            /></label>
+            <dl class="selected-metrics">
+              <div>
+                <dt><span aria-hidden="true">🚀</span> Última versão</dt>
+                <dd id="selected-version">—</dd>
+              </div>
+              <div>
+                <dt><span aria-hidden="true">🗓️</span> Última publicação</dt>
+                <dd id="selected-date">—</dd>
+              </div>
+              <div>
+                <dt><span aria-hidden="true">🧰</span> Versão de tooling</dt>
+                <dd id="selected-tooling">—</dd>
+              </div>
+            </dl>
           </div>
-          <p id="message" role="status" aria-live="polite"></p>
-          <div class="table-wrap">
-            <table>
-              <caption class="sr-only">
-                Latest published app releases and tooling versions at those releases
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Application</th>
-                  <th scope="col">App version</th>
-                  <th scope="col">Tooling version</th>
-                  <th scope="col">Last release</th>
-                </tr>
-              </thead>
-              <tbody id="rows"></tbody>
-            </table>
+          <div class="review-overview" aria-label="Estado de revisão">
+            <div class="review-stat">
+              <span>🧪 Novidades</span><strong id="review-total">—</strong>
+            </div>
+            <div class="review-stat">
+              <span>🟡 Por validar</span><strong id="review-pending">—</strong>
+            </div>
+            <div class="review-stat">
+              <span>💬 Conversas em aberto</span><strong id="review-open">—</strong>
+            </div>
+            <div class="review-completion">
+              <label for="review-progress" id="review-caption">A carregar a revisão…</label
+              ><progress id="review-progress" value="0" max="1"></progress>
+            </div>
           </div>
-          <p class="note">
-            Versions are read from the published release, including prereleases. Apps without a
-            release stay visible.
-          </p>
-          <noscript
-            ><p>
-              Enable JavaScript to view the release dashboard, or open
-              <a href="./data.json">the release data</a>.
-            </p></noscript
-          >
+          <div class="notes-heading">
+            <div>
+              <h2 id="notes-title">Histórico de versões</h2>
+            </div>
+            <span class="order-label">Mais recentes primeiro ↓</span>
+          </div>
+          <div class="filter-panel" aria-label="Filtrar alterações">
+            <label class="search">
+              <span aria-hidden="true">🔎</span><span class="sr-only">Pesquisar novidades</span>
+              <input
+                id="notes-search"
+                type="search"
+                placeholder="Pesquisar uma novidade, tema ou versão…"
+              />
+            </label>
+            <div class="review-controls">
+              <label
+                >Tema<select id="topic-filter">
+                  <option value="all">Todos os temas</option>
+                </select></label
+              >
+              <label
+                >Conteúdo<select id="content-filter">
+                  <option value="all">Produto e técnica</option>
+                  <option value="product">Só produto</option>
+                  <option value="technical">Só técnica</option>
+                </select></label
+              >
+              <label
+                >Validação<select id="review-filter">
+                  <option value="all">Todos os estados</option>
+                  <option value="pending">🟡 Por validar</option>
+                  <option value="validated">✅ Validadas</option>
+                </select></label
+              >
+              <label
+                >Conversas<select id="discussion-filter">
+                  <option value="all">Todas</option>
+                  <option value="open">💬 Em aberto</option>
+                  <option value="resolved">✓ Resolvidas</option>
+                </select></label
+              >
+            </div>
+            <div class="filter-footer">
+              <span id="filter-results" role="status" aria-live="polite"></span>
+              <button id="clear-filters" type="button" class="text-button" hidden>
+                Limpar filtros
+              </button>
+              <button id="refresh-review" type="button" class="text-button">↻ Atualizar</button>
+            </div>
+          </div>
+          <div class="feed-toolbar">
+            <div class="section-actions">
+              <button id="expand-all" type="button" class="text-button">Expandir tudo</button
+              ><button id="collapse-all" type="button" class="text-button">Recolher tudo</button>
+            </div>
+          </div>
+          <p id="notes-message" role="status" aria-live="polite"></p>
+          <div id="release-feed"></div>
+          <button id="load-more" class="load-more" hidden>Mostrar versões anteriores ↓</button>
         </section>
-      </main>
-      <footer>
-        <span>Built for the things you’re building.</span
-        ><span>Powered by GitHub Releases <span aria-hidden="true">↗</span></span>
-      </footer>
-    </div>
+        <details id="apps" class="portfolio">
+          <summary>
+            <span>📦 Visão geral das aplicações</span
+            ><span class="portfolio-hint">Versões e tooling</span>
+          </summary>
+          <section aria-labelledby="apps-title">
+            <div class="stats" aria-label="Visão geral das aplicações">
+              <div><strong id="total">—</strong><span>Aplicações</span></div>
+              <div><strong id="released">—</strong><span>Com versões publicadas</span></div>
+              <div><strong id="adopted">—</strong><span>Com tooling partilhado</span></div>
+            </div>
+            <div class="section-heading">
+              <h2 id="apps-title">
+                Todas as aplicações <span id="app-count" class="count">—</span>
+              </h2>
+              <label class="search"
+                ><span class="sr-only">Pesquisar aplicações</span
+                ><input
+                  id="search"
+                  type="search"
+                  placeholder="Pesquisar aplicações…"
+                  autocomplete="off"
+              /></label>
+            </div>
+            <div class="collection-controls">
+              <div class="filters" role="group" aria-label="Filtrar aplicações">
+                <button class="filter active" data-filter="all" aria-pressed="true">
+                  Todas <span id="all-count">—</span></button
+                ><button class="filter" data-filter="released" aria-pressed="false">
+                  Publicadas <span id="released-count">—</span></button
+                ><button class="filter" data-filter="unreleased" aria-pressed="false">
+                  Por publicar <span id="unreleased-count">—</span>
+                </button>
+              </div>
+              <label class="sort"
+                ><span class="sr-only">Ordenar aplicações</span
+                ><select id="sort">
+                  <option value="latest">Publicação mais recente</option>
+                  <option value="name">Nome A–Z</option>
+                </select></label
+              >
+            </div>
+            <p id="message" role="status" aria-live="polite"></p>
+            <div id="cards" class="app-grid"></div>
+            <details class="workspace-details">
+              <summary>Entre aplicações</summary>
+              <section id="activity" aria-labelledby="activity-title">
+                <h2 id="activity-title">🗓️ Publicações recentes</h2>
+                <ol id="release-list" class="release-list"></ol>
+                <p id="activity-empty" hidden>Ainda não há versões publicadas.</p>
+              </section>
+              <section aria-labelledby="adoption-title">
+                <h2 id="adoption-title">🧰 Tooling partilhado</h2>
+                <p>
+                  <strong id="adoption-percent">—</strong> das aplicações têm a versão de tooling
+                  identificada.
+                </p>
+                <progress
+                  id="adoption-progress"
+                  value="0"
+                  max="100"
+                  aria-label="Aplicações com tooling partilhado"
+                ></progress>
+                <p id="adoption-note">A carregar as versões…</p>
+              </section>
+            </details>
+          </section>
+        </details>
+        <noscript
+          ><p>
+            Ative o JavaScript para ver o painel ou consulte
+            <a href="./data.json">os dados das versões</a>.
+          </p></noscript
+        >
+        <footer>
+          <span>Feito para acompanhar, conversar e validar. ✨</span
+          ><span
+            >Hora de Portugal continental <span aria-hidden="true">·</span>
+            <a href="./data.json">Dados das versões ↗</a></span
+          >
+        </footer>
+      </div>
+    </main>
   </body>
 </html>

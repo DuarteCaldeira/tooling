@@ -1,6 +1,7 @@
 import { readFile, mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { itemId, changelogSections, technicalNotes } from './release-items.mjs';
 
 const repositoryPattern = /^[\w.-]+\/[\w.-]+$/;
 const exactVersion = /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/;
@@ -16,7 +17,7 @@ export function validateConfig(config) {
     const key = app.repository.toLowerCase();
     if (repositories.has(key)) throw new Error(`Duplicate repository: ${app.repository}`);
     repositories.add(key);
-    for (const key of ['packagePath', 'lockPath', 'workflowPath']) {
+    for (const key of ['packagePath', 'lockPath', 'workflowPath', 'changelogPath']) {
       const path = app[key];
       if (
         path !== undefined &&
@@ -72,20 +73,37 @@ async function contents(api, repository, path, ref) {
   return Buffer.from(data.content, 'base64').toString('utf8');
 }
 
-export async function latestRelease(api, repository) {
+export async function releaseHistory(api, repository) {
   const releases = [];
   for (let page = 1; page <= 50; page++) {
     const batch = await api(`/repos/${repository}/releases?per_page=100&page=${page}`);
     if (!Array.isArray(batch)) throw new Error('Invalid release response');
     releases.push(...batch.filter((release) => !release.draft && release.published_at));
     if (batch.length < 100)
-      return (
-        releases.sort(
-          (a, b) => Date.parse(b.published_at) - Date.parse(a.published_at) || b.id - a.id,
-        )[0] ?? null
+      return releases.sort(
+        (a, b) => Date.parse(b.published_at) - Date.parse(a.published_at) || b.id - a.id,
       );
   }
   throw new Error('Release history exceeds pagination limit');
+}
+
+export async function latestRelease(api, repository) {
+  return (await releaseHistory(api, repository))[0] ?? null;
+}
+
+export function productNotes(body = '') {
+  if (typeof body !== 'string') return null;
+  const lines = body.split(/\r?\n/);
+  const start = lines.findIndex((line) => /^##\s+(Novidades|Product updates)\s*$/i.test(line));
+  if (start < 0) return null;
+  const next = lines.slice(start + 1).findIndex((line) => /^##\s/.test(line));
+  const section = lines.slice(start + 1, next < 0 ? undefined : start + 1 + next);
+  const changes = section
+    .filter((line) => /^\s*[-*]\s+/.test(line))
+    .map((line) => line.replace(/^\s*[-*]\s+/, '').trim());
+  return changes.length
+    ? { changes, language: /Novidades/i.test(lines[start]) ? 'pt-PT' : 'en' }
+    : null;
 }
 
 export async function toolingAtRelease(api, app, sha, toolingRepository) {
@@ -159,16 +177,40 @@ export async function collect(config, api, now = new Date()) {
   for (const app of config.apps) {
     const row = {
       name: app.name,
+      emoji: app.emoji ?? '📦',
       repository: app.repository,
       repositoryUrl: `https://github.com/${app.repository}`,
       version: null,
       releasedAt: null,
       tooling: { version: null, status: 'unknown' },
+      releases: [],
     };
     try {
       // A missing release and a missing/private repository are different states.
       await api(`/repos/${app.repository}`);
-      const release = await latestRelease(api, app.repository);
+      const history = await releaseHistory(api, app.repository);
+      row.releases = history.map((item) => {
+        const override = app.releaseNotes?.[item.tag_name.replace(/^v/, '')];
+        const edited = override ?? productNotes(item.body);
+        if (
+          edited &&
+          (!Array.isArray(edited.changes) ||
+            edited.changes.some((change) => typeof change !== 'string'))
+        )
+          throw new Error('Invalid product release notes');
+        return {
+          version: item.tag_name,
+          releasedAt: item.published_at,
+          url: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(item.tag_name)}`,
+          prerelease: Boolean(item.prerelease),
+          notes: edited?.changes ?? [],
+          summaryContext: edited?.context ?? null,
+          language: edited?.language ?? null,
+          source: override ? 'edited' : edited ? 'published' : 'github',
+          originalNotes: typeof item.body === 'string' ? item.body : '',
+        };
+      });
+      const release = history[0];
       if (!release) {
         apps.push({ ...row, status: 'unreleased' });
         continue;
@@ -177,6 +219,26 @@ export async function collect(config, api, now = new Date()) {
         `/repos/${app.repository}/commits/${encodeURIComponent(release.tag_name)}`,
       );
       if (!/^[a-f\d]{40}$/i.test(commit.sha)) throw new Error('Invalid release commit');
+      const changelog = await contents(
+        api,
+        app.repository,
+        app.changelogPath ?? 'CHANGELOG.md',
+        commit.sha,
+      );
+      const sections = changelogSections(changelog ?? '');
+      for (const entry of row.releases) {
+        const source = sections[entry.version.replace(/^v/, '')] ?? entry.originalNotes;
+        entry.originalNotes = source;
+        entry.technicalNotes = technicalNotes(source);
+        entry.items = entry.notes.map((text, index) => ({
+          id: app.releaseNotes?.[entry.version.replace(/^v/, '')]?.itemIds?.[index] ?? itemId(text),
+          text,
+        }));
+        entry.technicalItems = entry.technicalNotes.map((text) => ({
+          id: itemId(text, 'technical'),
+          text,
+        }));
+      }
       Object.assign(row, {
         version: release.tag_name,
         releasedAt: release.published_at,
@@ -200,6 +262,7 @@ export async function collect(config, api, now = new Date()) {
   return {
     schemaVersion: 1,
     title: config.title ?? 'App overview',
+    defaultApp: config.defaultApp ?? null,
     generatedAt: now.toISOString(),
     apps,
   };
@@ -207,10 +270,33 @@ export async function collect(config, api, now = new Date()) {
 
 export async function build({ configPath, output, api }) {
   const config = JSON.parse(await readFile(configPath, 'utf8'));
+  const notesPath = new URL('./release-notes.json', import.meta.url);
+  const notes = JSON.parse(await readFile(notesPath, 'utf8'));
+  for (const releases of Object.values(notes))
+    for (const note of Object.values(releases)) {
+      if (
+        !Array.isArray(note.changes) ||
+        note.changes.some((text) => typeof text !== 'string') ||
+        (note.itemIds &&
+          (!Array.isArray(note.itemIds) ||
+            note.itemIds.length !== note.changes.length ||
+            note.itemIds.some((id) => !/^product-[a-f\d]{20}$/.test(id)) ||
+            new Set(note.itemIds).size !== note.itemIds.length))
+      )
+        throw new Error('Invalid edited release notes or item IDs');
+    }
+  for (const app of config.apps) app.releaseNotes = notes[app.repository] ?? {};
   const snapshot = await collect(config, api);
   await mkdir(output, { recursive: true });
   const here = dirname(fileURLToPath(import.meta.url));
-  for (const file of ['index.html', 'styles.css', 'app.js'])
+  for (const file of [
+    'index.html',
+    'design-system.css',
+    'styles.css',
+    'discussions.css',
+    'app.js',
+    'discussions.js',
+  ])
     await copyFile(join(here, file), join(output, file));
   await writeFile(join(output, 'data.json'), `${JSON.stringify(snapshot, null, 2)}\n`);
   return snapshot;
