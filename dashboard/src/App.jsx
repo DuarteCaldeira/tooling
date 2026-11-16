@@ -102,7 +102,7 @@ function Hero({ apps, app, onSelect }) {
         </div>
         <div>
           <dt>
-            <span aria-hidden="true">🧰</span> Versão de tooling
+            <span aria-hidden="true">🧰</span> Tooling
           </dt>
           <dd>
             <ToolingValue tooling={app?.tooling ?? { status: 'unknown' }} />
@@ -136,19 +136,22 @@ function ReviewOverview({ app, review }) {
   }
   return (
     <div className="review-overview" aria-label="Estado de revisão">
-      <Card padding="lg" gap="xs">
+      <Card padding="md" gap="xs">
         <span className="stat-label">🧪 Novidades</span>
         <strong className="stat-value">{total}</strong>
       </Card>
-      <Card padding="lg" gap="xs">
+      <Card padding="md" gap="xs">
         <span className="stat-label">🟡 Por validar</span>
         <strong className="stat-value">{loaded ? total - validated : '—'}</strong>
       </Card>
-      <Card padding="lg" gap="xs">
+      <Card padding="md" gap="xs">
         <span className="stat-label">💬 Conversas em aberto</span>
         <strong className="stat-value">{loaded ? open : '—'}</strong>
       </Card>
       <div className="review-completion">
+        <span className="progress-caption">
+          {loaded ? `${validated} de ${total} novidades validadas` : 'A carregar a revisão…'}
+        </span>
         <Progress
           variant="primary"
           size="md"
@@ -441,6 +444,10 @@ export function App() {
           {failed ? (
             <p role="status" id="notes-message">
               Não foi possível carregar as versões. Tente novamente dentro de instantes.
+            </p>
+          ) : !snapshot ? (
+            <p className="loading" role="status">
+              A carregar as versões…
             </p>
           ) : snapshot ? (
             <>
