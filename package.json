@@ -10,7 +10,8 @@
     "pack:tooling": "npm pack -w packages/tooling",
     "check": "node --test tests/*.test.mjs",
     "format:check": "prettier --check .",
-    "test:browser": "node --test tests/a11y.integration.mjs tests/dashboard.browser.mjs"
+    "test:browser": "node --test tests/a11y.integration.mjs tests/dashboard.browser.mjs",
+    "test:dashboard:mobile": "npm --prefix dashboard run build:web && node --test tests/dashboard-mobile.browser.mjs"
   },
   "engines": {
     "node": ">=22.13.0"

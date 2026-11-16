@@ -27,7 +27,13 @@ jobs:
       - run: npm test
       - name: Install browser for accessibility integration
         if: runner.os == 'Linux'
-        run: npx --no-install playwright install --with-deps chromium
+        run: npx --no-install playwright install --with-deps chromium webkit
+      - name: Install dashboard dependencies
+        if: runner.os == 'Linux'
+        run: npm ci --prefix dashboard --ignore-scripts
+      - name: Check mobile conversation panel
+        if: runner.os == 'Linux'
+        run: npm run test:dashboard:mobile
       - name: Check rendered accessibility
         if: runner.os == 'Linux'
         run: npm run test:browser

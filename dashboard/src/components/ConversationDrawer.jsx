@@ -11,7 +11,7 @@ import {
 } from '@dcaldeira/design-system';
 import { api, itemKey, readStorage, writeStorage } from '../lib/api.js';
 import { itemTopics, portugueseDate } from '../lib/topics.js';
-import { usePolling } from '../hooks.js';
+import { useConversationOverlay, usePolling } from '../hooks.js';
 
 const kinds = [
   { value: 'comment', label: 'Comentário' },
@@ -48,6 +48,8 @@ function Section({ title, aside, children, className = '' }) {
 
 export function ConversationDrawer({ context, onClose, review, participantId, drafts }) {
   const open = Boolean(context);
+  const contentRef = useRef(null);
+  useConversationOverlay(open, contentRef);
   const [comments, setComments] = useState([]);
   const [cursor, setCursor] = useState(null);
   const [status, setStatus] = useState('');
@@ -102,6 +104,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
     setCursor(null);
     setStatus('');
     setNotice('');
+    setBusy(false);
     request.current = null;
     if (!key) return undefined;
     const draft = drafts.current.get(key);
@@ -139,15 +142,17 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
   }, [context]);
 
   async function change(field, value, done) {
+    if (!context || busy) return;
+    const current = generation.current;
     setBusy(true);
     setNotice('');
     try {
       await review.setField(context, field, value);
-      setNotice(done);
+      if (current === generation.current) setNotice(done);
     } catch (error) {
-      setNotice(error.message);
+      if (current === generation.current) setNotice(error.message);
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
 
@@ -198,7 +203,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
     } catch (error) {
       if (current === generation.current) setStatus(error.message);
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
 
@@ -206,7 +211,8 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
     (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
   );
 
-  return (
+  // Closing must not depend on animationend (reduced motion can suppress it).
+  return open ? (
     <Drawer
       isOpen={open}
       onClose={onClose}
@@ -216,7 +222,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
       size="lg"
     >
       {context ? (
-        <div className="conversation">
+        <div className="conversation" ref={contentRef}>
           <Section title={isRelease ? 'Versão' : 'Alteração'} className="drawer-context">
             {isRelease ? null : <TopicTags text={context.text} technical={context.technical} />}
             <blockquote className="conversation-quote">{context.text}</blockquote>
@@ -226,6 +232,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
             <div className="action-list">
               {canValidate ? (
                 <ToggleSwitch
+                  id="conversation-validated"
                   label="Validada"
                   helperText="Confirma que esta novidade está correta."
                   checked={state.validated}
@@ -240,6 +247,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                 />
               ) : null}
               <ToggleSwitch
+                id="conversation-resolved"
                 label="Conversa resolvida"
                 helperText="Marca esta conversa como tratada. Pode reabri-la quando quiser."
                 checked={state.closed}
@@ -362,5 +370,5 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
         </div>
       ) : null}
     </Drawer>
-  );
+  ) : null;
 }
