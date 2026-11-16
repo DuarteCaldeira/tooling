@@ -3,7 +3,9 @@
   "title": "Repository tooling",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion"],
+  "required": [
+    "schemaVersion"
+  ],
   "properties": {
     "$schema": {
       "type": "string"
@@ -137,7 +139,11 @@
               "profiles": {
                 "type": "array",
                 "items": {
-                  "enum": ["dev", "push", "ci"]
+                  "enum": [
+                    "dev",
+                    "push",
+                    "ci"
+                  ]
                 }
               },
               "dependsOn": {
@@ -214,7 +220,9 @@
                   {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["inputs"],
+                    "required": [
+                      "inputs"
+                    ],
                     "properties": {
                       "inputs": {
                         "type": "array",
@@ -246,7 +254,8 @@
                   "workflows",
                   "architecture",
                   "a11y",
-                  "dependency-consistency"
+                  "dependency-consistency",
+                  "sass"
                 ]
               }
             }
@@ -262,7 +271,10 @@
     },
     "translations": {
       "type": "object",
-      "required": ["directory", "source"],
+      "required": [
+        "directory",
+        "source"
+      ],
       "additionalProperties": false,
       "properties": {
         "directory": {
@@ -303,7 +315,10 @@
           }
         },
         "preset": {
-          "enum": ["standard", "rookie"]
+          "enum": [
+            "standard",
+            "rookie"
+          ]
         },
         "rules": {
           "type": "object",
@@ -335,7 +350,11 @@
       "properties": {
         "bundle": {
           "type": "object",
-          "required": ["dist", "initialKB", "chunkKB"],
+          "required": [
+            "dist",
+            "initialKB",
+            "chunkKB"
+          ],
           "additionalProperties": false,
           "properties": {
             "dist": {
@@ -379,7 +398,10 @@
     "release": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["prepare", "files"],
+      "required": [
+        "prepare",
+        "files"
+      ],
       "properties": {
         "prepare": {
           "type": "array",
@@ -431,7 +453,9 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["paths"],
+        "required": [
+          "paths"
+        ],
         "properties": {
           "paths": {
             "type": "array",
@@ -502,7 +526,11 @@
                 }
               }
             },
-            "required": ["name", "paths", "allow"]
+            "required": [
+              "name",
+              "paths",
+              "allow"
+            ]
           }
         },
         "modules": {
@@ -528,7 +556,11 @@
                 "minItems": 1
               }
             },
-            "required": ["name", "root", "public"]
+            "required": [
+              "name",
+              "root",
+              "public"
+            ]
           }
         }
       }
@@ -619,7 +651,10 @@
               "pattern": "^[A-Z][A-Za-z0-9]*$"
             }
           },
-          "required": ["package", "component"]
+          "required": [
+            "package",
+            "component"
+          ]
         }
       }
     },
@@ -672,7 +707,11 @@
                   "additionalProperties": false,
                   "properties": {
                     "type": {
-                      "enum": ["click", "fill", "press"]
+                      "enum": [
+                        "click",
+                        "fill",
+                        "press"
+                      ]
                     },
                     "selector": {
                       "type": "string",
@@ -682,11 +721,16 @@
                       "type": "string"
                     }
                   },
-                  "required": ["type", "selector"]
+                  "required": [
+                    "type",
+                    "selector"
+                  ]
                 }
               }
             },
-            "required": ["path"]
+            "required": [
+              "path"
+            ]
           }
         },
         "tags": {
@@ -700,7 +744,12 @@
         "failImpacts": {
           "type": "array",
           "items": {
-            "enum": ["minor", "moderate", "serious", "critical"]
+            "enum": [
+              "minor",
+              "moderate",
+              "serious",
+              "critical"
+            ]
           }
         },
         "viewports": {
@@ -726,7 +775,11 @@
                 "maximum": 10000
               }
             },
-            "required": ["name", "width", "height"]
+            "required": [
+              "name",
+              "width",
+              "height"
+            ]
           }
         },
         "storageState": {
@@ -768,10 +821,15 @@
               "maximum": 120000
             }
           },
-          "required": ["command"]
+          "required": [
+            "command"
+          ]
         }
       },
-      "required": ["baseURL", "routes"]
+      "required": [
+        "baseURL",
+        "routes"
+      ]
     },
     "reporting": {
       "type": "object",
@@ -819,6 +877,49 @@
         "regressionPercent": {
           "type": "number",
           "minimum": 0
+        }
+      }
+    },
+    "sass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entrypoints"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entrypoints": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "importantExceptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }

@@ -48,7 +48,8 @@
     "knip": ">=5 <7",
     "postcss": ">=8 <9",
     "typescript": ">=5 <7",
-    "@axe-core/playwright": ">=4 <5"
+    "@axe-core/playwright": ">=4 <5",
+    "sass": ">=1 <2"
   },
   "peerDependenciesMeta": {
     "prettier": {
@@ -91,6 +92,9 @@
       "optional": true
     },
     "@axe-core/playwright": {
+      "optional": true
+    },
+    "sass": {
       "optional": true
     }
   },
