@@ -95,7 +95,7 @@ test(
       const handler = createHandler(async () =>
         createDiscussionService({ store, manifest: discussionManifest(fixture) }),
       );
-      await context.route('https://tooling.test/**', async (route) => {
+      const routeHandler = async (route) => {
         const path = new URL(route.request().url()).pathname;
         if (path === '/api/discussions') {
           const original = route.request();
@@ -125,7 +125,8 @@ test(
                 : 'text/html',
           body: files[file] ?? 'Not found',
         });
-      });
+      };
+      await context.route('https://tooling.test/**', routeHandler);
       await page.goto('https://tooling.test/');
       await page.waitForSelector('.release-entry');
       assert.equal(await page.locator('#total').textContent(), '6');
@@ -171,7 +172,9 @@ test(
         0,
       );
       assert.equal(await page.locator('.technical-notes').last().getAttribute('open'), null);
+      await page.locator('.release-entry').last().locator(':scope > summary').click();
       await page.locator('.technical-notes').last().locator(':scope > summary').click();
+      assert.equal(await page.locator('.technical-list .validation-button').count(), 0);
       assert.equal(await page.locator('.original-notes').count(), 0);
       assert.equal(await page.getByText('Read original changelog').count(), 0);
       assert.equal(await page.locator('html').getAttribute('lang'), 'pt-PT');
@@ -207,30 +210,97 @@ test(
       await page.locator('.submit-comment').click();
       await page.getByText('Comentário enviado', { exact: true }).waitFor();
       assert.match(await page.locator('.comment-list').textContent(), /QA reviewer/);
+      assert.equal(await page.locator('.comment-mine .comment-self').textContent(), 'Tu');
       const link = await page.locator('.discussion-toolbar a').getAttribute('href');
       const another = await context.newPage();
       await another.goto(link);
       await another.locator('.comment-list .comment').waitFor();
       assert.match(await another.locator('.comment-list').textContent(), /imported date changes/);
       assert.equal(await another.locator('.validation-button[aria-pressed="true"]').count(), 1);
+      assert.equal(await another.locator('.comment-mine').count(), 1);
       await another.close();
+      const otherContext = await browser.newContext();
+      await otherContext.route('https://tooling.test/**', routeHandler);
+      const otherPerson = await otherContext.newPage();
+      await otherPerson.goto(link);
+      await otherPerson.locator('.comment-list .comment').waitFor();
+      assert.equal(await otherPerson.locator('.comment-mine').count(), 0);
+      await otherPerson.locator('input[name="author"]').fill('QA reviewer');
+      await otherPerson
+        .locator('textarea[name="body"]')
+        .fill('Another person with the same display name.');
+      await otherPerson.locator('.submit-comment').click();
+      await otherPerson.getByText('Comentário enviado', { exact: true }).waitFor();
+      assert.equal(await otherPerson.locator('.comment-mine').count(), 1);
+      assert.equal(await otherPerson.locator('.comment-other').count(), 1);
+      await otherContext.close();
+      await page.getByRole('button', { name: 'Atualizar', exact: true }).click();
+      await page.locator('.comment-other').waitFor();
+      assert.equal(await page.locator('.comment-mine').count(), 1);
       await scan();
       await page.getByRole('button', { name: 'Marcar como resolvida', exact: true }).click();
       await page.getByText('Conversa resolvida', { exact: true }).waitFor();
       await page.locator('.discussion-heading button').click();
-      await page.locator('#review-filter').selectOption('discussions');
+      await page.locator('#discussion-filter').selectOption('open');
       assert.equal(await page.locator('.release-entry').count(), 0);
-      await page.locator('#review-filter').selectOption('all');
+      await page.locator('#discussion-filter').selectOption('all');
       await page.locator('.item-trigger').first().click();
       await page.getByRole('button', { name: 'Reabrir conversa', exact: true }).click();
       await page.getByText('Conversa reaberta', { exact: true }).waitFor();
       await page.locator('.discussion-heading button').click();
-      await page.locator('#review-filter').selectOption('discussions');
+      await page.locator('#discussion-filter').selectOption('open');
       assert.equal(await page.locator('.release-entry').count(), 1);
       assert.equal(await page.locator('.change-item').count(), 1);
-      await page.locator('#review-filter').selectOption('all');
-      await page.locator('#product-only').check();
+      await page.locator('#review-filter').selectOption('pending');
+      assert.equal(await page.locator('.release-entry').count(), 0);
+      await page.locator('#review-filter').selectOption('validated');
+      assert.equal(await page.locator('.change-item').count(), 1);
+      await page.locator('#clear-filters').click();
+      await page.locator('#content-filter').selectOption('product');
       assert.equal(await page.locator('.release-entry').count(), 10);
+      await page.locator('#notes-search').fill('copia seguranca');
+      assert.ok((await page.locator('.change-item').count()) > 0);
+      await page.locator('#clear-filters').click();
+      const firstRelease = page.locator('.release-entry').first();
+      const remaining = await firstRelease
+        .locator('.validation-button[aria-pressed="false"]')
+        .count();
+      for (let index = 0; index < remaining; index++) {
+        const before = await firstRelease
+          .locator('.validation-button[aria-pressed="false"]')
+          .count();
+        await firstRelease.locator('.validation-button[aria-pressed="false"]').first().click();
+        await page.waitForFunction(
+          (count) =>
+            document
+              .querySelector('.release-entry')
+              .querySelectorAll('.validation-button[aria-pressed="false"]').length < count,
+          before,
+        );
+      }
+      await page.waitForFunction(() => !document.querySelector('.release-entry').open);
+      assert.match(await firstRelease.locator(':scope > summary').textContent(), /Tudo validado/);
+      const reopened = await context.newPage();
+      await reopened.goto('https://tooling.test/');
+      await reopened.waitForFunction(
+        () =>
+          document.querySelector('.release-entry.release-complete') &&
+          !document.querySelector('.release-entry').open,
+      );
+      await reopened.close();
+      await firstRelease.locator(':scope > summary').click();
+      await page.locator('#refresh-review').click();
+      assert.equal(await firstRelease.evaluate((el) => el.open), true);
+      await firstRelease.locator('.validation-button[aria-pressed="true"]').first().click();
+      await firstRelease.locator('.validation-button[aria-pressed="false"]').waitFor();
+      await page.locator('#collapse-all').click();
+      assert.equal(await page.locator('.release-entry[open]').count(), 0);
+      await page.locator('#expand-all').click();
+      assert.equal(
+        await page.locator('.release-entry[open]').count(),
+        await page.locator('.release-entry').count(),
+      );
+      await page.locator('#content-filter').selectOption('product');
       await page.locator('#notes-search').fill('Vacinas');
       assert.equal(await page.locator('.release-entry').count(), 1);
       await page.locator('#notes-search').fill('nothing-matches');

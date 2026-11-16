@@ -5,6 +5,38 @@ import { createDiscussionService, createHandler } from '../dashboard/server/disc
 import { changelogSections, technicalNotes, itemId } from '../dashboard/release-items.mjs';
 import { portugueseDate } from '../dashboard/discussions.js';
 
+test('technical changes do not accept validation and participant IDs distinguish identical names', async () => {
+  const { service, input } = fixture();
+  await assert.rejects(
+    service.setState({
+      ...input,
+      item: 'technical-one',
+      field: 'validated',
+      value: true,
+      requestId: randomUUID(),
+    }),
+    (error) => error.status === 400,
+  );
+  const first = await service.post(
+    { ...input, requestId: randomUUID(), participantId: randomUUID() },
+    'one',
+  );
+  const second = await service.post(
+    { ...input, requestId: randomUUID(), participantId: randomUUID() },
+    'two',
+  );
+  assert.equal(first.author, second.author);
+  assert.notEqual(first.participantId, second.participantId);
+  await assert.rejects(
+    service.post({ ...input, participantId: 'not-an-id' }),
+    (error) => error.status === 400,
+  );
+  await assert.rejects(
+    service.post({ ...input, requestId: first.id, participantId: second.participantId }),
+    (error) => error.status === 409,
+  );
+});
+
 test('Portuguese dates include release time and follow Lisbon daylight saving time', () => {
   assert.equal(portugueseDate('2026-11-15T23:47:00Z'), '15 de novembro, 2026 23:47');
   assert.equal(portugueseDate('2026-07-15T23:47:00Z'), '16 de julho, 2026 00:47');

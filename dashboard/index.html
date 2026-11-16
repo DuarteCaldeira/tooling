@@ -73,7 +73,7 @@
           </div>
           <div class="review-overview" aria-label="Estado de revisão">
             <div class="review-stat">
-              <span>📋 Alterações</span><strong id="review-total">—</strong>
+              <span>🧪 Novidades</span><strong id="review-total">—</strong>
             </div>
             <div class="review-stat">
               <span>🟡 Por validar</span><strong id="review-pending">—</strong>
@@ -93,31 +93,55 @@
             </div>
             <span class="order-label">Mais recentes primeiro ↓</span>
           </div>
-          <div class="notes-controls">
-            <label class="search"
-              ><span aria-hidden="true">🔎</span><span class="sr-only">Pesquisar novidades</span
-              ><input
+          <div class="filter-panel" aria-label="Filtrar alterações">
+            <label class="search">
+              <span aria-hidden="true">🔎</span><span class="sr-only">Pesquisar novidades</span>
+              <input
                 id="notes-search"
                 type="search"
-                placeholder="Pesquisar alterações ou versões…" /></label
-            ><label class="product-filter"
-              ><input id="product-only" type="checkbox" /> Só novidades do produto</label
-            >
+                placeholder="Pesquisar uma novidade, tema ou versão…"
+              />
+            </label>
+            <div class="review-controls">
+              <label
+                >Conteúdo<select id="content-filter">
+                  <option value="all">Produto e técnica</option>
+                  <option value="product">Só produto</option>
+                  <option value="technical">Só técnica</option>
+                </select></label
+              >
+              <label
+                >Validação<select id="review-filter">
+                  <option value="all">Todos os estados</option>
+                  <option value="pending">🟡 Por validar</option>
+                  <option value="validated">✅ Validadas</option>
+                </select></label
+              >
+              <label
+                >Conversas<select id="discussion-filter">
+                  <option value="all">Todas</option>
+                  <option value="open">💬 Em aberto</option>
+                  <option value="resolved">✓ Resolvidas</option>
+                </select></label
+              >
+            </div>
+            <div class="filter-footer">
+              <span id="filter-results" role="status" aria-live="polite"></span>
+              <button id="clear-filters" type="button" class="text-button" hidden>
+                Limpar filtros
+              </button>
+              <button id="refresh-review" type="button" class="text-button">↻ Atualizar</button>
+            </div>
           </div>
-          <div class="review-controls">
-            <label for="review-filter">Mostrar</label>
-            <select id="review-filter">
-              <option value="all">Todas as alterações</option>
-              <option value="pending">🟡 Por validar</option>
-              <option value="discussions">💬 Com conversas em aberto</option>
-            </select>
-            <button type="button" id="refresh-review" class="quiet-button">
-              ↻ Atualizar revisão
-            </button>
+          <div class="feed-toolbar">
+            <p class="interaction-hint">
+              Abra uma versão para rever as novidades. Só o produto precisa de validação.
+            </p>
+            <div class="section-actions">
+              <button id="expand-all" type="button" class="text-button">Expandir tudo</button
+              ><button id="collapse-all" type="button" class="text-button">Recolher tudo</button>
+            </div>
           </div>
-          <p class="interaction-hint">
-            Toque numa alteração para abrir a conversa. Marque como validada depois de a testar.
-          </p>
           <p id="notes-message" role="status" aria-live="polite"></p>
           <div id="release-feed"></div>
           <button id="load-more" class="load-more" hidden>Mostrar versões anteriores ↓</button>

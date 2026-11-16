@@ -20,6 +20,15 @@ const node = (tag, text, className) => {
 };
 
 export function createDiscussions() {
+  let participantId = crypto.randomUUID();
+  try {
+    const saved = localStorage.getItem('tooling-discussion-participant');
+    if (/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(saved ?? '')) participantId = saved;
+    localStorage.setItem('tooling-discussion-participant', participantId);
+  } catch {
+    /* Keep the identity for this page when storage is unavailable. */
+  }
+
   const dialog = node('dialog', undefined, 'discussion-dialog');
   dialog.id = 'discussion';
   dialog.setAttribute('aria-labelledby', 'discussion-title');
@@ -99,7 +108,7 @@ export function createDiscussions() {
   submit.type = 'submit';
   const identityNote = node(
     'p',
-    'Visível para quem tem acesso a este painel. Os nomes são indicados pelos participantes.',
+    'Os seus comentários aparecem como «Tu» neste navegador. Os nomes são indicados pelos participantes.',
     'identity-note',
   );
   form.append(nameLabel, kindLabel, bodyLabel, identityNote, submit);
@@ -146,11 +155,14 @@ export function createDiscussions() {
     for (const comment of [...comments.values()].sort(
       (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
     )) {
-      const item = node('li', undefined, 'comment');
+      const mine = comment.participantId === participantId;
+      const item = node('li', undefined, mine ? 'comment comment-mine' : 'comment comment-other');
       const header = node('div', undefined, 'comment-heading');
       const time = node('time', portugueseDate(comment.createdAt));
       time.dateTime = comment.createdAt;
-      header.append(node('strong', comment.author), time);
+      header.append(node('strong', comment.author));
+      if (mine) header.append(node('span', 'Tu', 'comment-self'));
+      header.append(time);
       if (comment.kind !== 'comment')
         header.append(
           node('span', comment.kind === 'issue' ? '🐛 Problema' : '❓ Pergunta', 'comment-kind'),
@@ -287,6 +299,7 @@ export function createDiscussions() {
       author: author.value.trim(),
       body: body.value.trim(),
       kind: kind.value,
+      participantId,
     };
     const signature = JSON.stringify(value);
     if (request?.signature !== signature) request = { signature, id: crypto.randomUUID() };
@@ -325,9 +338,10 @@ export function createDiscussions() {
     item(context) {
       const item = node('li', undefined, 'change-item');
       const current = state(context);
-      if (current.validated) item.classList.add('is-validated');
+      if (current.validated && !context.technical) item.classList.add('is-validated');
       const trigger = node('button', undefined, 'item-trigger');
       trigger.type = 'button';
+      trigger.dataset.focusKey = keyOf(context) + '/open';
       trigger.setAttribute('aria-label', 'Abrir conversa: ' + context.text);
       const copy = node('span', undefined, 'change-copy');
       const split = context.text.indexOf(': ');
@@ -348,6 +362,7 @@ export function createDiscussions() {
         'validation-button',
       );
       validate.type = 'button';
+      validate.dataset.focusKey = keyOf(context) + '/validate';
       validate.disabled = !summaries.has(context.repository);
       validate.setAttribute('aria-pressed', String(current.validated));
       validate.setAttribute(
@@ -371,10 +386,12 @@ export function createDiscussions() {
         'conversation-link',
       );
       conversation.type = 'button';
+      conversation.dataset.focusKey = keyOf(context) + '/conversation';
       conversation.addEventListener('click', () => open(context));
       const feedback = node('span', undefined, 'item-feedback');
       feedback.setAttribute('role', 'status');
-      actions.append(validate, conversation);
+      if (!context.technical) actions.append(validate);
+      actions.append(conversation);
       item.append(trigger, actions, feedback);
       return item;
     },

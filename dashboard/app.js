@@ -113,7 +113,26 @@ function setupReleaseHub(apps, defaultApp) {
     text,
     appName: app.name,
   });
+  const expanded = new Map();
+  const completed = new Map();
+  const normalize = (text) =>
+    text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLocaleLowerCase('pt-PT');
+  const filterIds = ['notes-search', 'review-filter', 'discussion-filter', 'content-filter'];
+  const initial = new URLSearchParams(location.search);
+  for (const id of filterIds) {
+    const input = document.getElementById(id);
+    const value = initial.get(id);
+    if (
+      value &&
+      (id === 'notes-search' || [...input.options].some((option) => option.value === value))
+    )
+      input.value = value;
+  }
   function updateHistory() {
+    const focusKey = document.activeElement?.dataset.focusKey;
     const app = apps.find((app) => app.repository === selection.value);
     document.querySelector('#selected-emoji').textContent = app?.emoji ?? '📦';
     document.querySelector('#selected-app-name').textContent = app?.name ?? 'Escolha uma aplicação';
@@ -128,46 +147,53 @@ function setupReleaseHub(apps, defaultApp) {
     const feed = document.querySelector('#release-feed');
     feed.replaceChildren();
     const all = app?.releases ?? [];
-    const search = document.querySelector('#notes-search').value.toLocaleLowerCase('pt-PT').trim();
-    const onlyProduct = document.querySelector('#product-only').checked;
+    const search = normalize(document.querySelector('#notes-search').value.trim());
     const filter = document.querySelector('#review-filter').value;
+    const conversation = document.querySelector('#discussion-filter').value;
+    const content = document.querySelector('#content-filter').value;
     const loaded = discussions.isLoaded(app?.repository);
-    const itemMatches = (release, item) => {
+    const filtering = Boolean(
+      search || filter !== 'all' || conversation !== 'all' || content !== 'all',
+    );
+    const needsState = filter !== 'all' || conversation !== 'all';
+    const matchesText = (text) =>
+      search.split(/\s+/).every((term) => normalize(text).includes(term));
+    const matchesConversation = (state) =>
+      conversation === 'all' ||
+      (loaded && state.count > 0 && (conversation === 'open' ? !state.closed : state.closed));
+    const itemMatches = (release, item, technical = false) => {
+      if (technical && filter !== 'all') return false;
       const state = discussions.state(context(app, release, item.id, item.text));
-      const matchesSearch = `${release.version} ${portugueseDate(release.releasedAt)} ${item.text}`
-        .toLocaleLowerCase('pt-PT')
-        .includes(search);
       return (
-        matchesSearch &&
+        matchesText(`${release.version} ${portugueseDate(release.releasedAt)} ${item.text}`) &&
+        matchesConversation(state) &&
         (filter === 'all' ||
-          (loaded && (filter === 'pending' ? !state.validated : state.count > 0 && !state.closed)))
+          (loaded && (filter === 'pending' ? !state.validated : state.validated)))
       );
     };
     const matches = all
       .map((release) => {
-        const items = (release.items ?? release.notes.map((text) => ({ text }))).filter((item) =>
-          itemMatches(release, item),
-        );
-        const technical = onlyProduct
-          ? []
-          : (release.technicalItems ?? []).filter((item) => itemMatches(release, item));
+        const items =
+          content === 'technical'
+            ? []
+            : (release.items ?? []).filter((item) => itemMatches(release, item));
+        const technical =
+          content === 'product'
+            ? []
+            : (release.technicalItems ?? []).filter((item) => itemMatches(release, item, true));
         const releaseState = discussions.state(context(app, release, 'release', ''));
         const releaseMatch =
-          filter === 'discussions' &&
-          loaded &&
-          releaseState.count > 0 &&
-          !releaseState.closed &&
-          `${release.version} ${release.summaryContext ?? ''}`
-            .toLocaleLowerCase('pt-PT')
-            .includes(search);
-        const emptyMatch =
+          content === 'all' &&
           filter === 'all' &&
-          !onlyProduct &&
-          !release.notes.length &&
+          conversation !== 'all' &&
+          matchesConversation(releaseState) &&
+          matchesText(`${release.version} ${release.summaryContext ?? ''}`);
+        const emptyMatch =
+          !needsState &&
+          content === 'all' &&
+          !release.items?.length &&
           !release.technicalItems?.length &&
-          `${release.version} ${release.summaryContext ?? ''}`
-            .toLocaleLowerCase('pt-PT')
-            .includes(search);
+          matchesText(`${release.version} ${release.summaryContext ?? ''}`);
         return {
           release,
           items,
@@ -176,20 +202,21 @@ function setupReleaseHub(apps, defaultApp) {
         };
       })
       .filter((entry) => entry.visible);
-    const totalItems = all.flatMap((release) => [
-      ...(release.items ?? []),
-      ...(release.technicalItems ?? []),
-    ]);
+    const totalItems = all.flatMap((release) => release.items ?? []);
     let validated = 0,
       open = 0;
     for (const release of all) {
-      for (const item of [...(release.items ?? []), ...(release.technicalItems ?? [])]) {
+      for (const item of release.items ?? []) {
+        if (discussions.state(context(app, release, item.id, item.text)).validated) validated++;
+      }
+      for (const item of [
+        ...(release.items ?? []),
+        ...(release.technicalItems ?? []),
+        { id: 'release', text: '' },
+      ]) {
         const state = discussions.state(context(app, release, item.id, item.text));
-        if (state.validated) validated++;
         if (state.count && !state.closed) open++;
       }
-      const state = discussions.state(context(app, release, 'release', ''));
-      if (state.count && !state.closed) open++;
     }
     document.querySelector('#review-total').textContent = totalItems.length;
     document.querySelector('#review-pending').textContent = loaded
@@ -200,64 +227,116 @@ function setupReleaseHub(apps, defaultApp) {
     progress.value = validated;
     progress.max = totalItems.length || 1;
     document.querySelector('#review-caption').textContent = loaded
-      ? `${validated} de ${totalItems.length} alterações validadas`
-      : 'A carregar o estado de revisão…';
-    document.querySelector('#notes-context').textContent =
-      `${all.length} versões publicadas · ${matches.length} nesta vista`;
+      ? `${validated} de ${totalItems.length} novidades validadas`
+      : 'A carregar a revisão…';
+    document.querySelector('#notes-context').textContent = `${all.length} versões publicadas`;
+    const resultCount = matches.reduce(
+      (count, entry) => count + entry.items.length + entry.technical.length,
+      0,
+    );
+    document.querySelector('#filter-results').textContent =
+      `${resultCount} ${resultCount === 1 ? 'alteração' : 'alterações'} · ${matches.length} ${matches.length === 1 ? 'versão' : 'versões'}`;
+    document.querySelector('#clear-filters').hidden = !filtering;
+    document.querySelector('#review-filter').disabled = content === 'technical';
     document.querySelector('#notes-message').textContent =
       app?.status === 'unavailable'
-        ? 'Não foi possível consultar esta aplicação. Tente novamente após a próxima atualização.'
+        ? 'Não foi possível consultar esta aplicação.'
         : !all.length
           ? 'Ainda não há versões publicadas. As novidades vão aparecer aqui.'
-          : filter !== 'all' && !loaded
+          : needsState && !loaded
             ? discussions.hasError(app?.repository)
               ? 'Não foi possível carregar os estados. Tente atualizar a revisão.'
               : 'A carregar validações e conversas…'
             : !matches.length
-              ? 'Nenhuma alteração corresponde aos filtros.'
+              ? 'Nenhuma alteração corresponde aos filtros. Experimente limpar os filtros.'
               : '';
     const share = new URL(location.href);
     share.searchParams.set('app', selection.value);
+    for (const id of filterIds) {
+      const value = document.getElementById(id).value;
+      if (value && value !== 'all') share.searchParams.set(id, value);
+      else share.searchParams.delete(id);
+    }
     share.searchParams.delete('release');
     share.searchParams.delete('item');
     share.hash = 'release-notes';
     document.querySelector('#share-app').href = share.toString();
     for (const { release, items, technical } of matches.slice(0, limit)) {
-      const article = element('article', undefined, 'release-entry');
-      article.id = `release-${release.version.replace(/[^a-z\d.-]/gi, '-')}`;
-      const heading = element('div', undefined, 'release-heading');
-      const identity = element('div', undefined, 'release-identity');
-      const icon = element('span', '🚀', 'release-icon');
+      const key = `${app.repository}/${release.version}`;
+      const product = release.items ?? [];
+      const checked = product.filter(
+        (item) => discussions.state(context(app, release, item.id, item.text)).validated,
+      ).length;
+      const fullyValidated = loaded && product.length > 0 && checked === product.length;
+      if (fullyValidated && completed.get(key) === false) expanded.delete(key);
+      completed.set(key, fullyValidated);
+      const article = element(
+        'details',
+        undefined,
+        `release-entry${fullyValidated ? ' release-complete' : ''}`,
+      );
+      article.open = expanded.get(key) ?? (filtering || (!fullyValidated && product.length > 0));
+      article.id = `release-${release.version.replace(/[^a-z0-9.-]/gi, '-')}`;
+      const heading = element('summary', undefined, 'release-heading');
+      heading.dataset.focusKey = key + '/heading';
+      heading.addEventListener('click', () => expanded.set(key, !article.open));
+      const identity = element('span', undefined, 'release-identity');
+      const icon = element('span', fullyValidated ? '✅' : '🚀', 'release-icon');
       icon.setAttribute('aria-hidden', 'true');
-      identity.append(icon, element('h3', release.version, 'mono'));
+      identity.append(icon, element('span', release.version, 'release-version'));
       if (release === all[0])
         identity.append(element('span', 'Mais recente', 'badge badge-released'));
       if (release.prerelease) identity.append(element('span', 'Pré-lançamento', 'badge'));
-      heading.append(identity, releaseDate(release.releasedAt));
+      const meta = element('span', undefined, 'release-meta');
+      meta.append(
+        releaseDate(release.releasedAt),
+        element(
+          'span',
+          !product.length
+            ? 'Sem validação necessária'
+            : loaded
+              ? fullyValidated
+                ? 'Tudo validado'
+                : `${checked}/${product.length} validadas`
+              : 'A carregar revisão…',
+          `release-review${fullyValidated ? ' complete' : ''}`,
+        ),
+      );
+      const chevron = element('span', '⌄', 'release-chevron');
+      chevron.setAttribute('aria-hidden', 'true');
+      heading.append(identity, meta, chevron);
       article.append(heading);
+      const body = element('div', undefined, 'release-body');
       if (items.length) {
         const list = element('ul', undefined, 'change-list');
         list.lang = release.language ?? 'pt-PT';
         for (const item of items)
           list.append(discussions.item(context(app, release, item.id, item.text)));
-        article.append(list);
-      } else if (!technical.length && filter === 'all') {
-        article.append(
+        body.append(list);
+      } else if (!technical.length && !needsState)
+        body.append(
           element(
             'p',
-            release.summaryContext ?? 'Esta versão não tem alterações funcionais descritas.',
+            release.summaryContext ?? 'Esta versão não tem novidades de produto descritas.',
             'source-note',
           ),
         );
-      }
       if (technical.length) {
         const details = element('details', undefined, 'technical-notes');
-        details.append(element('summary', `🛠️ Detalhes técnicos · ${technical.length}`));
+        const technicalKey = key + '/technical';
+        details.open =
+          expanded.get(technicalKey) ??
+          (content === 'technical' || conversation !== 'all' || Boolean(search));
+        const summary = element('summary', `🛠️ Detalhes técnicos · ${technical.length}`);
+        summary.addEventListener('click', () => expanded.set(technicalKey, !details.open));
+        details.append(summary);
         const list = element('ul', undefined, 'change-list technical-list');
         for (const item of technical)
-          list.append(discussions.item(context(app, release, item.id, item.text)));
+          list.append(
+            discussions.item({ ...context(app, release, item.id, item.text), technical: true }),
+          );
         details.append(list);
-        article.append(details);
+        body.append(details);
       }
       const footer = element('div', undefined, 'release-footer');
       footer.append(
@@ -267,26 +346,61 @@ function setupReleaseHub(apps, defaultApp) {
         ),
         githubLink('Ver no GitHub ↗', release.url, 'text-link'),
       );
-      article.append(footer);
+      body.append(footer);
+      article.append(body);
       feed.append(article);
     }
     document.querySelector('#load-more').hidden = matches.length <= limit;
+    if (focusKey) {
+      const target = [...document.querySelectorAll('[data-focus-key]')].find(
+        (node) => node.dataset.focusKey === focusKey,
+      );
+      const section = target?.closest('.release-entry');
+      (section && !section.open ? section.querySelector('summary') : target)?.focus({
+        preventScroll: true,
+      });
+    }
   }
   selection.addEventListener('change', () => {
     limit = 10;
-    document.querySelector('#notes-search').value = '';
+    for (const id of filterIds)
+      document.getElementById(id).value = id === 'notes-search' ? '' : 'all';
+    expanded.clear();
     const url = new URL(location.href);
     url.searchParams.set('app', selection.value);
     url.searchParams.delete('release');
     url.searchParams.delete('item');
+    for (const id of filterIds) url.searchParams.delete(id);
     url.hash = 'release-notes';
     history.replaceState(null, '', url);
     updateHistory();
     discussions.refreshSummary(selection.value);
   });
-  for (const id of ['notes-search', 'product-only', 'review-filter'])
-    document.getElementById(id).addEventListener(id === 'notes-search' ? 'input' : 'change', () => {
-      limit = 10;
+  function filtersChanged() {
+    limit = 10;
+    expanded.clear();
+    if (document.querySelector('#content-filter').value === 'technical')
+      document.querySelector('#review-filter').value = 'all';
+    updateHistory();
+    const url = new URL(document.querySelector('#share-app').href);
+    history.replaceState(null, '', url);
+  }
+  for (const id of filterIds)
+    document
+      .getElementById(id)
+      .addEventListener(id === 'notes-search' ? 'input' : 'change', filtersChanged);
+  document.querySelector('#clear-filters').addEventListener('click', () => {
+    for (const id of filterIds)
+      document.getElementById(id).value = id === 'notes-search' ? '' : 'all';
+    filtersChanged();
+  });
+  for (const [id, open] of [
+    ['expand-all', true],
+    ['collapse-all', false],
+  ])
+    document.getElementById(id).addEventListener('click', () => {
+      for (const release of apps.find((app) => app.repository === selection.value)?.releases ?? [])
+        expanded.set(selection.value + '/' + release.version, open);
       updateHistory();
     });
   document.querySelector('#load-more').addEventListener('click', () => {
