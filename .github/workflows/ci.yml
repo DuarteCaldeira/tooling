@@ -7,7 +7,10 @@ on:
         required: true
       config-path:
         type: string
-        default: repo-tooling.config.json
+        default: tooling.config.json
+      lightweight-docs:
+        type: boolean
+        default: false
       pull-request-number:
         type: string
         default: ''
@@ -25,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: DuarteCaldeira/repo-tooling
+          repository: DuarteCaldeira/tooling
           ref: ${{ inputs.tooling-sha }}
           path: tooling
           persist-credentials: false
@@ -34,7 +37,7 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pull-request-number }}
           CONFIG_PATH: ${{ inputs.config-path }}
-          PUBLIC_KEY: ${{ vars.REPO_TOOLING_RELEASE_PUBLIC_KEY }}
+          PUBLIC_KEY: ${{ vars.TOOLING_RELEASE_PUBLIC_KEY }}
         with:
           script: |
             const { verifyPullRequest } = await import(`${process.cwd()}/tooling/packages/tooling/release/github.mjs`);
@@ -65,16 +68,14 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          repository: DuarteCaldeira/repo-tooling
+          repository: DuarteCaldeira/tooling
           ref: ${{ inputs.tooling-sha }}
-          path: .repo-tooling/source
+          path: .tooling/source
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-      - name: Install
-        run: npm ci --ignore-scripts
       - name: Plan the entire PR diff
         env:
           BASE: ${{ needs.route.outputs.base }}
@@ -82,45 +83,89 @@ jobs:
         run: |
           args=(--all)
           if [ -n "$BASE" ]; then args=(--changed --base="$BASE" --committed); fi
-          node .repo-tooling/source/packages/tooling/runner/cli.mjs --profile=ci --config="$CONFIG" "${args[@]}" --plan > .repo-tooling/plan.json
+          node .tooling/source/packages/tooling/runner/cli.mjs --profile=ci --config="$CONFIG" "${args[@]}" --plan > .tooling/plan.json
+      - name: Inspect plan
+        id: plan-info
+        env:
+          CONFIG: ${{ inputs.config-path }}
+        run: node .tooling/source/packages/tooling/runner/ci-plan.mjs .tooling/plan.json
+      - name: Select formatter installation
+        id: install-plan
+        if: inputs.lightweight-docs && steps.plan-info.outputs.active == 'true'
+        run: node .tooling/source/packages/tooling/runner/docs-install.mjs .tooling/plan.json --plan
+      - name: Install standalone formatter
+        if: steps.plan-info.outputs.active == 'true' && steps.install-plan.outputs.lightweight == 'true'
+        run: node .tooling/source/packages/tooling/runner/docs-install.mjs .tooling/plan.json
+      - name: Install application dependencies
+        if: steps.plan-info.outputs.active == 'true' && steps.install-plan.outputs.lightweight != 'true'
+        run: npm ci --ignore-scripts
+      - name: Restore tool caches
+        if: steps.plan-info.outputs.active == 'true' && steps.install-plan.outputs.lightweight != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.plan-info.outputs.tool-cache-paths }}
+          key: tooling-tools-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            tooling-tools-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}-
       - name: Provision selected prerequisites
-        run: node .repo-tooling/source/packages/tooling/runner/provision.mjs .repo-tooling/plan.json
+        if: steps.plan-info.outputs.active == 'true'
+        run: node .tooling/source/packages/tooling/runner/provision.mjs .tooling/plan.json
       - uses: actions/cache@v4
+        if: steps.plan-info.outputs.browsers == 'true'
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: playwright-${{ runner.os }}-${{ steps.plan-info.outputs.browser-key }}
       - name: Install matching browsers
-        run: |
-          if node -e 'const p=JSON.parse(require("fs").readFileSync(".repo-tooling/plan.json")); process.exit(p.checks.some(c=>["e2e","visual"].includes(c.id))?0:1)'; then
-            npx --no-install playwright install --with-deps chromium
-            node -e 'require("fs").appendFileSync(process.env.GITHUB_ENV, `CHROME_PATH=${require("@playwright/test").chromium.executablePath()}\n`)'
-          fi
+        if: steps.plan-info.outputs.browsers == 'true'
+        run: node .tooling/source/packages/tooling/runner/browsers.mjs .tooling/plan.json
+      - name: Restore performance history
+        if: steps.plan-info.outputs.active == 'true' && steps.plan-info.outputs.history == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .tooling/history/runs.json
+          key: tooling-history-${{ runner.os }}-${{ hashFiles('.nvmrc') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            tooling-history-${{ runner.os }}-${{ hashFiles('.nvmrc') }}-
       - name: Run shared check graph
+        if: steps.plan-info.outputs.active == 'true'
         env:
           BASE: ${{ needs.route.outputs.base }}
           CONFIG: ${{ inputs.config-path }}
         run: |
           args=(--all)
           if [ -n "$BASE" ]; then args=(--changed --base="$BASE" --committed); fi
-          node .repo-tooling/source/packages/tooling/runner/cli.mjs --profile=ci --config="$CONFIG" "${args[@]}" --output=.repo-tooling/report
+          node .tooling/source/packages/tooling/runner/cli.mjs --profile=ci --config="$CONFIG" "${args[@]}" --output=.tooling/report
       - name: Collect visual report
-        if: always()
+        if: always() && steps.plan-info.outputs.active == 'true'
         run: |
           if [ -f playwright-report/index.html ]; then
-            node .repo-tooling/source/packages/tooling/checks/visual-report.mjs
+            node .tooling/source/packages/tooling/checks/visual-report.mjs
           elif [ -f frontend/playwright-report/index.html ]; then
-            node .repo-tooling/source/packages/tooling/checks/visual-report.mjs frontend/playwright-report
+            node .tooling/source/packages/tooling/checks/visual-report.mjs frontend/playwright-report
           fi
       - uses: actions/upload-artifact@v4
-        if: always()
+        id: validation-artifacts
+        if: always() && steps.plan-info.outputs.active == 'true'
         with:
           name: validation-${{ github.run_id }}
           include-hidden-files: true
           path: |
-            .repo-tooling/report/
+            .tooling/report/
             **/test-results/
             **/coverage/
           retention-days: 3
+      - name: Publish validation summary
+        if: always()
+        env:
+          TOOLING_ARTIFACT_URL: ${{ steps.validation-artifacts.outputs.artifact-url }}
+          TOOLING_EMPTY_PLAN: ${{ steps.plan-info.outputs.active == 'false' }}
+        run: node .tooling/source/packages/tooling/runner/summary.mjs .tooling/report
+      - name: Save performance history
+        if: always() && steps.plan-info.outputs.active == 'true' && steps.plan-info.outputs.history == 'true' && hashFiles('.tooling/history/runs.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .tooling/history/runs.json
+          key: tooling-history-${{ runner.os }}-${{ hashFiles('.nvmrc') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
   result:
     name: result
     needs: [route, checks]

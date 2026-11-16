@@ -36,7 +36,7 @@ export function validateCatalogues(catalogues, source, { pluralExceptions = [] }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const root = process.cwd();
+  const root = process.env.TOOLING_ROOT ?? process.cwd();
   const { config } = loadConfig(root);
   if (!config.translations?.directory || !config.translations?.source)
     throw new Error('Configure translations.directory and translations.source');

@@ -2,9 +2,10 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { loadConfig, inside } from '../runner/config.mjs';
+import { matches } from '../runner/graph.mjs';
 import scss from 'postcss-scss';
 
-const repo = process.cwd();
+const repo = process.env.TOOLING_ROOT ?? process.cwd();
 const { config } = loadConfig(repo);
 const options = config.styles ?? {};
 const ORDER = JSON.parse(
@@ -14,6 +15,8 @@ const RANK = new Map(ORDER.map((name, index) => [name, index]));
 
 const BEM =
   /^[a-z][a-z0-9]*(-[a-z0-9]+)*(__[a-z][a-z0-9]*(-[a-z0-9]+)*)?(--[a-z][a-z0-9]*(-[a-z0-9]+)*)?$/;
+const rookie = options.preset === 'rookie';
+const rules = { bem: rookie, componentName: rookie, palette: rookie, ...options.rules };
 const COLOUR_FREE = /[/\\](_palette|themes)[/\\]/;
 const MAX_DEPTH = options.maxDepth ?? 3;
 const CONTROL = new Set(['for', 'each', 'while', 'if', 'else']);
@@ -120,12 +123,16 @@ const lintFile = (file, fix) => {
   const source = readFileSync(file, 'utf8');
   const problems = [];
   const root = scss.parse(source, { from: file });
-  const colourFree = COLOUR_FREE.test(file);
-  const moduleBlock = /\.module\.scss$/.test(file)
-    ? basename(file, '.module.scss')
-        .replace(/(?<!^)(?=[A-Z])/g, '-')
-        .toLowerCase()
-    : null;
+  const colourFree =
+    !rules.palette ||
+    COLOUR_FREE.test(file) ||
+    (options.colourTokenPaths ?? []).some((pattern) => matches(relative(repo, file), pattern));
+  const moduleBlock =
+    rules.componentName && /\.module\.scss$/.test(file)
+      ? basename(file, '.module.scss')
+          .replace(/(?<!^)(?=[A-Z])/g, '-')
+          .toLowerCase()
+      : null;
   const disabled = new Map();
   root.walkComments((c) => {
     const m = /lint-scss-disable-next-line\s+([\w-]+)/.exec(c.text);
@@ -181,11 +188,11 @@ const lintFile = (file, fix) => {
           if (!sel.includes('#{') && !sel.includes('%')) {
             const bare = sel.replace(/:global\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
             for (const m of bare.matchAll(/\.(-?[\w-]+)/g))
-              if (!BEM.test(m[1]))
+              if (rules.bem && !BEM.test(m[1]))
                 report(
                   node,
                   'selector-class-pattern',
-                  `Use BEM: .block, .block__element, .block--modifier, in kebab-case (docs/specs/code-cleanup.md): .${m[1]}`,
+                  `Use BEM: .block, .block__element, .block--modifier, in kebab-case: .${m[1]}`,
                 );
             for (const m of bare.matchAll(/\.([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?:__|--|(?![\w-]))/g))
               if (moduleBlock && m[1] !== moduleBlock)
@@ -196,7 +203,11 @@ const lintFile = (file, fix) => {
                 );
           }
           if (!sel.includes('#{') && tooSpecific(specificity(sel)))
-            report(node, 'selector-max-specificity', `Specificity of "${sel}" is above 0,4,2`);
+            report(
+              node,
+              'selector-max-specificity',
+              `Specificity of "${sel}" is above ${MAX_SPECIFICITY.join(',')}`,
+            );
         }
         visit(node, own, depth + 1);
         return;

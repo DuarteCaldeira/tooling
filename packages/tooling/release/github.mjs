@@ -8,13 +8,13 @@ export async function verifyPullRequest({
   publicKey,
   workflow,
   version,
-  configPath = 'repo-tooling.config.json',
+  configPath = 'tooling.config.json',
 }) {
   if (!publicKey) return false;
   try {
     const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: Number(number) });
     if (pr.state !== 'open' || pr.head.repo.full_name !== `${owner}/${repo}`) return false;
-    const marker = pr.body?.match(/<!-- repo-tooling-evidence:([A-Za-z0-9+/=]+) -->/);
+    const marker = pr.body?.match(/<!-- tooling-evidence:([A-Za-z0-9+/=]+) -->/);
     if (!marker) return false;
     const envelope = JSON.parse(Buffer.from(marker[1], 'base64'));
     const { data: head } = await github.rest.git.getCommit({

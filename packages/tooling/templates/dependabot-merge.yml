@@ -10,4 +10,4 @@ permissions:
   checks: read
 jobs:
   merge:
-    uses: DuarteCaldeira/repo-tooling/.github/workflows/dependabot-merge.yml@REPLACE_WITH_TOOLING_COMMIT_SHA
+    uses: DuarteCaldeira/tooling/.github/workflows/dependabot-merge.yml@REPLACE_WITH_TOOLING_COMMIT_SHA

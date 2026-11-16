@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/@dcaldeira/repo-tooling/config.schema.json",
+  "$schema": "./node_modules/@dcaldeira/tooling/config.schema.json",
   "schemaVersion": 1,
   "paths": {
     "app": ["frontend/src/**", "frontend/e2e/**", "frontend/index.html", "shared/src/**"],
@@ -15,7 +15,7 @@
       "backend/scripts/sync-shared.mjs"
     ],
     "tooling": [
-      "repo-tooling.config.json",
+      "tooling.config.json",
       "*config*",
       "**/*config*",
       "scripts/**",
@@ -37,6 +37,7 @@
     "CHROME_PATH"
   ],
   "styles": {
+    "preset": "rookie",
     "source": "frontend/src",
     "maxDepth": 3,
     "maxSpecificity": [0, 4, 2]

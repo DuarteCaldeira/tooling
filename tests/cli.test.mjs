@@ -23,9 +23,9 @@ function fixture() {
     groups: ['docs'],
     profiles: ['dev', 'push', 'ci'],
   };
-  writeFileSync(join(root, 'repo-tooling.config.json'), JSON.stringify(config));
+  writeFileSync(join(root, 'tooling.config.json'), JSON.stringify(config));
   writeFileSync(join(root, 'README.md'), 'base');
-  writeFileSync(join(root, '.gitignore'), '.repo-tooling/\n');
+  writeFileSync(join(root, '.gitignore'), '.tooling/\n');
   git(root, 'add', '.');
   git(root, 'commit', '-m', 'base');
   git(root, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
@@ -46,7 +46,7 @@ test('CLI records complete clean passes, reuses them and rejects dirty/stale or 
   assert.match(result.stderr, /No pass recorded/);
   result = run(root, '--profile=ci', '--all', '--skip=format');
   assert.equal(result.status, 1);
-  const report = JSON.parse(readFileSync(join(root, '.repo-tooling/report/summary.json')));
+  const report = JSON.parse(readFileSync(join(root, '.tooling/report/summary.json')));
   assert.equal(report.complete, false);
   assert.equal(report.results[0].status, 'excluded');
   assert.equal(run(root, '--profile=push', '--committed', '--all').status, 2);
@@ -54,7 +54,7 @@ test('CLI records complete clean passes, reuses them and rejects dirty/stale or 
 
 test('a cached docs-only pass cannot authorize a subsequent full validation request', () => {
   const root = fixture();
-  const path = join(root, 'repo-tooling.config.json');
+  const path = join(root, 'tooling.config.json');
   const config = JSON.parse(readFileSync(path));
   config.checks.app = {
     command: ['node', '-e', 'process.exit(1)'],
@@ -79,7 +79,7 @@ test('plan is read-only and unknown flags/ids cannot silently pass', () => {
     JSON.parse(result.stdout).checks.map((c) => c.id),
     ['format'],
   );
-  assert.equal(existsSync(join(root, '.repo-tooling')), false);
+  assert.equal(existsSync(join(root, '.tooling')), false);
   assert.equal(run(root, '--only=typo').status, 2);
   assert.equal(run(root, '--wat').status, 1);
   git(root, 'commit', '--allow-empty', '-m', 'next');
