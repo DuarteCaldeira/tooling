@@ -22,6 +22,11 @@ export function analyseArchitecture(root, settings = {}, files, ts = peer('types
   const included = new Set(files.map((file) => resolve(root, file)));
   const graph = new Map(files.map((file) => [file, []]));
   const options = compilerOptions(ts, root, settings.tsconfig);
+  const resolutionCache = ts.createModuleResolutionCache(
+    root,
+    (file) => (ts.sys.useCaseSensitiveFileNames ? file : file.toLowerCase()),
+    options,
+  );
   const issues = [];
   if (settings.tsconfig && !existsSync(inside(root, settings.tsconfig)))
     throw new Error(`Missing architecture tsconfig: ${settings.tsconfig}`);
@@ -40,6 +45,7 @@ export function analyseArchitecture(root, settings = {}, files, ts = peer('types
         join(root, file),
         options,
         ts.sys,
+        resolutionCache,
       ).resolvedModule;
       if (!resolved) {
         const local =

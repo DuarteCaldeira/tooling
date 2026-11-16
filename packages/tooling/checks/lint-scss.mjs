@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { loadConfig, inside } from '../runner/config.mjs';
 import { matches } from '../runner/graph.mjs';
@@ -31,10 +31,10 @@ const COLOUR_PROPS =
   /^(color|background(-color|-image)?|border(-[a-z]+)*-color|border(-top|-right|-bottom|-left)?|outline(-color)?|fill|stroke|box-shadow|text-shadow|caret-color|accent-color|text-decoration(-color)?|column-rule(-color)?)$/;
 
 const files = (dir) =>
-  readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return files(path);
-    return path.endsWith('.scss') ? [path] : [];
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return files(path);
+    return entry.isFile() && path.endsWith('.scss') ? [path] : [];
   });
 
 const stripValue = (value) =>
@@ -334,8 +334,7 @@ const given = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const targets = given.length ? given : files(inside(repo, options.source ?? 'src'));
 let total = 0;
 for (const file of targets) {
-  const problems = lintFile(file, fix);
-  if (fix) continue;
+  const problems = fix ? (lintFile(file, true), lintFile(file, false)) : lintFile(file, false);
   for (const p of problems.sort((a, b) => a.line - b.line)) {
     console.error(
       `${relative(repo, file).replaceAll('\\', '/')}:${p.line}  ${p.message}  (${p.rule})`,
@@ -347,4 +346,4 @@ if (total) {
   console.error(`\n${total} SCSS problem${total === 1 ? '' : 's'}.`);
   process.exit(1);
 }
-if (!fix) console.log(`SCSS lint passed (${targets.length} files).`);
+console.log(`SCSS lint passed (${targets.length} files).`);
