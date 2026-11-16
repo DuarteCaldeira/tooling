@@ -40,8 +40,8 @@ publication remain separate concerns.
 ## Adoption
 
 Design-system uses the preview server, package smoke check, failure summary,
-baseline report and shared release preparer. Its emoji generator and Sass
-entry/important guard remain application-owned.
+baseline report and shared release preparer. Its emoji generator remains application-owned; Sass entrypoints and important
+exceptions are consumer configuration for the shared Sass check.
 
 The visual suites in website-baseline, dr-gabriela-videira and billy can reuse
 the JSON summary. They currently use a different snapshot layout, so the
