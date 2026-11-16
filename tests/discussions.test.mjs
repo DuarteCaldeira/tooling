@@ -22,6 +22,20 @@ test('topic tags identify product areas and cross-cutting concerns without chang
   assert.equal(itemId(text), before);
 });
 
+test('every change gets a tag besides its area, falling back to a reusable change type', () => {
+  const kinds = (text, technical = false) =>
+    itemTopics(text, technical)
+      .filter((topic) => topic.kind !== 'area')
+      .map((topic) => topic.id);
+  assert.deepEqual(kinds('Perfil: novo campo para registar problemas de saúde.'), ['novidade']);
+  assert.deepEqual(kinds('Análises: unidade dos Leucócitos corrigida.'), ['correcao']);
+  assert.deepEqual(kinds('Treinos: mais nomes sugeridos nos detalhes.'), ['melhoria']);
+  assert.deepEqual(kinds('test: close coverage gaps', true), ['testes']);
+  assert.deepEqual(kinds('refactor(log): remove the card', true), ['refatoracao']);
+  assert.deepEqual(kinds('chore: update dependencies', true), ['manutencao']);
+  assert.ok(kinds('Texto qualquer sem tema').length >= 1);
+});
+
 test('technical changes do not accept validation and participant IDs distinguish identical names', async () => {
   const { service, input } = fixture();
   await assert.rejects(
