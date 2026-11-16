@@ -73,10 +73,14 @@ function Hero({ apps, app, onSelect }) {
         <span className="selected-emoji" aria-hidden="true">
           {app?.emoji ?? '📦'}
         </span>
+        <div className="selected-name">
+          <span className="selected-label">A acontecer em</span>
+          <h2>{app?.name ?? 'Escolha uma aplicação'}</h2>
+        </div>
         <div className="selected-picker">
           <SelectFilter
             id="release-app"
-            label="A acontecer em"
+            label="Mudar de aplicação"
             value={app?.repository ?? ''}
             options={apps.map((entry) => ({ value: entry.repository, label: entry.name }))}
             onChange={onSelect}
@@ -150,21 +154,29 @@ function ReviewOverview({ app, review }) {
       </Card>
       <div className="review-completion">
         <span className="progress-caption">
-          {loaded ? `${validated} de ${total} novidades validadas` : 'A carregar a revisão…'}
+          {loaded
+            ? `${validated} de ${total} novidades validadas`
+            : review.hasError(repository)
+              ? 'Revisão indisponível de momento'
+              : 'A carregar a revisão…'}
         </span>
         <Progress
           variant="primary"
           size="md"
           value={validated}
           max={total || 1}
-          label={loaded ? `${validated} de ${total} novidades validadas` : 'A carregar a revisão…'}
+          label={loaded
+            ? `${validated} de ${total} novidades validadas`
+            : review.hasError(repository)
+              ? 'Revisão indisponível de momento'
+              : 'A carregar a revisão…'}
         />
       </div>
     </div>
   );
 }
 
-function Portfolio({ apps, snapshot }) {
+function Portfolio({ apps, snapshot, onSelect }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('latest');
@@ -279,16 +291,27 @@ function Portfolio({ apps, snapshot }) {
                 </p>
                 <div className="app-grid">
                   {visible.map((app) => (
-                    <Card key={app.repository} as="article" padding="lg" gap="md">
+                    <Card key={app.repository} as="article" padding="lg" gap="md" className="app-card">
                       <div className="identity">
                         <span className="app-icon">{app.emoji ?? '📦'}</span>
                         <h3>
-                          {githubUrl(app.repositoryUrl) ? (
-                            <a href={app.repositoryUrl}>{app.name}</a>
-                          ) : (
-                            app.name
-                          )}
+                          <button
+                            type="button"
+                            className="app-card-button"
+                            onClick={() => onSelect(app.repository)}
+                          >
+                            {app.name}
+                          </button>
                         </h3>
+                        {githubUrl(app.repositoryUrl) ? (
+                          <a
+                            className="app-card-github"
+                            href={app.repositoryUrl}
+                            aria-label={`${app.name} no GitHub`}
+                          >
+                            GitHub ↗
+                          </a>
+                        ) : null}
                       </div>
                       <p className="app-version mono">{app.version ?? 'Sem versão publicada'}</p>
                       <dl className="card-metrics">
@@ -408,6 +431,12 @@ export function App() {
   }, []);
 
   const apps = snapshot?.apps ?? [];
+  const chooseApp = (repository) => {
+    setSelected(repository);
+    requestAnimationFrame(() =>
+      document.getElementById('release-notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
+  };
   const app = apps.find((entry) => entry.repository === selected);
   const updated = failed
     ? 'Informação indisponível'
@@ -451,10 +480,10 @@ export function App() {
             </p>
           ) : snapshot ? (
             <>
+              <Portfolio apps={apps} snapshot={snapshot} onSelect={chooseApp} />
               <Hero apps={apps} app={app} onSelect={setSelected} />
               <ReviewOverview app={app} review={review} />
               <ReleaseHub apps={apps} app={app} review={review} onOpen={setConversation} />
-              <Portfolio apps={apps} snapshot={snapshot} />
             </>
           ) : null}
           <footer>
