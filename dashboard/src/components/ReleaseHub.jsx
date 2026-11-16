@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Accordion,
   Badge,
@@ -208,7 +208,10 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
   const topic = filters['topic-filter'];
 
   // Changing app resets paging, filters and open state, like a fresh page.
+  const previous = useRef(repository);
   useEffect(() => {
+    if (previous.current === repository) return;
+    previous.current = repository;
     setLimit(PAGE);
     setExpanded({});
     setFilters(DEFAULTS);
@@ -393,7 +396,9 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
       content: (
         <div className="release-body">
           {items.length ? (
-            <AreaGroups items={items} technical={false} groupKey={key} {...groupProps} />
+            <div className="area-groups">
+              <AreaGroups items={items} technical={false} groupKey={key} {...groupProps} />
+            </div>
           ) : !technical.length && !needsState ? (
             <p className="source-note">
               {release.summaryContext ?? 'Esta versão não tem novidades de produto descritas.'}
@@ -407,12 +412,14 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
                   id: technicalKey,
                   header: <span className="area-heading">{`🛠️ Detalhes técnicos · ${technical.length}`}</span>,
                   content: (
-                    <AreaGroups
-                      items={technical}
-                      technical
-                      groupKey={technicalKey}
-                      {...groupProps}
-                    />
+                    <div className="area-groups">
+                      <AreaGroups
+                        items={technical}
+                        technical
+                        groupKey={technicalKey}
+                        {...groupProps}
+                      />
+                    </div>
                   ),
                 },
               ]}
@@ -465,7 +472,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             label="Tema"
             value={topics.some((entry) => entry.id === topic) ? topic : 'all'}
             options={[
-              { value: 'all', label: 'Todos os temas' },
+              { value: 'all', label: 'Todos' },
               ...topics.map((entry) => ({ value: entry.id, label: `${entry.emoji} ${entry.label}` })),
             ]}
             onChange={(value) => update('topic-filter', value)}
@@ -475,7 +482,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             label="Conteúdo"
             value={content}
             options={[
-              { value: 'all', label: 'Produto e técnica' },
+              { value: 'all', label: 'Tudo' },
               { value: 'product', label: 'Só produto' },
               { value: 'technical', label: 'Só técnica' },
             ]}
@@ -486,9 +493,9 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             label="Validação"
             value={filter}
             options={[
-              { value: 'all', label: 'Todos os estados' },
-              { value: 'pending', label: '🟡 Por validar' },
-              { value: 'validated', label: '✅ Validadas' },
+              { value: 'all', label: 'Todos' },
+              { value: 'pending', label: 'Por validar' },
+              { value: 'validated', label: 'Validadas' },
             ]}
             onChange={(value) => update('review-filter', value)}
           />
@@ -498,8 +505,8 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             value={conversation}
             options={[
               { value: 'all', label: 'Todas' },
-              { value: 'open', label: '💬 Em aberto' },
-              { value: 'resolved', label: '✓ Resolvidas' },
+              { value: 'open', label: 'Em aberto' },
+              { value: 'resolved', label: 'Resolvidas' },
             ]}
             onChange={(value) => update('discussion-filter', value)}
           />
