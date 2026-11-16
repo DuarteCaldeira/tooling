@@ -176,7 +176,7 @@ function ReviewOverview({ app, review }) {
   );
 }
 
-function Portfolio({ apps, snapshot }) {
+function Portfolio({ apps, snapshot, onSelect }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('latest');
@@ -291,16 +291,27 @@ function Portfolio({ apps, snapshot }) {
                 </p>
                 <div className="app-grid">
                   {visible.map((app) => (
-                    <Card key={app.repository} as="article" padding="lg" gap="md">
+                    <Card key={app.repository} as="article" padding="lg" gap="md" className="app-card">
                       <div className="identity">
                         <span className="app-icon">{app.emoji ?? '📦'}</span>
                         <h3>
-                          {githubUrl(app.repositoryUrl) ? (
-                            <a href={app.repositoryUrl}>{app.name}</a>
-                          ) : (
-                            app.name
-                          )}
+                          <button
+                            type="button"
+                            className="app-card-button"
+                            onClick={() => onSelect(app.repository)}
+                          >
+                            {app.name}
+                          </button>
                         </h3>
+                        {githubUrl(app.repositoryUrl) ? (
+                          <a
+                            className="app-card-github"
+                            href={app.repositoryUrl}
+                            aria-label={`${app.name} no GitHub`}
+                          >
+                            GitHub ↗
+                          </a>
+                        ) : null}
                       </div>
                       <p className="app-version mono">{app.version ?? 'Sem versão publicada'}</p>
                       <dl className="card-metrics">
@@ -420,6 +431,12 @@ export function App() {
   }, []);
 
   const apps = snapshot?.apps ?? [];
+  const chooseApp = (repository) => {
+    setSelected(repository);
+    requestAnimationFrame(() =>
+      document.getElementById('release-notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
+  };
   const app = apps.find((entry) => entry.repository === selected);
   const updated = failed
     ? 'Informação indisponível'
@@ -463,10 +480,10 @@ export function App() {
             </p>
           ) : snapshot ? (
             <>
+              <Portfolio apps={apps} snapshot={snapshot} onSelect={chooseApp} />
               <Hero apps={apps} app={app} onSelect={setSelected} />
               <ReviewOverview app={app} review={review} />
               <ReleaseHub apps={apps} app={app} review={review} onOpen={setConversation} />
-              <Portfolio apps={apps} snapshot={snapshot} />
             </>
           ) : null}
           <footer>
