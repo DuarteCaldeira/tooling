@@ -8,6 +8,7 @@ import {
   Tag,
 } from '@dcaldeira/design-system';
 import { itemTopics, normalize, portugueseDate } from '../lib/topics.js';
+import { ArrowUpRight, Bug, Chat, Check, Dot, Filter, Refresh } from './Icons.jsx';
 
 const FILTER_KEYS = [
   'notes-search',
@@ -59,69 +60,85 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
     }
   }
 
+  const status = reported
+    ? 'is-reported'
+    : technical
+      ? 'is-technical'
+      : state.validated
+        ? 'is-validated'
+        : 'is-pending';
   return (
-    <li className={`change-item${state.validated && !technical ? ' is-validated' : ''}`}>
-      <button
-        type="button"
-        className="item-trigger"
-        aria-label={`Abrir conversa: ${text}`}
-        onClick={() => onOpen(context)}
-      >
-        <span className="change-copy">
-          {repeated ? (
-            text.slice(split + 2)
-          ) : split > 0 && split < 45 ? (
-            <>
-              <strong>{text.slice(0, split + 1)}</strong>
-              {text.slice(split + 1)}
-            </>
-          ) : (
-            text
-          )}
-        </span>
-      </button>
-      <div className="item-meta">
-        {tags.length || reported ? (
-          <div className="item-topics">
-            {reported ? (
-              <span className="comment-kind comment-kind--issue">🐛 Problema</span>
-            ) : null}
-            {tags.map((topic) => (
-              <button
-                key={topic.id}
-                type="button"
-                className="tag-button"
-                aria-label={`Filtrar por ${topic.label}`}
-                aria-pressed={activeTopic === topic.id}
-                onClick={() => onTopic(topic.id)}
-              >
-                <Tag size="sm">{`${topic.emoji} ${topic.label}`}</Tag>
-              </button>
-            ))}
-          </div>
-        ) : null}
-        <div className="item-actions">
-          {technical || reported ? null : (
-            <Button
-              variant="secondary"
-              size="sm"
-              aria-pressed={state.validated}
-              aria-label={(state.validated ? 'Retirar validação: ' : 'Validar: ') + text}
-              disabled={pending || !review.isLoaded(context.repository)}
-              onClick={toggleValidation}
-            >
-              {state.validated ? '✓ Validado' : '○ Por validar'}
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={() => onOpen(context)}>
-            {state.count
-              ? `💬 ${state.count} · ${state.closed ? 'Resolvida' : 'Em aberto'}`
-              : reported
-                ? state.closed
-                  ? '💬 Resolvido'
-                  : '💬 Em aberto'
-                : '💬 Comentar'}
+    <li className={`change-item ${status}${state.count && !state.closed ? ' has-open' : ''}`}>
+      <span className="check-wrap">
+        {technical || reported ? (
+          <span className="item-bullet" aria-hidden="true">
+            {reported ? <Bug /> : <Dot />}
+          </span>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-pressed={state.validated}
+            aria-label={(state.validated ? 'Retirar validação: ' : 'Validar: ') + text}
+            disabled={pending || !review.isLoaded(context.repository)}
+            onClick={toggleValidation}
+          >
+            <Check />
           </Button>
+        )}
+      </span>
+      <div className="item-main">
+        <button
+          type="button"
+          className="item-trigger"
+          aria-label={`Abrir conversa: ${text}`}
+          onClick={() => onOpen(context)}
+        >
+          <span className="change-copy">
+            {repeated ? (
+              text.slice(split + 2)
+            ) : split > 0 && split < 45 ? (
+              <>
+                <strong>{text.slice(0, split + 1)}</strong>
+                {text.slice(split + 1)}
+              </>
+            ) : (
+              text
+            )}
+          </span>
+        </button>
+        <div className="item-meta">
+          {tags.length || reported ? (
+            <div className="item-topics">
+              {reported ? (
+                <span className="comment-kind comment-kind--issue">Problema</span>
+              ) : null}
+              {tags.map((topic) => (
+                <button
+                  key={topic.id}
+                  type="button"
+                  className="tag-button"
+                  aria-label={`Filtrar por ${topic.label}`}
+                  aria-pressed={activeTopic === topic.id}
+                  onClick={() => onTopic(topic.id)}
+                >
+                  <Tag size="sm">{topic.label}</Tag>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="item-actions">
+            <Button variant="ghost" size="sm" onClick={() => onOpen(context)}>
+              <Chat />
+              {state.count
+                ? `${state.count} · ${state.closed ? 'Resolvida' : 'Em aberto'}`
+                : reported
+                  ? state.closed
+                    ? 'Resolvido'
+                    : 'Em aberto'
+                  : 'Comentar'}
+            </Button>
+          </div>
         </div>
       </div>
       {feedback ? (
@@ -162,7 +179,7 @@ function AreaGroups({ items, technical, release, app, review, onOpen, onTopic, t
     <section className="release-area" key={area.id} aria-label={area.label}>
       <header className="release-area-heading">
         <h3>{area.label}</h3>
-        {group.length > 1 ? <span>{group.length} alterações</span> : null}
+        <span>{group.length === 1 ? '1 alteração' : `${group.length} alterações`}</span>
       </header>
       <ul className="change-list" lang={release.language ?? 'pt-PT'}>
         {group.map((item) => (
@@ -187,6 +204,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
   });
   const [limit, setLimit] = useState(PAGE);
   const [expanded, setExpanded] = useState({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const repository = app?.repository;
   const loaded = review.isLoaded(repository);
   const search = normalize(filters['notes-search'].trim());
@@ -383,9 +401,6 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
       header: (
         <span className="release-heading">
           <span className="release-identity">
-            <span className="release-icon" aria-hidden="true">
-              {fully ? '✅' : '🚀'}
-            </span>
             <span className="release-version">{release.version}</span>
             {release === all[0] ? <Badge variant="success" size="sm" text="Mais recente" /> : null}
             {release.prerelease ? (
@@ -395,6 +410,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
           <span className="release-meta">
             <ReleaseDate value={release.releasedAt} />
             <span className={`release-review${fully ? ' complete' : ''}`}>
+              <i className="status-dot" aria-hidden="true" />
               {!product.length
                 ? 'Sem validação necessária'
                 : loaded
@@ -445,7 +461,9 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
                 {
                   id: technicalKey,
                   header: (
-                    <span className="area-heading">{`🛠️ Detalhes técnicos · ${technical.length}`}</span>
+                    <span className="area-heading">
+                      Detalhes técnicos <span className="count">{technical.length}</span>
+                    </span>
                   ),
                   content: (
                     <div className="area-groups">
@@ -469,11 +487,11 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
                 })
               }
             >
-              🐛 Reportar bug
+              <Bug /> Reportar bug
             </Button>
             {githubUrl(release.url) ? (
               <a className="text-link" href={release.url}>
-                Ver no GitHub ↗
+                Ver no GitHub <ArrowUpRight />
               </a>
             ) : null}
           </div>
@@ -486,6 +504,32 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     <section id="release-notes" aria-labelledby="notes-title">
       <div className="notes-heading">
         <h2 id="notes-title">Histórico de versões</h2>
+        <div className="feed-toolbar">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setOpen(
+                states.map(({ entry }) => releaseId(entry.release)),
+                states.map(({ entry }) => releaseId(entry.release)),
+              )
+            }
+          >
+            Expandir tudo
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setOpen(
+                states.map(({ entry }) => releaseId(entry.release)),
+                [],
+              )
+            }
+          >
+            Recolher tudo
+          </Button>
+        </div>
       </div>
       <div className="filter-panel" role="group" aria-label="Filtrar alterações">
         <SearchFilter
@@ -495,7 +539,17 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
           value={filters['notes-search']}
           onChange={(value) => update('notes-search', value)}
         />
-        <div className="review-controls">
+        <Button
+          variant="secondary"
+          size="sm"
+          className="filters-toggle"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((value) => !value)}
+        >
+          <Filter /> Filtros
+          {filtering ? <span className="count">ativos</span> : null}
+        </Button>
+        <div className={`review-controls${filtersOpen ? ' is-open' : ''}`}>
           <SelectFilter
             id="topic-filter"
             label="Tema"
@@ -504,7 +558,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
               { value: 'all', label: 'Todos' },
               ...topics.map((entry) => ({
                 value: entry.id,
-                label: `${entry.emoji} ${entry.label}`,
+                label: entry.label,
               })),
             ]}
             onChange={(value) => update('topic-filter', value)}
@@ -553,40 +607,15 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             </Button>
           ) : null}
           <Button variant="ghost" size="sm" onClick={() => review.refresh(repository)}>
-            ↻ Atualizar
+            <Refresh /> Atualizar
           </Button>
         </div>
-      </div>
-      <div className="feed-toolbar">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() =>
-            setOpen(
-              states.map(({ entry }) => releaseId(entry.release)),
-              states.map(({ entry }) => releaseId(entry.release)),
-            )
-          }
-        >
-          Expandir tudo
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() =>
-            setOpen(
-              states.map(({ entry }) => releaseId(entry.release)),
-              [],
-            )
-          }
-        >
-          Recolher tudo
-        </Button>
       </div>
       <p id="notes-message" role="status" aria-live="polite">
         {message}
       </p>
       {accordionItems.length ? (
+        <div className="release-feed">
         <Accordion
           type="multiple"
           items={accordionItems}
@@ -598,11 +627,12 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             )
           }
         />
+        </div>
       ) : null}
       {matches.length > limit ? (
         <div className="load-more">
           <Button variant="pill" onClick={() => setLimit(limit + PAGE)}>
-            Mostrar versões anteriores ↓
+            Mostrar versões anteriores
           </Button>
         </div>
       ) : null}
