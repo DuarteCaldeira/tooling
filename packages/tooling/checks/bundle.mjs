@@ -101,12 +101,10 @@ export function analyseBundle(root, budget) {
       if (error.code !== 'ENOENT') throw error;
     }
     const size = gzip(file) / 1024;
-    // A file with no source map, such as a pre-built worker, gets its allowance by path.
-    const allowed = vendor ?? (budget.files ?? []).find(([part]) => file.includes(part));
-    const cap = allowed ? allowed[2] : budget.chunkKB;
+    const cap = vendor ? vendor[2] : budget.chunkKB;
     if (size > cap)
       errors.push(
-        `${file} (${allowed ? allowed[1] : 'route chunk'}) ${size.toFixed(1)} KB > ${cap} KB`,
+        `${file} (${vendor ? vendor[1] : 'route chunk'}) ${size.toFixed(1)} KB > ${cap} KB`,
       );
   }
   return { initialKB, initial: [...initial], chunks: chunks.length, errors };

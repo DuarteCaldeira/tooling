@@ -9,4 +9,3 @@
     "api/*.js": { "includeFiles": "{apps.json,release-notes.json}", "maxDuration": 60 }
   }
 }
-

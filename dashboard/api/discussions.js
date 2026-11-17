@@ -8,4 +8,3 @@ const handler = createHandler(
 
 export const GET = handler;
 export const POST = handler;
-
