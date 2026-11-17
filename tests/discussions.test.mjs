@@ -1,9 +1,58 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { createDiscussionService, createHandler } from '../dashboard/server/discussions.mjs';
+import {
+  createBlobStore,
+  createDiscussionService,
+  createHandler,
+} from '../dashboard/server/discussions.mjs';
 import { changelogSections, technicalNotes, itemId } from '../dashboard/release-items.mjs';
 import { portugueseDate, itemTopics } from '../dashboard/src/lib/topics.js';
+
+test('blob reads reuse unchanged ETags and invalidate on edits, external updates and deletions', async () => {
+  let body = { body: 'Original' };
+  let reads = 0;
+  let fail = false;
+  const gate = Promise.withResolvers();
+  const store = createBlobStore({
+    async get() {
+      reads++;
+      await gate.promise;
+      if (fail) throw new Error('Read failed');
+      return body ? { statusCode: 200, stream: Response.json(body).body } : null;
+    },
+    async put(_path, text) {
+      body = JSON.parse(text);
+    },
+    async del() {
+      body = null;
+    },
+    async list() {
+      return { blobs: [] };
+    },
+  });
+  const first = store.get('comment', 'etag-1');
+  const duplicate = store.get('comment', 'etag-1');
+  assert.equal(reads, 1);
+  gate.resolve();
+  assert.deepEqual(await first, await duplicate);
+  await store.get('comment', 'etag-1');
+  assert.equal(reads, 1);
+  body = { body: 'Edited elsewhere' };
+  assert.equal((await store.get('comment', 'etag-2')).body, 'Edited elsewhere');
+  assert.equal(reads, 2);
+  await store.set('comment', { body: 'Edited here' });
+  assert.equal((await store.get('comment', 'etag-2')).body, 'Edited here');
+  await store.get('comment');
+  assert.equal(reads, 4);
+  await store.remove(['comment']);
+  assert.equal(await store.get('comment', 'etag-2'), null);
+  fail = true;
+  await assert.rejects(store.get('comment', 'etag-3'), /Read failed/);
+  fail = false;
+  body = { body: 'Recovered' };
+  assert.equal((await store.get('comment', 'etag-3')).body, 'Recovered');
+});
 
 test('topic tags identify product areas and cross-cutting concerns without changing item IDs', () => {
   const text = 'Exames: importar relatórios fica mais rápido e com mais contraste.';
@@ -382,4 +431,3 @@ test('comments can be edited and deleted persistently without changing their ide
   assert.equal((await mutate('edit', { body: 'Missing comment' })).status, 404);
   assert.equal((await mutate('delete', { id: '../escape' })).status, 400);
 });
-

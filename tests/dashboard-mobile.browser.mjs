@@ -164,6 +164,7 @@ test(
               await dialog.getByRole('button', { name: 'Enviar comentário', exact: true }).tap();
               await dialog.getByText('Comentário enviado', { exact: true }).waitFor();
               assert.match(await dialog.locator('.comment-list').textContent(), /DUveloper/);
+              assert.equal(await dialog.locator('.comment-qa').count(), 0);
               const comment = dialog.locator('.comment-list .comment').first();
               await comment.getByRole('button', { name: 'Editar', exact: true }).tap();
               await comment
@@ -173,11 +174,20 @@ test(
               await dialog.getByText('Comentário atualizado', { exact: true }).waitFor();
               assert.match(await comment.textContent(), /Mensagem corrigida/);
               await comment.getByRole('button', { name: 'Eliminar', exact: true }).tap();
-              await comment.getByRole('button', { name: 'Cancelar', exact: true }).tap();
+              const confirmation = page.getByRole('dialog', {
+                name: 'Eliminar comentário',
+                exact: true,
+              });
+              await confirmation.waitFor();
+              await page.keyboard.press('Escape');
+              await confirmation.waitFor({ state: 'detached' });
+              await dialog.waitFor();
+              await comment.getByRole('button', { name: 'Eliminar', exact: true }).tap();
+              await confirmation.getByRole('button', { name: 'Cancelar', exact: true }).tap();
               assert.equal(await dialog.locator('.comment-list .comment').count(), 1);
               await comment.getByRole('button', { name: 'Eliminar', exact: true }).tap();
-              await comment
-                .getByRole('button', { name: 'Confirmar eliminação', exact: true })
+              await confirmation
+                .getByRole('button', { name: 'Eliminar comentário', exact: true })
                 .tap();
               await dialog.getByText('Comentário eliminado', { exact: true }).waitFor();
               await dialog

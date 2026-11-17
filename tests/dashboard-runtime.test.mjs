@@ -5,6 +5,31 @@ import { discussionManifest } from '../dashboard/release-items.mjs';
 import { createDiscussionService, createHandler } from '../dashboard/server/discussions.mjs';
 import { createDiscussionProvider } from '../dashboard/server/discussion-context.mjs';
 
+test('reported conversations do not trigger GitHub collection and reuse their storage connection', async () => {
+  const snapshot = {
+    apps: [
+      { repository: 'owner/app', releases: [{ version: 'v1.0.0', items: [], technicalItems: [] }] },
+    ],
+  };
+  let opens = 0;
+  const item = 'reported-00000000-0000-4000-8000-000000000001';
+  const serviceFor = createDiscussionProvider({
+    async readSnapshot(options) {
+      assert.equal(options?.preferCached, true, 'A reported item must not refresh GitHub');
+      return snapshot;
+    },
+    async openStore() {
+      opens++;
+      return { get: async () => ({ id: item }), list: async () => ({ blobs: [], hasMore: false }) };
+    },
+  });
+  const input = { repository: 'owner/app', version: 'v1.0.0', item };
+  const [first, second] = await Promise.all([serviceFor(input), serviceFor(input)]);
+  assert.equal((await first.list(input)).total, 0);
+  assert.equal((await second.list(input)).total, 0);
+  assert.equal(opens, 1);
+});
+
 function fixture() {
   let time = Date.parse('2026-11-17T12:00:00Z');
   let version = 'v1.0.0';
@@ -152,7 +177,7 @@ test('known conversations reuse stale shared releases without collecting GitHub 
   assert.equal((await cold()).apps[0].version, 'v2.0.0');
   assert.equal(f.calls(), 2);
   f.advance();
-  assert.equal((await read({ preferCached: true })).apps[0].version, 'v2.0.0');
+  assert.equal((await read({ preferCached: true })).apps[0].version, 'v1.0.0');
   assert.equal(f.calls(), 2);
 });
 

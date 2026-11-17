@@ -36,6 +36,7 @@ export function createReleaseSource({ load, store, key, now = Date.now, ttl = RE
 
   return async function snapshot({ preferCached = false } = {}) {
     if (preferCached) {
+      if (cached) return cached;
       await readShared();
       if (cached) return cached;
     }
@@ -124,3 +125,4 @@ export function createReleaseHandler(getSnapshot = releaseSnapshot) {
     }
   };
 }
+

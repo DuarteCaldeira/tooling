@@ -782,6 +782,16 @@ dd {
   gap: var(--ds-spacing-3);
   margin-top: var(--ds-spacing-3);
 }
+.delete-comment-preview {
+  max-height: 160px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  margin: var(--ds-spacing-4) 0 0;
+  padding: var(--ds-spacing-3);
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-muted);
+}
 .comment-edited {
   display: block;
   margin-top: var(--ds-spacing-2);

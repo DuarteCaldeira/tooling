@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
   Drawer,
+  Modal,
   Select,
   Tag,
   Textarea,
@@ -69,6 +70,19 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
   const [author, setAuthor] = useState('QAren');
   const [edit, setEdit] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
+  const deletingComment = comments.find((comment) => comment.id === deleting);
+  useLayoutEffect(() => {
+    if (!deletingComment) return undefined;
+    const drawer = contentRef.current?.closest('[role="dialog"]');
+    if (!drawer) return undefined;
+    drawer.inert = true;
+    drawer.setAttribute('aria-hidden', 'true');
+    return () => {
+      drawer.inert = false;
+      drawer.removeAttribute('aria-hidden');
+    };
+  }, [deletingComment]);
   const loadedCount = useRef(0);
   const readRequest = useRef(null);
   loadedCount.current = comments.length;
@@ -141,6 +155,7 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
     setBusy(false);
     setEdit(null);
     setDeleting(null);
+    setDeleteError('');
     request.current = null;
     if (!key) return undefined;
     const draft = drafts.current.get(key);
@@ -258,6 +273,7 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
     setBusy(true);
     setNotice('');
     setStatus('');
+    setDeleteError('');
     try {
       const result = await api(
         {},
@@ -281,6 +297,7 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
       setNotice(action === 'delete' ? 'Comentário eliminado' : 'Comentário atualizado');
       review.refresh(context.repository, { force: true });
     } catch (error) {
+      if (action === 'delete' && current === generation.current) setDeleteError(error.message);
       if (current === generation.current) setNotice(error.message);
     } finally {
       if (current === generation.current) setBusy(false);
@@ -293,248 +310,261 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
 
   // Closing must not depend on animationend (reduced motion can suppress it).
   return open ? (
-    <Drawer
-      isOpen={open}
-      onClose={onClose}
-      title={isReport ? '🐛 Reportar bug' : '💬 Conversa'}
-      subtitle={context ? `${context.appName} · ${context.version}` : undefined}
-      closeLabel="Fechar"
-      size="lg"
-    >
-      {context ? (
-        <div className="conversation" ref={contentRef}>
-          <Section title="Versão" className="drawer-version">
-            <p className="conversation-version">
-              <strong>
-                {context.appName} · {context.version}
-              </strong>
-            </p>
-          </Section>
-          {!isReport ? (
-            <>
-              <Section
-                title={isRelease ? 'Conversa da versão' : 'Alteração'}
-                className="drawer-context"
-              >
-                {isRelease ? null : <TopicTags text={context.text} technical={context.technical} />}
-                <blockquote className="conversation-quote">{context.text}</blockquote>
-              </Section>
+    <>
+      <Drawer
+        isOpen={open}
+        onClose={() => {
+          if (!deletingComment) onClose();
+        }}
+        title={isReport ? '🐛 Reportar bug' : '💬 Conversa'}
+        subtitle={context ? `${context.appName} · ${context.version}` : undefined}
+        closeLabel="Fechar"
+        size="lg"
+      >
+        {context ? (
+          <div className="conversation" ref={contentRef}>
+            <Section title="Versão" className="drawer-version">
+              <p className="conversation-version">
+                <strong>
+                  {context.appName} · {context.version}
+                </strong>
+              </p>
+            </Section>
+            {!isReport ? (
+              <>
+                <Section
+                  title={isRelease ? 'Conversa da versão' : 'Alteração'}
+                  className="drawer-context"
+                >
+                  {isRelease ? null : (
+                    <TopicTags text={context.text} technical={context.technical} />
+                  )}
+                  <blockquote className="conversation-quote">{context.text}</blockquote>
+                </Section>
 
-              <Section title="Ações" className="drawer-actions">
-                <div className="action-list">
-                  {canValidate ? (
+                <Section title="Ações" className="drawer-actions">
+                  <div className="action-list">
+                    {canValidate ? (
+                      <ToggleSwitch
+                        id="conversation-validated"
+                        label="Validada"
+                        helperText="Confirma que esta novidade está correta."
+                        checked={state.validated}
+                        disabled={busy || !review.isLoaded(context.repository)}
+                        onChange={(event) =>
+                          change(
+                            'validated',
+                            event.target.checked,
+                            event.target.checked ? 'Marcada como validada' : 'Validação removida',
+                          )
+                        }
+                      />
+                    ) : null}
                     <ToggleSwitch
-                      id="conversation-validated"
-                      label="Validada"
-                      helperText="Confirma que esta novidade está correta."
-                      checked={state.validated}
+                      id="conversation-resolved"
+                      label="Conversa resolvida"
+                      helperText="Marca esta conversa como tratada. Pode reabri-la quando quiser."
+                      checked={state.closed}
                       disabled={busy || !review.isLoaded(context.repository)}
                       onChange={(event) =>
                         change(
-                          'validated',
+                          'closed',
                           event.target.checked,
-                          event.target.checked ? 'Marcada como validada' : 'Validação removida',
+                          event.target.checked ? 'Conversa resolvida' : 'Conversa reaberta',
                         )
                       }
                     />
-                  ) : null}
-                  <ToggleSwitch
-                    id="conversation-resolved"
-                    label="Conversa resolvida"
-                    helperText="Marca esta conversa como tratada. Pode reabri-la quando quiser."
-                    checked={state.closed}
-                    disabled={busy || !review.isLoaded(context.repository)}
-                    onChange={(event) =>
-                      change(
-                        'closed',
-                        event.target.checked,
-                        event.target.checked ? 'Conversa resolvida' : 'Conversa reaberta',
-                      )
-                    }
-                  />
-                </div>
-                <div className="action-buttons">
-                  <Button variant="secondary" size="sm" onClick={copyLink}>
-                    Copiar ligação
-                  </Button>
-                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => load()}>
-                    Atualizar comentários
-                  </Button>
-                </div>
-                <p className="drawer-notice" role="status" aria-live="polite">
-                  {notice}
-                </p>
-              </Section>
-
-              <Section
-                title="Comentários"
-                aside={<Badge variant="neutral" size="sm" text={`${sorted.length}`} />}
-              >
-                <p className="drawer-status" role="status" aria-live="polite">
-                  {status}
-                </p>
-                {sorted.length ? (
-                  <ol className="comment-list">
-                    {sorted.map((comment) => {
-                      return (
-                        <li
-                          key={comment.id}
-                          className={`comment${comment.author === 'QAren' ? ' comment-qa' : ''}`}
-                        >
-                          <header className="comment-heading">
-                            <div className="comment-author-line">
-                              <strong className="comment-author">{comment.author}</strong>
-                              <CommentKind kind={comment.kind} />
-                            </div>
-                            <time dateTime={comment.createdAt}>
-                              {portugueseDate(comment.createdAt)}
-                            </time>
-                          </header>
-                          {edit?.id === comment.id ? (
-                            <form
-                              className="comment-editor"
-                              onSubmit={(event) => {
-                                event.preventDefault();
-                                mutateComment(comment, 'edit');
-                              }}
-                            >
-                              <Textarea
-                                id={`comment-edit-${comment.id}`}
-                                label="Editar mensagem"
-                                value={edit.body}
-                                onChange={(event) =>
-                                  setEdit({ id: comment.id, body: event.target.value })
-                                }
-                                required
-                                maxLength={4000}
-                                rows={4}
-                              />
-                              <div className="action-buttons">
-                                <Button
-                                  type="submit"
-                                  size="sm"
-                                  disabled={busy || !edit.body.trim()}
-                                >
-                                  Guardar
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  disabled={busy}
-                                  onClick={() => setEdit(null)}
-                                >
-                                  Cancelar
-                                </Button>
-                              </div>
-                            </form>
-                          ) : (
-                            <p className="comment-body">{comment.body}</p>
-                          )}
-                          {comment.updatedAt ? (
-                            <span className="comment-edited">Editado</span>
-                          ) : null}
-                          {deleting === comment.id ? (
-                            <div className="comment-editor">
-                              <p>Eliminar este comentário?</p>
-                              <div className="action-buttons">
-                                <Button
-                                  size="sm"
-                                  disabled={busy}
-                                  onClick={() => mutateComment(comment, 'delete')}
-                                >
-                                  Confirmar eliminação
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  disabled={busy}
-                                  onClick={() => setDeleting(null)}
-                                >
-                                  Cancelar
-                                </Button>
-                              </div>
-                            </div>
-                          ) : edit?.id === comment.id ? null : (
-                            <div className="comment-actions">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={busy}
-                                onClick={() => {
-                                  setEdit({ id: comment.id, body: comment.body });
-                                  setDeleting(null);
-                                }}
-                              >
-                                Editar
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={busy}
-                                onClick={() => {
-                                  setDeleting(comment.id);
-                                  setEdit(null);
-                                }}
-                                className="comment-delete"
-                              >
-                                Eliminar
-                              </Button>
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ol>
-                ) : status ? null : (
-                  <p className="drawer-empty">
-                    Ainda não há comentários. Comece a conversa abaixo.
+                  </div>
+                  <div className="action-buttons">
+                    <Button variant="secondary" size="sm" onClick={copyLink}>
+                      Copiar ligação
+                    </Button>
+                    <Button variant="secondary" size="sm" disabled={busy} onClick={() => load()}>
+                      Atualizar comentários
+                    </Button>
+                  </div>
+                  <p className="drawer-notice" role="status" aria-live="polite">
+                    {notice}
                   </p>
-                )}
-                {cursor ? (
-                  <Button variant="ghost" size="sm" onClick={() => load({ earlier: true })}>
-                    Carregar comentários anteriores
-                  </Button>
-                ) : null}
-              </Section>
-            </>
-          ) : null}
-          <Section title={isReport ? 'Novo problema' : 'Novo comentário'} className="drawer-form">
-            <form className="comment-form" onSubmit={submit} aria-busy={busy}>
-              <Select
-                id="comment-author"
-                label="Nome"
-                options={authors}
-                value={author}
-                onChange={setAuthor}
-              />
-              <Select
-                id="comment-kind"
-                label="Tipo"
-                options={kinds}
-                value={kind}
-                onChange={setKind}
-              />
-              <Textarea
-                id="comment-body"
-                label="Mensagem"
-                name="body"
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                required
-                maxLength={4000}
-                rows={4}
-                placeholder="O que aconteceu? O que esperava? Se for um problema, indique os passos para o reproduzir."
-              />
-              <Button type="submit" variant="primary" isLoading={busy}>
-                {isReport ? 'Adicionar à versão' : 'Enviar comentário'}
-              </Button>
-              {isReport && status ? <p role="status">{status}</p> : null}
-            </form>
-          </Section>
-        </div>
-      ) : null}
-    </Drawer>
+                </Section>
+
+                <Section
+                  title="Comentários"
+                  aside={<Badge variant="neutral" size="sm" text={`${sorted.length}`} />}
+                >
+                  <p className="drawer-status" role="status" aria-live="polite">
+                    {status}
+                  </p>
+                  {sorted.length ? (
+                    <ol className="comment-list">
+                      {sorted.map((comment) => {
+                        return (
+                          <li
+                            key={comment.id}
+                            className={`comment${comment.author === 'QAren' ? ' comment-qa' : ''}`}
+                          >
+                            <header className="comment-heading">
+                              <div className="comment-author-line">
+                                <strong className="comment-author">{comment.author}</strong>
+                                <CommentKind kind={comment.kind} />
+                              </div>
+                              <time dateTime={comment.createdAt}>
+                                {portugueseDate(comment.createdAt)}
+                              </time>
+                            </header>
+                            {edit?.id === comment.id ? (
+                              <form
+                                className="comment-editor"
+                                onSubmit={(event) => {
+                                  event.preventDefault();
+                                  mutateComment(comment, 'edit');
+                                }}
+                              >
+                                <Textarea
+                                  id={`comment-edit-${comment.id}`}
+                                  label="Editar mensagem"
+                                  value={edit.body}
+                                  onChange={(event) =>
+                                    setEdit({ id: comment.id, body: event.target.value })
+                                  }
+                                  required
+                                  maxLength={4000}
+                                  rows={4}
+                                />
+                                <div className="action-buttons">
+                                  <Button
+                                    type="submit"
+                                    size="sm"
+                                    disabled={busy || !edit.body.trim()}
+                                  >
+                                    Guardar
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={busy}
+                                    onClick={() => setEdit(null)}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </form>
+                            ) : (
+                              <p className="comment-body">{comment.body}</p>
+                            )}
+                            {comment.updatedAt ? (
+                              <span className="comment-edited">Editado</span>
+                            ) : null}
+                            {edit?.id === comment.id ? null : (
+                              <div className="comment-actions">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setEdit({ id: comment.id, body: comment.body });
+                                    setDeleting(null);
+                                  }}
+                                >
+                                  Editar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setDeleting(comment.id);
+                                    setDeleteError('');
+                                    setEdit(null);
+                                  }}
+                                  className="comment-delete"
+                                >
+                                  Eliminar
+                                </Button>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  ) : status ? null : (
+                    <p className="drawer-empty">
+                      Ainda não há comentários. Comece a conversa abaixo.
+                    </p>
+                  )}
+                  {cursor ? (
+                    <Button variant="ghost" size="sm" onClick={() => load({ earlier: true })}>
+                      Carregar comentários anteriores
+                    </Button>
+                  ) : null}
+                </Section>
+              </>
+            ) : null}
+            <Section title={isReport ? 'Novo problema' : 'Novo comentário'} className="drawer-form">
+              <form className="comment-form" onSubmit={submit} aria-busy={busy}>
+                <Select
+                  id="comment-author"
+                  label="Nome"
+                  options={authors}
+                  value={author}
+                  onChange={setAuthor}
+                />
+                <Select
+                  id="comment-kind"
+                  label="Tipo"
+                  options={kinds}
+                  value={kind}
+                  onChange={setKind}
+                />
+                <Textarea
+                  id="comment-body"
+                  label="Mensagem"
+                  name="body"
+                  value={body}
+                  onChange={(event) => setBody(event.target.value)}
+                  required
+                  maxLength={4000}
+                  rows={4}
+                  placeholder="O que aconteceu? O que esperava? Se for um problema, indique os passos para o reproduzir."
+                />
+                <Button type="submit" variant="primary" isLoading={busy}>
+                  {isReport ? 'Adicionar à versão' : 'Enviar comentário'}
+                </Button>
+                {isReport && status ? <p role="status">{status}</p> : null}
+              </form>
+            </Section>
+          </div>
+        ) : null}
+      </Drawer>
+      <Modal
+        isOpen={Boolean(deletingComment)}
+        onClose={() => {
+          if (!busy) setDeleting(null);
+        }}
+        title="Eliminar comentário"
+        closeLabel="Fechar confirmação"
+        size="sm"
+        closeOnBackdropClick={!busy}
+        footer={
+          <div className="action-buttons">
+            <Button variant="secondary" disabled={busy} onClick={() => setDeleting(null)}>
+              Cancelar
+            </Button>
+            <Button
+              isLoading={busy}
+              disabled={busy}
+              onClick={() => mutateComment(deletingComment, 'delete')}
+            >
+              Eliminar comentário
+            </Button>
+          </div>
+        }
+      >
+        <p>Queres eliminar este comentário? Esta ação não pode ser desfeita.</p>
+        <blockquote className="delete-comment-preview">{deletingComment?.body}</blockquote>
+        {deleteError ? <p role="alert">{deleteError}</p> : null}
+      </Modal>
+    </>
   ) : null;
 }
-
