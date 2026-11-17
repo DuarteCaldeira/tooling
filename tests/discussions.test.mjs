@@ -36,7 +36,7 @@ test('every change gets a tag besides its area, falling back to a reusable chang
   assert.ok(kinds('Texto qualquer sem tema').length >= 1);
 });
 
-test('technical changes do not accept validation and participant IDs distinguish identical names', async () => {
+test('technical changes reject validation and comments use display names without browser identity', async () => {
   const { service, input } = fixture();
   await assert.rejects(
     service.setState({
@@ -57,15 +57,11 @@ test('technical changes do not accept validation and participant IDs distinguish
     'two',
   );
   assert.equal(first.author, second.author);
-  assert.notEqual(first.participantId, second.participantId);
-  await assert.rejects(
-    service.post({ ...input, participantId: 'not-an-id' }),
-    (error) => error.status === 400,
-  );
-  await assert.rejects(
-    service.post({ ...input, requestId: first.id, participantId: second.participantId }),
-    (error) => error.status === 409,
-  );
+  assert.notEqual(first.id, second.id);
+  assert.equal('participantId' in first, false);
+  assert.equal('participantId' in second, false);
+  const retry = await service.post({ ...input, requestId: first.id, participantId: randomUUID() });
+  assert.equal(retry.id, first.id);
 });
 
 test('Portuguese dates include release time and follow Lisbon daylight saving time', () => {
@@ -305,7 +301,7 @@ test('changelog versions and technical notes are split without inventing product
 
 test('comments can be edited and deleted persistently without changing their identity or other threads', async () => {
   const { service, store, manifest, input } = fixture();
-  const original = await service.post({ ...input, participantId: randomUUID() });
+  const original = await service.post(input);
   const context = { ...input, id: original.id };
   const handler = createHandler(async () => service);
   const mutate = (action, extra = {}) =>
@@ -322,7 +318,7 @@ test('comments can be edited and deleted persistently without changing their ide
   assert.equal(updated.body, 'Corrected finding');
   assert.equal(updated.id, original.id);
   assert.equal(updated.author, original.author);
-  assert.equal(updated.participantId, original.participantId);
+  assert.equal('participantId' in updated, false);
   assert.equal(updated.createdAt, original.createdAt);
   assert.ok(updated.updatedAt);
   assert.equal((await mutate('edit', { body: ' ' })).status, 400);

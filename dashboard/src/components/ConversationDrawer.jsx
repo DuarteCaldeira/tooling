@@ -8,7 +8,7 @@ import {
   Textarea,
   ToggleSwitch,
 } from '@dcaldeira/design-system';
-import { api, itemKey, readStorage, writeStorage } from '../lib/api.js';
+import { api, itemKey } from '../lib/api.js';
 import { itemTopics, portugueseDate } from '../lib/topics.js';
 import { useConversationOverlay, usePolling } from '../hooks.js';
 
@@ -18,7 +18,18 @@ const kinds = [
   { value: 'issue', label: 'Problema' },
 ];
 const kindLabels = { comment: 'Comentário', question: 'Pergunta', issue: 'Problema' };
-const NAME_KEY = 'tooling-discussion-name';
+function CommentKind({ kind }) {
+  if (!['question', 'issue'].includes(kind)) return null;
+  return (
+    <span className={`comment-kind comment-kind--${kind}`}>
+      <span className="comment-kind__symbol" aria-hidden="true">
+        {kind === 'issue' ? '!' : '?'}
+      </span>
+      {kindLabels[kind]}
+    </span>
+  );
+}
+
 const authors = ['QAren', 'DUveloper'].map((value) => ({ value, label: value }));
 
 export function TopicTags({ text, technical }) {
@@ -46,7 +57,7 @@ function Section({ title, aside, children, className = '' }) {
   );
 }
 
-export function ConversationDrawer({ context, onClose, review, participantId, drafts }) {
+export function ConversationDrawer({ context, onClose, review, drafts }) {
   const open = Boolean(context);
   const contentRef = useRef(null);
   useConversationOverlay(open, contentRef);
@@ -55,10 +66,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
   const [status, setStatus] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [author, setAuthor] = useState(() => {
-    const saved = readStorage(NAME_KEY);
-    return authors.some(({ value }) => value === saved) ? saved : 'QAren';
-  });
+  const [author, setAuthor] = useState('QAren');
   const [edit, setEdit] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const loadedCount = useRef(0);
@@ -197,7 +205,6 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
       author: author.trim(),
       body: body.trim(),
       kind,
-      participantId,
     };
     const signature = JSON.stringify(value);
     if (request.current?.signature !== signature)
@@ -207,7 +214,6 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
     setStatus('A enviar o comentário…');
     try {
       const result = await api({}, { ...value, requestId: request.current.id });
-      writeStorage(NAME_KEY, value.author);
       drafts.current.delete(key);
       if (current === generation.current) {
         setComments((existing) => [
@@ -340,21 +346,20 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
             {sorted.length ? (
               <ol className="comment-list">
                 {sorted.map((comment) => {
-                  const mine = comment.participantId === participantId;
                   return (
-                    <li key={comment.id} className={`comment ${mine ? 'comment-mine' : ''}`}>
-                      <div className="comment-heading">
-                        <strong>{comment.author}</strong>
-                        {mine ? <span className="comment-self">Tu</span> : null}
-                        {comment.kind !== 'comment' ? (
-                          <span className="comment-kind">
-                            {kindLabels[comment.kind] ?? comment.kind}
-                          </span>
-                        ) : null}
+                    <li
+                      key={comment.id}
+                      className={`comment${comment.author === 'QAren' ? ' comment-qa' : ''}`}
+                    >
+                      <header className="comment-heading">
+                        <div className="comment-author-line">
+                          <strong className="comment-author">{comment.author}</strong>
+                          <CommentKind kind={comment.kind} />
+                        </div>
                         <time dateTime={comment.createdAt}>
                           {portugueseDate(comment.createdAt)}
                         </time>
-                      </div>
+                      </header>
                       {edit?.id === comment.id ? (
                         <form
                           className="comment-editor"
@@ -390,7 +395,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                           </div>
                         </form>
                       ) : (
-                        <p>{comment.body}</p>
+                        <p className="comment-body">{comment.body}</p>
                       )}
                       {comment.updatedAt ? <span className="comment-edited">Editado</span> : null}
                       {deleting === comment.id ? (
@@ -415,7 +420,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                           </div>
                         </div>
                       ) : edit?.id === comment.id ? null : (
-                        <div className="action-buttons">
+                        <div className="comment-actions">
                           <Button
                             size="sm"
                             variant="ghost"
@@ -435,6 +440,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                               setDeleting(comment.id);
                               setEdit(null);
                             }}
+                            className="comment-delete"
                           >
                             Eliminar
                           </Button>
@@ -461,10 +467,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                 label="Nome"
                 options={authors}
                 value={author}
-                onChange={(value) => {
-                  setAuthor(value);
-                  writeStorage(NAME_KEY, value);
-                }}
+                onChange={setAuthor}
               />
               <Select
                 id="comment-kind"
@@ -484,10 +487,6 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                 rows={4}
                 placeholder="O que aconteceu? O que esperava? Se for um problema, indique os passos para o reproduzir."
               />
-              <p className="identity-note">
-                Os seus comentários aparecem como «Tu» neste navegador. Os nomes são indicados pelos
-                participantes.
-              </p>
               <Button type="submit" variant="primary" isLoading={busy}>
                 Enviar comentário
               </Button>

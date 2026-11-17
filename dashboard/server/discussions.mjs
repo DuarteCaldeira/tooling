@@ -182,9 +182,6 @@ export function createDiscussionService({
       const author = typeof input.author === 'string' ? input.author.trim() : '';
       const body = typeof input.body === 'string' ? input.body.trim() : '';
       const kind = input.kind ?? 'comment';
-      const participantId = input.participantId;
-      if (participantId !== undefined && !uuidPattern.test(participantId))
-        throw new DiscussionError(400, 'Identificação do participante inválida');
       if (author.length < 2 || author.length > 60)
         throw new DiscussionError(400, 'Indique um nome entre 2 e 60 caracteres');
       if (!body || body.length > 4000)
@@ -196,12 +193,7 @@ export function createDiscussionService({
       const path = `${threadPrefix(context)}${id}.json`;
       const existing = await store.get(path);
       if (existing) {
-        if (
-          existing.author !== author ||
-          existing.body !== body ||
-          existing.kind !== kind ||
-          existing.participantId !== participantId
-        )
+        if (existing.author !== author || existing.body !== body || existing.kind !== kind)
           throw new DiscussionError(409, 'Este pedido já foi utilizado para outro comentário');
         return existing;
       }
@@ -229,18 +221,11 @@ export function createDiscussionService({
         author,
         body,
         kind,
-        ...(participantId ? { participantId } : {}),
         createdAt: time.toISOString(),
       };
       if (!(await store.create(path, comment))) {
         const saved = await store.get(path);
-        if (
-          saved?.author === author &&
-          saved?.body === body &&
-          saved?.kind === kind &&
-          saved?.participantId === participantId
-        )
-          return saved;
+        if (saved?.author === author && saved?.body === body && saved?.kind === kind) return saved;
         throw new DiscussionError(409, 'Este pedido já foi utilizado');
       }
       if (store.remove) {
