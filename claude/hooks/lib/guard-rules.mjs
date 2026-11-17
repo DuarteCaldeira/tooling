@@ -1,5 +1,3 @@
-import { basename } from 'node:path';
-
 const LOCKFILES = new Set([
   'package-lock.json',
   'npm-shrinkwrap.json',
@@ -13,12 +11,13 @@ const ENV_TEMPLATE = /\.(example|sample|template)(\.|$)/;
 
 export function blockReason(path) {
   if (!path) return undefined;
-  const name = basename(path);
+  // Split on both separators: Windows paths reach the hook whatever OS runs it (and the tests).
+  const segments = path.split(/[\\/]/);
+  const name = segments.at(-1);
   if (/^\.env(\..+)?$/.test(name) && !ENV_TEMPLATE.test(name))
     return `${name} holds secrets. Ask the user to edit it; edit a .env.example instead.`;
   if (LOCKFILES.has(name))
     return `${name} is generated. Change package.json and run the package manager instead.`;
-  const segments = path.split(/[\\/]/);
   const dir = GENERATED_DIRS.find((d) => segments.slice(0, -1).includes(d));
   if (dir) return `${dir}/ is build output. Change the source and rebuild instead.`;
   return undefined;

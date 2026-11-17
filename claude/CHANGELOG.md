@@ -2,6 +2,10 @@
 
 Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
 
+## 0.1.3
+
+- Guard: file names are split on both `/` and `\`, so a Windows path is recognised on any OS. Fixes the Linux CI failure on `.env` paths like `C:\repo\.env.production`.
+
 ## 0.1.2
 
 - Stop hook: a `tooling` run that hits the time limit is killed together with its children (test workers, `tsc`), so they no longer keep running and slow down later runs.
