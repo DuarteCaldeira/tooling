@@ -46,8 +46,16 @@ body {
   color: var(--color-text);
   min-height: 100vh;
   background:
-    radial-gradient(60rem 32rem at 100% -8%, color-mix(in srgb, var(--ds-color-primary-200) 55%, transparent), transparent 70%),
-    radial-gradient(44rem 28rem at -10% 4%, color-mix(in srgb, var(--ds-color-blue-200) 40%, transparent), transparent 70%),
+    radial-gradient(
+      60rem 32rem at 100% -8%,
+      color-mix(in srgb, var(--ds-color-primary-200) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      44rem 28rem at -10% 4%,
+      color-mix(in srgb, var(--ds-color-blue-200) 40%, transparent),
+      transparent 70%
+    ),
     var(--color-bg);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
@@ -611,6 +619,34 @@ dd {
   justify-content: center;
   margin: var(--ds-spacing-5) 0 var(--ds-spacing-8);
 }
+.area-groups {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--ds-radius-xl);
+  background: var(--color-surface);
+}
+.release-area {
+  padding: var(--ds-spacing-4) var(--ds-spacing-5);
+}
+.release-area + .release-area {
+  border-top: 1px solid var(--color-border);
+}
+.release-area-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ds-spacing-3);
+  margin-bottom: var(--ds-spacing-2);
+}
+.release-area-heading h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.release-area-heading > span {
+  font-size: 12px;
+  color: var(--color-text-subtle);
+}
 .area-heading {
   display: inline-flex;
   align-items: center;
@@ -632,13 +668,17 @@ dd {
   background: var(--color-surface);
 }
 .change-item {
-  padding: var(--ds-spacing-5);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ds-spacing-2) var(--ds-spacing-5);
+  padding: var(--ds-spacing-3) 0;
   border-bottom: 1px solid var(--color-border);
 }
 .change-item:last-child {
   border-bottom: 0;
 }
 .item-trigger {
+  grid-column: 1;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -674,12 +714,11 @@ dd {
   transform: translateX(3px);
 }
 .item-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ds-spacing-3) var(--ds-spacing-5);
-  margin-top: var(--ds-spacing-3);
+  display: contents;
+}
+.item-meta .item-topics {
+  grid-column: 1;
+  grid-row: 2;
 }
 .item-topics,
 .topic-row {
@@ -698,6 +737,9 @@ dd {
   outline: 2px solid var(--color-primary);
 }
 .item-actions {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -705,6 +747,7 @@ dd {
   margin-left: auto;
 }
 .item-feedback {
+  grid-column: 1 / -1;
   margin: var(--ds-spacing-2) 0 0;
   color: var(--color-warning-text);
   font-size: 14px;
@@ -733,6 +776,15 @@ dd {
   padding: 0;
   margin: 0;
   list-style: none;
+}
+.comment-editor {
+  display: grid;
+  gap: var(--ds-spacing-3);
+  margin-top: var(--ds-spacing-3);
+}
+.comment-edited {
+  font-size: 12px;
+  color: var(--color-text-subtle);
 }
 .comment {
   max-width: 94%;
@@ -1044,8 +1096,18 @@ footer {
     flex-direction: column;
     align-items: stretch;
   }
-  .change-item {
+  .release-area {
     padding: var(--ds-spacing-4);
+  }
+  .change-item {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--ds-spacing-3) 0;
+  }
+  .item-actions {
+    grid-column: 1;
+    grid-row: 3;
+    margin-left: 0;
+    margin-top: var(--ds-spacing-1);
   }
   footer {
     flex-direction: column;
@@ -1431,7 +1493,6 @@ button {
   white-space: nowrap;
   border: 0;
 }
-
 
 /* The drawer owns scrolling while the mobile page is fixed behind it. */
 .conversation-open [role='dialog'] {

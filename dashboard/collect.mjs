@@ -33,7 +33,7 @@ export function validateConfig(config) {
   return config;
 }
 
-export function createClient(token, fetchImpl = fetch) {
+export function createClient(token, fetchImpl = fetch, signal) {
   const cache = new Map();
   return async function api(path, { optional = false } = {}) {
     if (!cache.has(path))
@@ -47,7 +47,9 @@ export function createClient(token, fetchImpl = fetch) {
                 'X-GitHub-Api-Version': '2022-11-28',
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
               },
-              signal: AbortSignal.timeout(30000),
+              signal: signal
+                ? AbortSignal.any([signal, AbortSignal.timeout(30000)])
+                : AbortSignal.timeout(30000),
             });
             if (response.status === 404) return null;
             if (response.ok) return response.json();
@@ -268,7 +270,7 @@ export async function collect(config, api, now = new Date()) {
   };
 }
 
-export async function build({ configPath, output, api }) {
+export async function loadConfig(configPath = new URL('./apps.json', import.meta.url)) {
   const config = JSON.parse(await readFile(configPath, 'utf8'));
   const notesPath = new URL('./release-notes.json', import.meta.url);
   const notes = JSON.parse(await readFile(notesPath, 'utf8'));
@@ -286,6 +288,11 @@ export async function build({ configPath, output, api }) {
         throw new Error('Invalid edited release notes or item IDs');
     }
   for (const app of config.apps) app.releaseNotes = notes[app.repository] ?? {};
+  return validateConfig(config);
+}
+
+export async function build({ configPath, output, api }) {
+  const config = await loadConfig(configPath);
   const snapshot = await collect(config, api);
   await mkdir(output, { recursive: true });
   await writeFile(join(output, 'data.json'), `${JSON.stringify(snapshot, null, 2)}\n`);

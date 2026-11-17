@@ -122,6 +122,12 @@ test('validation and resolved conversations are shared, reversible and scoped to
 function fixture() {
   const data = new Map();
   const store = {
+    async set(path, value) {
+      data.set(path, structuredClone(value));
+    },
+    async remove(paths) {
+      for (const path of paths) data.delete(path);
+    },
     async create(path, value) {
       if (data.has(path)) return false;
       data.set(path, structuredClone(value));
@@ -134,7 +140,11 @@ function fixture() {
       return {
         blobs: [...data.keys()]
           .filter((path) => path.startsWith(prefix))
-          .map((pathname) => ({ pathname, uploadedAt: data.get(pathname).createdAt })),
+          .map((pathname) => ({
+            pathname,
+            url: pathname,
+            uploadedAt: data.get(pathname).createdAt,
+          })),
         hasMore: false,
       };
     },
@@ -291,4 +301,40 @@ test('changelog versions and technical notes are split without inventing product
   assert.deepEqual(technicalNotes(sections['1.0.0']), ['Bump library']);
   assert.equal(itemId('A change'), itemId('A change'));
   assert.notEqual(itemId('A change'), itemId('A change', 'technical'));
+});
+
+test('comments can be edited and deleted persistently without changing their identity or other threads', async () => {
+  const { service, store, manifest, input } = fixture();
+  const original = await service.post({ ...input, participantId: randomUUID() });
+  const context = { ...input, id: original.id };
+  const handler = createHandler(async () => service);
+  const mutate = (action, extra = {}) =>
+    handler(
+      new Request('https://hub.test/api/discussions', {
+        method: 'POST',
+        headers: { origin: 'https://hub.test', 'content-type': 'application/json' },
+        body: JSON.stringify({ ...context, action, ...extra }),
+      }),
+    );
+  assert.equal((await mutate('edit', { body: '  Corrected finding  ' })).status, 200);
+  const other = createDiscussionService({ store, manifest });
+  const updated = (await other.list(input)).comments[0];
+  assert.equal(updated.body, 'Corrected finding');
+  assert.equal(updated.id, original.id);
+  assert.equal(updated.author, original.author);
+  assert.equal(updated.participantId, original.participantId);
+  assert.equal(updated.createdAt, original.createdAt);
+  assert.ok(updated.updatedAt);
+  assert.equal((await mutate('edit', { body: ' ' })).status, 400);
+  assert.equal((await mutate('edit', { body: 'x'.repeat(4001) })).status, 400);
+  assert.equal((await mutate('edit', { item: 'release', body: 'Wrong thread' })).status, 404);
+  assert.equal((await mutate('delete', { item: '../../outside' })).status, 404);
+  await service.post({ ...input, item: 'release', requestId: original.id });
+  assert.equal((await mutate('delete')).status, 200);
+  assert.equal((await other.list(input)).total, 0);
+  assert.equal((await other.summary(input.repository)).summary[input.version][input.item], 0);
+  assert.equal((await other.list({ ...input, item: 'release' })).total, 1);
+  assert.equal((await mutate('delete')).status, 200);
+  assert.equal((await mutate('edit', { body: 'Missing comment' })).status, 404);
+  assert.equal((await mutate('delete', { id: '../escape' })).status, 400);
 });

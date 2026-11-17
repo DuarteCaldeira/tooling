@@ -43,62 +43,42 @@ Edit `dashboard/apps.json` to add or remove apps. The list includes Rookie, Bill
 
 Each product or technical item has a **Discuss** button. **Release discussion / new finding** opens the release-level conversation for issues outside the listed changes. Participants can choose Comment, Question or Issue, write a display name, reply, and share a direct thread link. Open threads refresh every 15 seconds. Drafts are retained while switching or reopening threads in the current tab, and network retries reuse a request ID to avoid duplicate posts.
 
-Comments are shared server-side, rather than saved only in a browser. The Vercel project uses the private `tooling-release-discussions` Blob store in `fra1`; its connection supplies `BLOB_READ_WRITE_TOKEN`. Each comment is an immutable object, preventing simultaneous posts from overwriting one another. The Node function validates every app, version and item against a manifest generated from the deployed release data. It limits comment size and posting rate, rejects cross-origin writes, paginates history, and never renders submitted HTML. Old rate-limit records are removed opportunistically when that participant posts again. Display names are participant-provided, not verified account identities. Keep Vercel Deployment Protection enabled and grant reviewers access to the dashboard.
+Comments are shared server-side, rather than saved only in a browser. The Vercel project uses the private `tooling-release-discussions` Blob store in `fra1`; its connection supplies `BLOB_READ_WRITE_TOKEN`. Each comment is an immutable object, preventing simultaneous posts from overwriting one another. The Node function validates every app, version and item against a manifest generated from the current runtime release snapshot. It limits comment size and posting rate, rejects cross-origin writes, paginates history, and never renders submitted HTML. Old rate-limit records are removed opportunistically when that participant posts again. Display names are participant-provided, not verified account identities. Keep Vercel Deployment Protection enabled and grant reviewers access to the dashboard.
 
 Product notes have persisted `itemIds`. When changing wording, keep the matching ID; when adding/removing/reordering notes, update the parallel ID array accordingly. Moving an item to a different ID creates a different conversation. Fallback IDs for app-authored notes and technical entries are based on their text. Published source text should remain stable; retain an explicit editorial ID if a wording correction needs to preserve a thread.
 
-The private store is already provisioned and connected to this project. For a different project, create/connect a private Vercel Blob store first. The server SDK is pinned with a dashboard-specific lockfile; a same-major Zod override fixes the SDK's transitive audit finding. Build verification performs a temporary private write/read/duplicate-write check and removes the diagnostic object afterwards. Neither storage credentials nor the server manifest are included in the static site.
+The private store is already provisioned and connected to this project. For a different project, create/connect a private Vercel Blob store first. The server SDK is pinned with a dashboard-specific lockfile; a same-major Zod override fixes the SDK's transitive audit finding. The runtime also stores a shared release snapshot in this private store, separately from immutable discussion events. Neither storage credentials nor the server manifest are included in the static site.
 
 Collection resolves each release tag to its commit, then reads the manifest and npm lockfile at that commit. Tooling comes from `@dcaldeira/tooling` (or its previous package name), preferring the nearest workspace installation in `package-lock.json`. Exact manifest versions work without a lockfile. Unresolved ranges, non-npm lockfiles and moving workflow refs are labelled unresolved. Alternatively, a SHA-pinned reusable workflow in `.github/workflows/ci.yml` resolves to `packages/tooling/package.json` at that exact tooling revision. The revision appears below the version, since multiple commits can share a package version. Configure `workflowPath` if the app uses another workflow file.
 
-Apps without releases show "No releases yet". Released apps without the package or a shared workflow show "Not adopted". Access errors show "Unavailable"; tooling-only errors preserve the release and show a warning. If every repository is inaccessible, collection fails and leaves the previous deployment intact. A last-checked timestamp and overdue indicator make stale deployments visible. No repository code is executed during collection. Only selected app metadata, published release notes and their edited summaries are deployed; credentials and source manifests are excluded.
+Apps without releases show "No releases yet". Released apps without the package or a shared workflow show "Not adopted". Access errors show "Unavailable"; tooling-only errors preserve the release and show a warning. If every repository is inaccessible, the runtime retains its last successful snapshot and retries after a minute. During partial outages, previously collected releases for inaccessible apps remain available. A last-checked timestamp and overdue indicator make stale data visible. No repository code is executed during collection. Only selected app metadata, published release notes and their edited summaries are returned by the API; credentials and source manifests are excluded.
 
-## First deployment
+## Runtime updates
 
-1. Merge this branch into `main`.
-2. Import `DuarteCaldeira/tooling` into Vercel as a new project. Set **Root Directory** to `dashboard`, **Framework Preset** to **Other**, **Node.js** to **22.x**, and **Production Branch** to `main`. `dashboard/vercel.json` installs locked server dependencies without install scripts, installs dependencies (including the Vite build tools), runs `vite build && node build.mjs` (bundle first, then `data.json`), serves static files from `dist`, and publishes the discussion API as a Node function. Leave the repository private.
-3. Create an expiring fine-grained PAT with **Contents: read** for the listed app repositories and tooling. Save it as the **APPS_READ_TOKEN** environment variable in Vercel's **Production** environment. The ordinary tooling `GITHUB_TOKEN` cannot read other private repositories. A GitHub App token also works if your setup refreshes it before builds. Do not expose the token through a public/client environment variable.
-4. Deploy. The build collects release data on Vercel; a missing token or total repository-access failure fails the build and preserves the previous production deployment. Vercel provides the live project URL. Preview deployments also need a suitable read token in the Preview environment; otherwise they deliberately fail instead of publishing misleading data.
-5. In Vercel project **Settings → Git → Deploy Hooks**, create an `app-releases` hook targeting **main**. Save its complete URL as the **VERCEL_DEPLOY_HOOK** Actions secret in `DuarteCaldeira/tooling`. Treat this URL as a credential and never commit it.
-6. Run **Refresh app dashboard** from GitHub Actions. It requests a Vercel build; inspect the Vercel deployment to confirm it finished successfully. Git pushes deploy through Vercel's Git integration, while release notifications and scheduled refreshes use the hook. No Vercel API token or GitHub Pages setup is needed.
+The browser reads `/api/releases` on opening the dashboard, every 30 seconds while visible, and when returning to the tab. The server collects GitHub releases with a 60-second cache shared through private Vercel Blob storage. Concurrent requests within a function instance share one refresh. Expect updates in roughly 60–90 seconds plus collection time under normal conditions; this is polling, not an instant push guarantee. Hidden tabs pause polling. The current app, filters, expanded releases and conversation drafts survive background updates. Failed refreshes retain visible data and display an error; server-side collection failures retain the previous timestamp, with an overdue indicator after two minutes.
 
-The selected app names, repository names, versions and dates are present in the static site. Configure Vercel Deployment Protection if this metadata needs restricted access. No read token or deploy-hook URL is sent to the browser. This workflow replaces the previous Pages deployment; remove any old Pages publication configuration if it was enabled.
+Discussion validation uses the same runtime source, so newly discovered releases accept comments and validation without rebuilding. Each refresh uses a fresh GitHub client, preventing its request cache from hiding new releases. No repository code is executed.
 
-See Vercel's [project configuration](https://vercel.com/docs/project-configuration/vercel-json) and [deploy-hook documentation](https://vercel.com/docs/deploy-hooks).
+New releases, edited release bodies, deletions and released tooling versions need no deployment. Changing the app allowlist, reviewed summaries in `release-notes.json`, dashboard code or the design-system dependency still requires a deployment. Versions continue to represent published releases and the tooling dependency at each release commit, not unpublished changes on main.
 
-## Update immediately after an app release
+## Deployment
 
-Create a second fine-grained PAT with **Contents: write only on DuarteCaldeira/tooling** (the permission required for `repository_dispatch`). Store it as **DASHBOARD_DISPATCH_TOKEN** in each app. For a GitHub App token, give the app the equivalent repository permission. If tooling is private, also allow its reusable workflows to be accessed by your app repositories under Settings → Actions → General → Access.
+1. Import `DuarteCaldeira/tooling` into Vercel. Set **Root Directory** to `dashboard`, **Framework Preset** to **Other**, **Node.js** to **22.x**, and **Production Branch** to `main`.
+2. Set **APPS_READ_TOKEN** in each applicable Vercel environment to a fine-grained PAT with **Contents: read** for the configured app repositories and tooling. Renew it before expiration. Never prefix it with `VITE_` or otherwise expose it to the browser. GitHub App tokens require a token-renewal mechanism at runtime.
+3. Connect the private Blob store, supplying **BLOB_READ_WRITE_TOKEN**. Existing discussion storage can be reused. Snapshot keys include a hash of the app configuration and reviewed summaries so deployments with different configurations do not share snapshots.
+4. Deploy once. `dashboard/vercel.json` runs `vite build`, serves `dist`, and publishes the release and discussion functions with their server-only configuration. Builds no longer contact GitHub or require a valid GitHub token; verify `/api/releases` after deployment to check runtime access. Configure Deployment Protection if the selected private repository metadata should have restricted access.
 
-Copy `dashboard/templates/notify-dashboard.yml` into each app's `.github/workflows/`. Replace `REPLACE_WITH_DASHBOARD_COMMIT_SHA` with the merged commit SHA. On published, edited or deleted releases it calls the reusable notification workflow, which dispatches `app-released` to tooling. Tooling requests a Vercel deployment; the Vercel build reads the configured allowlist from GitHub. No versions or repository names supplied in dispatch payloads are trusted. Existing app notifications continue working after the hosting migration.
+The existing `app-released` dispatch workflow remains compatible with app notification jobs, but only records that runtime refresh is automatic. It no longer requests builds or runs on a schedule. Notification jobs, their dispatch tokens and the old **VERCEL_DEPLOY_HOOK** secret are optional and can be removed once old pinned notification callers are retired. No new secret or notification integration is needed for automatic updates.
 
-**Releases created with an app's GITHUB_TOKEN do not trigger a separate release-event workflow.** In that case, call the reusable workflow explicitly as a job after the publishing job, including workflows using the shared release finalizer:
-
-```yaml
-jobs:
-  publish:
-    # Your existing release job (must finish publishing before notification).
-    # ...
-  dashboard:
-    needs: publish
-    permissions: {}
-    uses: DuarteCaldeira/tooling/.github/workflows/notify-app-release.yml@REPLACE_WITH_DASHBOARD_COMMIT_SHA
-    secrets:
-      DASHBOARD_DISPATCH_TOKEN: ${{ secrets.DASHBOARD_DISPATCH_TOKEN }}
-```
-
-Add this to the workflow which actually publishes the release, not the workflow which only opens a release PR. For a local finalizer, a release made using a PAT triggers the event template; the scheduled fallback also picks it up.
-
-A scheduled refresh requests a Vercel build every 15 minutes to reconcile missed notifications, edited releases and deletions. GitHub can delay scheduled jobs; the schedule is a fallback, not an immediate-update guarantee. Notifications can also be sent with the app template's manual dispatch. Build time is needed before fresh data becomes visible. The Actions job confirms that Vercel accepted the request, not that deployment finished. Tokens need renewal when they expire.
+Existing installations need one deployment containing this change before runtime updates take effect. Remove any Vercel dashboard build-command override that still invokes the old collector.
 
 ## Local checks
 
 ```sh
-node --test tests/dashboard.test.mjs
-# With APPS_READ_TOKEN set in your environment:
-node dashboard/collect.mjs
-# Build exactly the static output used by Vercel:
-node dashboard/build.mjs
+node --test tests/dashboard-runtime.test.mjs tests/dashboard.test.mjs tests/discussions.test.mjs
+npm --prefix dashboard run build
+npm run test:dashboard:mobile
+npm run test:dashboard:runtime
 ```
 
-Serve `.tooling/dashboard-site` (collector CLI) or `dashboard/dist` (Vercel build) with a static server to preview release notes. Shared discussions additionally need the Vercel Node function and connected private storage; a static-only preview cannot post comments. Browser code has no API credentials or third-party JavaScript. The server uses the locked Blob SDK. Search works against the deployed snapshot; comments are fetched separately and do not require rebuilding the site.
+Use Vercel's development environment with the runtime secrets for a full local preview. A static-only server or plain Vite preview does not provide the release/discussion APIs. For a standalone data export, the legacy `node dashboard/collect.mjs` command still writes `.tooling/dashboard-site/data.json` with `APPS_READ_TOKEN` set; `node dashboard/build.mjs` remains an optional export/storage diagnostic, outside the deployment build path.

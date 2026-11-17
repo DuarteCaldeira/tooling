@@ -68,6 +68,25 @@ export function createDiscussionService({
     return all;
   }
   return {
+    async edit(input) {
+      const context = target(input);
+      if (!uuidPattern.test(input.id ?? '')) throw new DiscussionError(400, 'Comentário inválido');
+      const body = typeof input.body === 'string' ? input.body.trim() : '';
+      if (!body || body.length > 4000)
+        throw new DiscussionError(400, 'Escreva um comentário com até 4 000 caracteres');
+      const path = `${threadPrefix(context)}${input.id}.json`;
+      const existing = await store.get(path);
+      if (!existing) throw new DiscussionError(404, 'Comentário não encontrado');
+      const comment = { ...existing, body, updatedAt: now().toISOString() };
+      await store.set(path, comment);
+      return { comment };
+    },
+    async delete(input) {
+      const context = target(input);
+      if (!uuidPattern.test(input.id ?? '')) throw new DiscussionError(400, 'Comentário inválido');
+      await store.remove([`${threadPrefix(context)}${input.id}.json`]);
+      return { deleted: true };
+    },
     async summary(repository) {
       if (!Object.hasOwn(manifest, repository ?? ''))
         throw new DiscussionError(404, 'Aplicação não encontrada');
@@ -243,6 +262,14 @@ export function createDiscussionService({
 export async function blobStore() {
   const { put, get, list, del } = await import('@vercel/blob');
   return {
+    async set(path, value) {
+      await put(path, JSON.stringify(value), {
+        access: 'private',
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType: 'application/json',
+      });
+    },
     async create(path, value) {
       try {
         await put(path, JSON.stringify(value), {
@@ -308,6 +335,11 @@ export function createHandler(serviceFactory) {
           'workspace';
         if (input.action === 'state')
           return new Response(JSON.stringify(await service.setState(input)), {
+            status: 200,
+            headers,
+          });
+        if (input.action === 'edit' || input.action === 'delete')
+          return new Response(JSON.stringify(await service[input.action](input)), {
             status: 200,
             headers,
           });

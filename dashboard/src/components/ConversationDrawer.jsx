@@ -3,7 +3,6 @@ import {
   Badge,
   Button,
   Drawer,
-  Input,
   Select,
   Tag,
   Textarea,
@@ -20,6 +19,7 @@ const kinds = [
 ];
 const kindLabels = { comment: 'Comentário', question: 'Pergunta', issue: 'Problema' };
 const NAME_KEY = 'tooling-discussion-name';
+const authors = ['QAren', 'DUveloper'].map((value) => ({ value, label: value }));
 
 export function TopicTags({ text, technical }) {
   const topics = itemTopics(text, technical);
@@ -55,8 +55,14 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
   const [status, setStatus] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [author, setAuthor] = useState(() => readStorage(NAME_KEY) ?? '');
-  const [editingName, setEditingName] = useState(false);
+  const [author, setAuthor] = useState(() => {
+    const saved = readStorage(NAME_KEY);
+    return authors.some(({ value }) => value === saved) ? saved : 'QAren';
+  });
+  const [edit, setEdit] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const loadedCount = useRef(0);
+  loadedCount.current = comments.length;
   const [kind, setKind] = useState('comment');
   const [body, setBody] = useState('');
   const generation = useRef(0);
@@ -67,7 +73,6 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
   const state = context ? review.stateOf(context) : { closed: false, validated: false };
   const isRelease = context?.item === 'release';
   const canValidate = Boolean(context) && !isRelease && !context.technical;
-  const knownName = author.trim().length >= 2 && !editingName;
 
   const load = useCallback(
     async ({ earlier = false, quiet = false, from = cursor } = {}) => {
@@ -75,19 +80,33 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
       const current = generation.current;
       if (!quiet) setStatus('A carregar os comentários…');
       try {
-        const result = await api({
+        let result = await api({
           repository: context.repository,
           version: context.version,
           item: context.item,
           ...(earlier && from ? { cursor: from } : {}),
         });
+        const refreshed = [...result.comments];
+        // Refresh loaded pages as well, so deleted comments disappear on every device.
+        if (!earlier) {
+          while (result.nextCursor && refreshed.length < loadedCount.current) {
+            result = await api({
+              repository: context.repository,
+              version: context.version,
+              item: context.item,
+              cursor: result.nextCursor,
+            });
+            refreshed.push(...result.comments);
+          }
+        }
         if (current !== generation.current) return;
         setComments((existing) => {
+          if (!earlier) return refreshed;
           const merged = new Map(existing.map((comment) => [comment.id, comment]));
-          for (const comment of result.comments) merged.set(comment.id, comment);
+          for (const comment of refreshed) merged.set(comment.id, comment);
           return [...merged.values()];
         });
-        if (earlier || !quiet) setCursor(result.nextCursor);
+        setCursor(result.nextCursor);
         setStatus('');
       } catch (error) {
         if (current === generation.current) setStatus(error.message);
@@ -105,6 +124,8 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
     setStatus('');
     setNotice('');
     setBusy(false);
+    setEdit(null);
+    setDeleting(null);
     request.current = null;
     if (!key) return undefined;
     const draft = drafts.current.get(key);
@@ -128,7 +149,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
       review.refresh(context.repository);
     },
     15000,
-    open,
+    open && !busy,
   );
 
   const shareUrl = useMemo(() => {
@@ -195,13 +216,48 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
         ]);
         setBody('');
         request.current = null;
-        setEditingName(false);
         setStatus('');
         setNotice('Comentário enviado');
       }
       review.refresh(context.repository);
     } catch (error) {
       if (current === generation.current) setStatus(error.message);
+    } finally {
+      if (current === generation.current) setBusy(false);
+    }
+  }
+
+  async function mutateComment(comment, action) {
+    if (!context || busy) return;
+    // Discard pending polls that still contain the old comment.
+    const current = ++generation.current;
+    setBusy(true);
+    setNotice('');
+    setStatus('');
+    try {
+      const result = await api(
+        {},
+        {
+          repository: context.repository,
+          version: context.version,
+          item: context.item,
+          action,
+          id: comment.id,
+          ...(action === 'edit' ? { body: edit.body } : {}),
+        },
+      );
+      if (current !== generation.current) return;
+      setComments((existing) =>
+        action === 'delete'
+          ? existing.filter(({ id }) => id !== comment.id)
+          : existing.map((entry) => (entry.id === comment.id ? result.comment : entry)),
+      );
+      setEdit(null);
+      setDeleting(null);
+      setNotice(action === 'delete' ? 'Comentário eliminado' : 'Comentário atualizado');
+      review.refresh(context.repository);
+    } catch (error) {
+      if (current === generation.current) setNotice(error.message);
     } finally {
       if (current === generation.current) setBusy(false);
     }
@@ -265,7 +321,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
               <Button variant="secondary" size="sm" onClick={copyLink}>
                 Copiar ligação
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => load()}>
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => load()}>
                 Atualizar comentários
               </Button>
             </div>
@@ -299,7 +355,91 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                           {portugueseDate(comment.createdAt)}
                         </time>
                       </div>
-                      <p>{comment.body}</p>
+                      {edit?.id === comment.id ? (
+                        <form
+                          className="comment-editor"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            mutateComment(comment, 'edit');
+                          }}
+                        >
+                          <Textarea
+                            id={`comment-edit-${comment.id}`}
+                            label="Editar mensagem"
+                            value={edit.body}
+                            onChange={(event) =>
+                              setEdit({ id: comment.id, body: event.target.value })
+                            }
+                            required
+                            maxLength={4000}
+                            rows={4}
+                          />
+                          <div className="action-buttons">
+                            <Button type="submit" size="sm" disabled={busy || !edit.body.trim()}>
+                              Guardar
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={() => setEdit(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </form>
+                      ) : (
+                        <p>{comment.body}</p>
+                      )}
+                      {comment.updatedAt ? <span className="comment-edited">Editado</span> : null}
+                      {deleting === comment.id ? (
+                        <div className="comment-editor">
+                          <p>Eliminar este comentário?</p>
+                          <div className="action-buttons">
+                            <Button
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => mutateComment(comment, 'delete')}
+                            >
+                              Confirmar eliminação
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={() => setDeleting(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : edit?.id === comment.id ? null : (
+                        <div className="action-buttons">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => {
+                              setEdit({ id: comment.id, body: comment.body });
+                              setDeleting(null);
+                            }}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => {
+                              setDeleting(comment.id);
+                              setEdit(null);
+                            }}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -316,31 +456,16 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
 
           <Section title="Novo comentário" className="drawer-form">
             <form className="comment-form" onSubmit={submit} aria-busy={busy}>
-              {knownName ? (
-                <p className="comment-as">
-                  A comentar como <strong>{author.trim()}</strong>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    onClick={() => setEditingName(true)}
-                  >
-                    Alterar nome
-                  </Button>
-                </p>
-              ) : (
-                <Input
-                  label="Nome"
-                  name="author"
-                  value={author}
-                  onChange={(event) => setAuthor(event.target.value)}
-                  required
-                  minLength={2}
-                  maxLength={60}
-                  autoComplete="nickname"
-                  autoFocus={editingName}
-                />
-              )}
+              <Select
+                id="comment-author"
+                label="Nome"
+                options={authors}
+                value={author}
+                onChange={(value) => {
+                  setAuthor(value);
+                  writeStorage(NAME_KEY, value);
+                }}
+              />
               <Select
                 id="comment-kind"
                 label="Tipo"
@@ -349,6 +474,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                 onChange={setKind}
               />
               <Textarea
+                id="comment-body"
                 label="Mensagem"
                 name="body"
                 value={body}
@@ -359,8 +485,8 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                 placeholder="O que aconteceu? O que esperava? Se for um problema, indique os passos para o reproduzir."
               />
               <p className="identity-note">
-                Os seus comentários aparecem como «Tu» neste navegador. Os nomes são indicados
-                pelos participantes.
+                Os seus comentários aparecem como «Tu» neste navegador. Os nomes são indicados pelos
+                participantes.
               </p>
               <Button type="submit" variant="primary" isLoading={busy}>
                 Enviar comentário
