@@ -14,8 +14,37 @@ import { api } from './lib/api.js';
 import { portugueseDate } from './lib/topics.js';
 import { usePolling, useReview } from './hooks.js';
 
+// Every app gets its own colour; the whole page re-tints when you switch.
+const ACCENTS = ['#c8ff3d', '#ff7a59', '#4cc9ff', '#ff5fa2', '#ffc233', '#3dffb0', '#b794ff'];
+
 const githubUrl = (url) =>
   typeof url === 'string' && url.startsWith('https://github.com/') ? url : undefined;
+
+/** Counts up to `value` once it changes, unless the visitor prefers reduced motion. */
+function useCountUp(value) {
+  const [shown, setShown] = useState(value);
+  const from = useRef(value);
+  useEffect(() => {
+    if (typeof value !== 'number' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setShown(value);
+      from.current = value;
+      return undefined;
+    }
+    const start = typeof from.current === 'number' ? from.current : 0;
+    const t0 = performance.now();
+    let frame;
+    const tick = (now) => {
+      const t = Math.min(1, (now - t0) / 900);
+      const eased = 1 - Math.pow(1 - t, 4);
+      setShown(Math.round(start + (value - start) * eased));
+      if (t < 1) frame = requestAnimationFrame(tick);
+      else from.current = value;
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return shown;
+}
 
 function ToolingValue({ tooling }) {
   const labels = {
@@ -36,90 +65,57 @@ function ToolingValue({ tooling }) {
 const versionLabel = (app) =>
   app?.version ?? (app?.status === 'unavailable' ? 'Indisponível' : 'Sem publicações');
 
-function Sidebar({ apps, selected, onSelect, updated, stale }) {
+function Ticker({ apps }) {
+  const recent = apps
+    .filter((app) => app.version && app.releasedAt)
+    .sort((a, b) => Date.parse(b.releasedAt) - Date.parse(a.releasedAt));
+  if (!recent.length) return null;
+  const row = (hidden) => (
+    <ul className="ticker-row" aria-hidden={hidden || undefined}>
+      {recent.map((app) => (
+        <li key={app.repository}>
+          <span className="ticker-emoji">{app.emoji ?? '📦'}</span>
+          <strong>{app.name}</strong>
+          <span className="mono">{app.version}</span>
+          <ReleaseDate value={app.releasedAt} />
+        </li>
+      ))}
+    </ul>
+  );
   return (
-    <aside className="app-sidebar" aria-label="Aplicações">
-      <div className="rail-heading">
-        <h2>Aplicações</h2>
-        <span className="count">{apps.length}</span>
+    <div className="ticker" role="group" aria-label="Publicações recentes">
+      <div className="ticker-track">
+        {row(false)}
+        {row(true)}
       </div>
-      <nav id="app-nav" aria-label="Escolher uma aplicação">
-        {apps.map((app) => (
-          <button
-            key={app.repository}
-            type="button"
-            className="app-choice"
-            aria-pressed={app.repository === selected}
-            onClick={() => onSelect(app.repository)}
-          >
-            <span className="choice-emoji" aria-hidden="true">
-              {app.emoji ?? '📦'}
-            </span>
-            <span className="choice-text">
-              <span className="choice-name">{app.name}</span>
-              <span className="choice-version mono">{versionLabel(app)}</span>
-            </span>
-          </button>
-        ))}
-      </nav>
-      <a className="overview-link" href="#apps">
-        Visão geral <ArrowUpRight />
-      </a>
-      <div className="sync-info">
-        <span className={`sync-label${stale ? ' is-stale' : ''}`}>
-          <i className="live-dot" aria-hidden="true" />
-          Última atualização
-        </span>
-        <p>{updated}</p>
-      </div>
-    </aside>
+    </div>
   );
 }
 
-function Hero({ apps, app, onSelect }) {
+function AppTabs({ apps, selected, onSelect }) {
   return (
-    <section className="selected-app" aria-label="Aplicação selecionada">
-      <div className="selected-app-heading">
-        <span className="selected-emoji" aria-hidden="true">
-          {app?.emoji ?? '📦'}
-        </span>
-        <div className="selected-name">
-          <span className="selected-label">A acontecer em</span>
-          <h2>{app?.name ?? 'Escolha uma aplicação'}</h2>
-        </div>
-        <div className="selected-picker">
-          <SelectFilter
-            id="release-app"
-            label="Mudar de aplicação"
-            value={app?.repository ?? ''}
-            options={apps.map((entry) => ({ value: entry.repository, label: entry.name }))}
-            onChange={onSelect}
-          />
-        </div>
-      </div>
-      <dl className="selected-metrics">
-        <div>
-          <dt>Última versão</dt>
-          <dd className="metric-version">{versionLabel(app)}</dd>
-        </div>
-        <div>
-          <dt>Última publicação</dt>
-          <dd>
-            <ReleaseDate value={app?.releasedAt} />
-          </dd>
-        </div>
-        <div>
-          <dt>Tooling</dt>
-          <dd>
-            <ToolingValue tooling={app?.tooling ?? { status: 'unknown' }} />
-          </dd>
-        </div>
-      </dl>
-    </section>
+    <nav id="app-nav" className="app-tabs" aria-label="Escolher uma aplicação">
+      {apps.map((app, index) => (
+        <button
+          key={app.repository}
+          type="button"
+          className="app-choice"
+          style={{ '--tab': ACCENTS[index % ACCENTS.length] }}
+          aria-pressed={app.repository === selected}
+          onClick={() => onSelect(app.repository)}
+        >
+          <span className="choice-emoji" aria-hidden="true">
+            {app.emoji ?? '📦'}
+          </span>
+          <span className="choice-name">{app.name}</span>
+          <span className="choice-version mono">{app.version ?? '—'}</span>
+        </button>
+      ))}
+    </nav>
   );
 }
 
-function ReviewOverview({ app, review }) {
+function Bento({ app, review }) {
   const repository = app?.repository;
   const loaded = review.isLoaded(repository);
   let total = 0;
@@ -151,32 +147,72 @@ function ReviewOverview({ app, review }) {
       ? 'Revisão indisponível de momento'
       : 'A carregar a revisão…';
   const percent = loaded && total ? Math.round((validated / total) * 100) : null;
+  const pShown = useCountUp(percent);
+  const tShown = useCountUp(total);
+  const pendingShown = useCountUp(loaded ? total - validated : null);
+  const openShown = useCountUp(loaded ? open : null);
   return (
-    <section className="review-overview" aria-label="Estado de revisão">
-      <div className="review-score">
+    <section className="bento" aria-label="Aplicação selecionada">
+      <div className="tile tile-name">
+        <div className="selected-app-heading">
+          <span className="selected-emoji" aria-hidden="true">
+            {app?.emoji ?? '📦'}
+          </span>
+          <span className="selected-label">A acontecer em</span>
+        </div>
+        <div className="selected-name">
+          <h2>{app?.name ?? 'Escolha uma aplicação'}</h2>
+        </div>
+        {githubUrl(app?.repositoryUrl) ? (
+          <a className="tile-link" href={app.repositoryUrl}>
+            Ver no GitHub <ArrowUpRight />
+          </a>
+        ) : null}
+      </div>
+      <dl className="selected-metrics">
+        <div className="tile tile-version">
+          <dt>Última versão</dt>
+          <dd className="metric-version">{versionLabel(app)}</dd>
+        </div>
+        <div className="tile tile-date">
+          <dt>Última publicação</dt>
+          <dd>
+            <ReleaseDate value={app?.releasedAt} />
+          </dd>
+        </div>
+        <div className="tile tile-tooling">
+          <dt>Tooling</dt>
+          <dd>
+            <ToolingValue tooling={app?.tooling ?? { status: 'unknown' }} />
+          </dd>
+        </div>
+      </dl>
+      <div className="tile tile-score review-overview" aria-label="Estado de revisão">
         <span className="review-percent" aria-hidden="true">
-          {percent ?? '—'}
+          {pShown ?? '—'}
           {percent === null ? null : <small>%</small>}
         </span>
         <span className="review-score-label">validado</span>
       </div>
-      <div className="review-stats">
-        <div className="stat">
-          <span className="stat-label">Novidades</span>
-          <strong className="stat-value">{total}</strong>
+      <div className="tile tile-stats">
+        <div className="review-stats">
+          <div className="stat">
+            <span className="stat-label">Novidades</span>
+            <strong className="stat-value">{tShown}</strong>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Por validar</span>
+            <strong className="stat-value">{pendingShown ?? '—'}</strong>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Conversas em aberto</span>
+            <strong className="stat-value">{openShown ?? '—'}</strong>
+          </div>
         </div>
-        <div className="stat">
-          <span className="stat-label">Por validar</span>
-          <strong className="stat-value">{loaded ? total - validated : '—'}</strong>
+        <div className="review-completion">
+          <span className="progress-caption">{caption}</span>
+          <Progress variant="primary" size="md" value={validated} max={total || 1} label={caption} />
         </div>
-        <div className="stat">
-          <span className="stat-label">Conversas em aberto</span>
-          <strong className="stat-value">{loaded ? open : '—'}</strong>
-        </div>
-      </div>
-      <div className="review-completion">
-        <span className="progress-caption">{caption}</span>
-        <Progress variant="primary" size="md" value={validated} max={total || 1} label={caption} />
       </div>
     </section>
   );
@@ -508,6 +544,13 @@ export function App() {
       : 'A carregar as versões…';
 
   const stale = Boolean(snapshot) && Date.now() - Date.parse(snapshot.generatedAt) > 120000;
+  const accentIndex = Math.max(
+    0,
+    apps.findIndex((entry) => entry.repository === selected),
+  );
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent', ACCENTS[accentIndex % ACCENTS.length]);
+  }, [accentIndex]);
   return (
     <>
       <a className="skip" href="#release-notes">
@@ -518,27 +561,23 @@ export function App() {
           <a href="./" className="brand">
             <Mark />
             <span className="brand-name">tooling</span>
-            <span className="brand-section">/ novidades</span>
           </a>
           <div className="header-end">
             <span className={`header-status${stale || failed ? ' is-stale' : ''}`}>
               <i className="live-dot" aria-hidden="true" />
               {failed ? 'Sem ligação' : stale ? 'Em atraso' : snapshot ? 'Em direto' : 'A ligar…'}
             </span>
+            <a className="header-link" href="#apps">
+              Visão geral
+            </a>
             <a className="header-link" href="https://github.com/DuarteCaldeira/tooling">
               GitHub <ArrowUpRight />
             </a>
           </div>
         </div>
+        {snapshot ? <AppTabs apps={apps} selected={selected} onSelect={setSelected} /> : null}
       </header>
       <main className="workspace">
-        <Sidebar
-          apps={apps}
-          selected={selected}
-          onSelect={setSelected}
-          updated={updated}
-          stale={stale || failed}
-        />
         <div className="main-area">
           <h1 className="visually-hidden">Novidades</h1>
           {failed ? (
@@ -552,14 +591,14 @@ export function App() {
             </p>
           ) : snapshot ? (
             <>
-              <Portfolio apps={apps} snapshot={snapshot} onSelect={chooseApp} />
-              <Hero apps={apps} app={app} onSelect={setSelected} />
-              <ReviewOverview app={app} review={review} />
+              <Ticker apps={apps} />
+              <Bento app={app} review={review} />
               <ReleaseHub apps={apps} app={app} review={review} onOpen={setConversation} />
+              <Portfolio apps={apps} snapshot={snapshot} onSelect={chooseApp} />
             </>
           ) : null}
           <footer>
-            <span>Cada novidade, uma conversa. Cada detalhe, no seu lugar.</span>
+            <span>Atualizado: {updated}</span>
             <span>
               Hora de Portugal continental <span aria-hidden="true">·</span>{' '}
               <a href="/api/releases">Dados das versões</a>

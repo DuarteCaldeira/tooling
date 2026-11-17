@@ -8,7 +8,7 @@ import { App } from './App.jsx';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ThemeProvider mode="light">
+    <ThemeProvider mode="dark">
       <App />
     </ThemeProvider>
   </StrictMode>,
