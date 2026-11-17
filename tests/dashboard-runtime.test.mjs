@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createReleaseHandler, createReleaseSource } from '../dashboard/server/releases.mjs';
 import { discussionManifest } from '../dashboard/release-items.mjs';
-import { createDiscussionService } from '../dashboard/server/discussions.mjs';
+import { createDiscussionService, createHandler } from '../dashboard/server/discussions.mjs';
+import { createDiscussionProvider } from '../dashboard/server/discussion-context.mjs';
 
 function fixture() {
   let time = Date.parse('2026-11-17T12:00:00Z');
@@ -138,4 +139,71 @@ test('new runtime releases are accepted by discussion validation', async () => {
     item: 'release',
   });
   assert.deepEqual(result.comments, []);
+});
+
+test('known conversations reuse stale shared releases without collecting GitHub again', async () => {
+  const f = fixture();
+  const read = createReleaseSource(f.options);
+  await read();
+  f.advance();
+  const cold = createReleaseSource(f.options);
+  assert.equal((await cold({ preferCached: true })).apps[0].version, 'v1.0.0');
+  assert.equal(f.calls(), 1);
+  assert.equal((await cold()).apps[0].version, 'v2.0.0');
+  assert.equal(f.calls(), 2);
+  f.advance();
+  assert.equal((await read({ preferCached: true })).apps[0].version, 'v2.0.0');
+  assert.equal(f.calls(), 2);
+});
+
+test(
+  'a blocked GitHub refresh does not block cached conversation requests',
+  { timeout: 1000 },
+  async () => {
+    const f = fixture();
+    const first = await createReleaseSource(f.options)();
+    f.advance();
+    const started = Promise.withResolvers();
+    const loading = Promise.withResolvers();
+    const read = createReleaseSource({
+      ...f.options,
+      load: () => {
+        started.resolve();
+        return loading.promise;
+      },
+    });
+    const refresh = read();
+    await started.promise;
+    try {
+      assert.equal(await read({ preferCached: true }), first);
+    } finally {
+      loading.resolve(await f.options.load());
+      await refresh;
+    }
+  },
+);
+
+test('discussion context refreshes new releases while rejecting unknown applications without GitHub work', async () => {
+  const f = fixture();
+  const read = createReleaseSource(f.options);
+  await read();
+  f.advance();
+  const serviceFor = createDiscussionProvider({
+    readSnapshot: read,
+    openStore: async () => ({ list: async () => ({ blobs: [], hasMore: false }) }),
+  });
+  const known = { repository: 'owner/app', version: 'v1.0.0', item: 'release' };
+  const handler = createHandler(serviceFor);
+  const response = await handler(
+    new Request('https://hub.test/api/discussions?' + new URLSearchParams(known)),
+  );
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).total, 0);
+  assert.equal(f.calls(), 1);
+  const unknown = { ...known, repository: 'toString' };
+  await assert.rejects((await serviceFor(unknown)).list(unknown), (error) => error.status === 404);
+  assert.equal(f.calls(), 1);
+  const discovered = { ...known, version: 'v2.0.0' };
+  assert.equal((await (await serviceFor(discovered)).list(discovered)).total, 0);
+  assert.equal(f.calls(), 2);
 });

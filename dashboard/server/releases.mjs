@@ -3,16 +3,17 @@ import { collect, createClient, loadConfig } from '../collect.mjs';
 
 export const RELEASE_TTL = 60_000;
 
-/** Shared snapshots survive cold starts; one refresh runs per function instance. */
 export function createReleaseSource({ load, store, key, now = Date.now, ttl = RELEASE_TTL }) {
   let cached;
   let pending;
+  let reading;
   let retryAt = 0;
-  return async function snapshot() {
-    if (cached && (now() - Date.parse(cached.generatedAt) < ttl || now() < retryAt)) return cached;
-    if (!cached && now() < retryAt) throw new Error('Release data unavailable');
-    if (!pending) {
-      pending = (async () => {
+  let checkedAt = -Infinity;
+
+  async function readShared() {
+    if (now() - checkedAt < ttl) return;
+    if (!reading) {
+      reading = (async () => {
         try {
           const shared = await store.get(key);
           if (
@@ -22,12 +23,30 @@ export function createReleaseSource({ load, store, key, now = Date.now, ttl = RE
           )
             cached = shared;
         } catch {
-          // A temporary cache outage must not prevent fetching GitHub directly.
+          // Keep live collection and known releases available during cache outages.
+        } finally {
+          checkedAt = now();
         }
+      })().finally(() => {
+        reading = undefined;
+      });
+    }
+    await reading;
+  }
+
+  return async function snapshot({ preferCached = false } = {}) {
+    if (preferCached) {
+      await readShared();
+      if (cached) return cached;
+    }
+    if (cached && (now() - Date.parse(cached.generatedAt) < ttl || now() < retryAt)) return cached;
+    if (!cached && now() < retryAt) throw new Error('Release data unavailable');
+    if (!pending) {
+      pending = (async () => {
+        await readShared();
         if (cached && now() - Date.parse(cached.generatedAt) < ttl) return cached;
         try {
           const fresh = await load();
-          // Keep releases available for conversations during a partial GitHub outage.
           for (const app of fresh.apps) {
             if (app.status !== 'unavailable') continue;
             const previous = cached?.apps.find((entry) => entry.repository === app.repository);
@@ -55,7 +74,7 @@ export function createReleaseSource({ load, store, key, now = Date.now, ttl = RE
 }
 
 let source;
-export async function releaseSnapshot() {
+export async function releaseSnapshot(options) {
   if (!source) {
     if (!process.env.APPS_READ_TOKEN) throw new Error('Release data unavailable');
     const config = await loadConfig();
@@ -86,7 +105,7 @@ export async function releaseSnapshot() {
       },
     });
   }
-  return source();
+  return source(options);
 }
 
 export function createReleaseHandler(getSnapshot = releaseSnapshot) {

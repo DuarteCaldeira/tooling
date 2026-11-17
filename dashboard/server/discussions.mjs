@@ -199,10 +199,14 @@ export function createDiscussionService({
       }
       const time = now();
       const bucket = Math.floor(time.getTime() / 60000);
+      const bucketPrefix = `rate-limits/v1/${digest(client)}/${bucket}/`;
+      const occupied = new Set((await metadata(bucketPrefix)).map((blob) => blob.pathname));
       let allowed = false;
       for (let slot = 0; slot < 10; slot++) {
+        const slotPath = `${bucketPrefix}${slot}.json`;
+        if (occupied.has(slotPath)) continue;
         if (
-          await store.create(`rate-limits/v1/${digest(client)}/${bucket}/${slot}.json`, {
+          await store.create(slotPath, {
             expiresAt: time.getTime() + 120000,
           })
         ) {
@@ -313,7 +317,7 @@ export function createHandler(serviceFactory) {
         }
         if (!input || typeof input !== 'object' || Array.isArray(input))
           throw new DiscussionError(400, 'Pedido de comentário inválido');
-        const service = await serviceFactory();
+        const service = await serviceFactory(input);
         const client =
           request.headers.get('x-vercel-forwarded-for') ??
           request.headers.get('x-forwarded-for') ??
@@ -333,8 +337,8 @@ export function createHandler(serviceFactory) {
         const comment = await service.post(input, client);
         return new Response(JSON.stringify({ comment }), { status: 201, headers });
       }
-      const service = await serviceFactory();
       const input = Object.fromEntries(url.searchParams);
+      const service = await serviceFactory(input);
       const result =
         input.view === 'summary'
           ? await service.summary(input.repository)

@@ -70,6 +70,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
   const [edit, setEdit] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const loadedCount = useRef(0);
+  const readRequest = useRef(null);
   loadedCount.current = comments.length;
   const [kind, setKind] = useState('comment');
   const [body, setBody] = useState('');
@@ -86,6 +87,9 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
     async ({ earlier = false, quiet = false, from = cursor } = {}) => {
       if (!context) return;
       const current = generation.current;
+      if (quiet && readRequest.current?.generation === current) return;
+      const operation = { generation: current };
+      readRequest.current = operation;
       if (!quiet) setStatus('A carregar os comentários…');
       try {
         let result = await api({
@@ -118,6 +122,8 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
         setStatus('');
       } catch (error) {
         if (current === generation.current) setStatus(error.message);
+      } finally {
+        if (readRequest.current === operation) readRequest.current = null;
       }
     },
     [context, cursor],
@@ -197,7 +203,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
   async function submit(event) {
     event.preventDefault();
     if (!context || busy) return;
-    const current = generation.current;
+    const current = ++generation.current;
     const value = {
       repository: context.repository,
       version: context.version,
@@ -225,7 +231,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
         setStatus('');
         setNotice('Comentário enviado');
       }
-      review.refresh(context.repository);
+      review.refresh(context.repository, { force: true });
     } catch (error) {
       if (current === generation.current) setStatus(error.message);
     } finally {
@@ -261,7 +267,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
       setEdit(null);
       setDeleting(null);
       setNotice(action === 'delete' ? 'Comentário eliminado' : 'Comentário atualizado');
-      review.refresh(context.repository);
+      review.refresh(context.repository, { force: true });
     } catch (error) {
       if (current === generation.current) setNotice(error.message);
     } finally {

@@ -93,11 +93,17 @@ test(
     const service = createDiscussionService({ store, manifest: discussionManifest(fixture) });
     const handler = createHandler(async () => service);
     let failWrites = false;
+    let pausedSummary;
+    const summaryRequests = [];
     const routeHandler = async (route) => {
       const original = route.request();
       const url = new URL(original.url());
       if (url.pathname === '/api/releases') return route.fulfill({ json: fixture });
       if (url.pathname === '/api/discussions') {
+        if (url.searchParams.get('view') === 'summary') {
+          summaryRequests.push(url.searchParams.get('repository'));
+          if (pausedSummary) await pausedSummary.promise;
+        }
         if (failWrites && original.method() === 'POST')
           return route.fulfill({ status: 503, json: { error: 'Falha temporária' } });
         const response = await handler(
@@ -171,10 +177,21 @@ test(
       assert.equal(await page.locator('.change-item').count(), 1);
       await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
       const validate = page.getByRole('button', { name: 'Validar: ' + texts[0], exact: true });
-      await validate.click();
-      await page
-        .getByRole('button', { name: 'Retirar validação: ' + texts[0], exact: true })
-        .waitFor();
+      const summaryGate = Promise.withResolvers();
+      pausedSummary = summaryGate;
+      try {
+        await validate.click();
+        const revoke = page.getByRole('button', {
+          name: 'Retirar validação: ' + texts[0],
+          exact: true,
+        });
+        await revoke.waitFor();
+        assert.equal(await revoke.isEnabled(), true);
+      } finally {
+        pausedSummary = undefined;
+        summaryGate.resolve();
+      }
+      assert.ok(summaryRequests.every((repository) => repository === 'owner/app'));
       await select('review-filter', 'Por validar');
       assert.equal(await page.getByRole('button', { name: /^Retirar validação:/ }).count(), 0);
       await select('review-filter', 'Todos');
