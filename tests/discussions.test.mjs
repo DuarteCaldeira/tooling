@@ -167,6 +167,46 @@ function fixture() {
   return { data, store, manifest, service, input };
 }
 
+test('reported bugs persist in the selected version with independent discussion and review state', async () => {
+  const { service, input, store, manifest } = fixture();
+  const report = { ...input, version: 'v2.0.0', requestId: randomUUID() };
+  const [first, retry] = await Promise.all([service.report(report), service.report(report)]);
+  assert.equal(first.item.id, retry.item.id);
+  assert.equal(first.item.kind, 'issue');
+  const other = createDiscussionService({ store, manifest });
+  const shared = await other.summary(input.repository);
+  assert.equal(shared.reportedItems['v1.0.0'].length, 0);
+  assert.equal(shared.reportedItems['v2.0.0'].length, 1);
+  assert.equal(shared.reportedItems['v2.0.0'][0].text, input.body);
+  const context = { ...input, version: 'v2.0.0', item: first.item.id };
+  await other.post({ ...context, body: 'Reproduzido na mesma versão' });
+  assert.equal((await service.list(context)).comments[0].body, 'Reproduzido na mesma versão');
+  await assert.rejects(service.list({ ...context, version: 'v1.0.0' }), (e) => e.status === 404);
+  await assert.rejects(
+    service.list({ ...context, item: 'reported-' + randomUUID() }),
+    (e) => e.status === 404,
+  );
+  await other.setState({ ...context, field: 'closed', value: true, requestId: randomUUID() });
+  assert.equal(
+    (await service.summary(input.repository)).states['v2.0.0'][first.item.id].closed,
+    true,
+  );
+  await assert.rejects(
+    other.setState({ ...context, field: 'validated', value: true, requestId: randomUUID() }),
+    (e) => e.status === 400,
+  );
+  await assert.rejects(
+    service.report({ ...report, body: 'Different report' }),
+    (e) => e.status === 409,
+  );
+  await assert.rejects(service.report({ ...report, version: 'v3.0.0' }), (e) => e.status === 404);
+  await assert.rejects(
+    service.report({ ...report, requestId: '../escape' }),
+    (e) => e.status === 400,
+  );
+  await assert.rejects(service.report({ ...report, body: ' ' }), (e) => e.status === 400);
+});
+
 test('shared release/item comments remain separate and survive a new service instance', async () => {
   const { store, manifest, service, input } = fixture();
   await service.post(input, 'client1');
@@ -342,3 +382,4 @@ test('comments can be edited and deleted persistently without changing their ide
   assert.equal((await mutate('edit', { body: 'Missing comment' })).status, 404);
   assert.equal((await mutate('delete', { id: '../escape' })).status, 400);
 });
+

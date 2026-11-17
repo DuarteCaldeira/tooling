@@ -41,11 +41,11 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
   const state = review.stateOf(context);
   const [feedback, setFeedback] = useState('');
   const [pending, setPending] = useState(false);
-  const { text, technical, areaLabel } = context;
+  const { text, technical, areaLabel, reported } = context;
   const split = text.indexOf(': ');
   const repeated =
     split > 0 && areaLabel && normalize(text.slice(0, split)) === normalize(areaLabel);
-  const tags = itemTopics(text, technical).filter((topic) => topic.kind !== 'area');
+  const tags = reported ? [] : itemTopics(text, technical).filter((topic) => topic.kind !== 'area');
 
   async function toggleValidation() {
     setPending(true);
@@ -81,8 +81,11 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
         </span>
       </button>
       <div className="item-meta">
-        {tags.length ? (
+        {tags.length || reported ? (
           <div className="item-topics">
+            {reported ? (
+              <span className="comment-kind comment-kind--issue">🐛 Problema</span>
+            ) : null}
             {tags.map((topic) => (
               <button
                 key={topic.id}
@@ -98,7 +101,7 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
           </div>
         ) : null}
         <div className="item-actions">
-          {technical ? null : (
+          {technical || reported ? null : (
             <Button
               variant="secondary"
               size="sm"
@@ -113,7 +116,11 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
           <Button variant="ghost" size="sm" onClick={() => onOpen(context)}>
             {state.count
               ? `💬 ${state.count} · ${state.closed ? 'Resolvida' : 'Em aberto'}`
-              : '💬 Comentar'}
+              : reported
+                ? state.closed
+                  ? '💬 Resolvido'
+                  : '💬 Em aberto'
+                : '💬 Comentar'}
           </Button>
         </div>
       </div>
@@ -255,7 +262,8 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     conversation === 'all' ||
     (loaded && state.count > 0 && (conversation === 'open' ? !state.closed : state.closed));
   const itemMatches = (release, item, technical = false) => {
-    if (technical && filter !== 'all') return false;
+    if ((technical || item.reported) && filter !== 'all') return false;
+    if (item.reported && topic !== 'all') return false;
     const entries = itemTopics(item.text, technical);
     if (topic !== 'all' && !entries.some((entry) => entry.id === topic)) return false;
     const state = review.stateOf(context(release, item.id, item.text));
@@ -271,6 +279,12 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
   };
   const matches = all
     .map((release) => {
+      const reported =
+        content === 'technical'
+          ? []
+          : review
+              .reportedItemsOf(repository, release.version)
+              .filter((item) => itemMatches(release, item));
       const items =
         content === 'technical'
           ? []
@@ -298,12 +312,13 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         release,
         items,
         technical,
-        visible: items.length || technical.length || releaseMatch || emptyMatch,
+        reported,
+        visible: items.length || technical.length || reported.length || releaseMatch || emptyMatch,
       };
     })
     .filter((entry) => entry.visible);
   const resultCount = matches.reduce(
-    (count, entry) => count + entry.items.length + entry.technical.length,
+    (count, entry) => count + entry.items.length + entry.technical.length + entry.reported.length,
     0,
   );
   const shown = matches.slice(0, limit);
@@ -319,7 +334,13 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
       product,
       checked,
       fully,
-      open: expanded[releaseId(entry.release)] ?? (filtering || (!fully && product.length > 0)),
+      open:
+        expanded[releaseId(entry.release)] ??
+        (filtering ||
+          (!fully && product.length > 0) ||
+          entry.reported.some(
+            (item) => !review.stateOf(context(entry.release, item.id, item.text)).closed,
+          )),
     };
   };
   const states = shown.map((entry) => ({ entry, ...entryOpen(entry) }));
@@ -343,7 +364,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             : '';
 
   const accordionItems = states.map(({ entry, product, checked, fully }) => {
-    const { release, items, technical } = entry;
+    const { release, items, technical, reported } = entry;
     const key = releaseId(release);
     const technicalKey = `${key}/technical`;
     const technicalOpen =
@@ -393,10 +414,29 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             <div className="area-groups">
               <AreaGroups items={items} technical={false} {...groupProps} />
             </div>
-          ) : !technical.length && !needsState ? (
+          ) : !technical.length && !reported.length && !needsState ? (
             <p className="source-note">
               {release.summaryContext ?? 'Esta versão não tem novidades de produto descritas.'}
             </p>
+          ) : null}
+          {reported.length ? (
+            <section className="area-groups release-area" aria-label="Problemas reportados">
+              <header className="release-area-heading">
+                <h3>Problemas reportados</h3>
+              </header>
+              <ul className="change-list">
+                {reported.map((item) => (
+                  <ChangeItem
+                    key={item.id}
+                    context={{ ...context(release, item.id, item.text), reported: true }}
+                    review={review}
+                    onOpen={onOpen}
+                    onTopic={(id) => update('topic-filter', id)}
+                    activeTopic={topic}
+                  />
+                ))}
+              </ul>
+            </section>
           ) : null}
           {technical.length ? (
             <Accordion
@@ -425,13 +465,11 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
               onClick={() =>
                 onOpen({
                   ...context(release, 'release', 'Conversa sobre esta versão e novas descobertas'),
+                  report: true,
                 })
               }
             >
-              {(() => {
-                const count = review.stateOf(context(release, 'release', '')).count;
-                return count ? `🐛 Reportar bug (${count})` : '🐛 Reportar bug';
-              })()}
+              🐛 Reportar bug
             </Button>
             {githubUrl(release.url) ? (
               <a className="text-link" href={release.url}>
@@ -571,3 +609,4 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     </section>
   );
 }
+
