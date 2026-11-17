@@ -1,0 +1,26 @@
+{
+  "skills/design-motion-principles": {
+    "repository": "kylezantos/design-motion-principles",
+    "path": "skills/design-motion-principles",
+    "commit": "4a9ca879f24a",
+    "license": "MIT",
+    "files": {
+      "LICENSE": "5945ed68f9c1f6c2cfecc674ce66226221f6a40ec4bf2e0b1a1f0084cf108bdb",
+      "SKILL.md": "599f42dbf011df38f3fcaf1497533af447d91cf97443b92439455af103c25b2e",
+      "references/accessibility.md": "1cb43ec768e800e31b8017d90a0ba0c050e3bc94d027cb2cac32c4b4834f1c0d",
+      "references/anti-checklist.md": "f9c5a255a98cc790b7e6190ee8653d4c3ef00ce096f0b93c9d3fe1e9ffb44f32",
+      "references/audit-checklist.md": "42dfa5637766c6868aea875b24b7ceab8a156ea91b79c0cf7233579992b46f4d",
+      "references/creation-gotchas.md": "c9869ee6f62ad53fd726ddef8ae0434259b104469ad2f84019bf6cb48540c07b",
+      "references/demo-shell.html": "a8434c6cd5e3738e3f223478c34c20f3224a380ce9b67525b3dc763431f69fd9",
+      "references/emil-kowalski.md": "aa0e77771a352fcecff8cd64b790ec8ec09a07befdbb2de145bb80d7755bd071",
+      "references/jakub-krehel.md": "7c996dbbe830f7dcebbf76ea46efcd1583ca5265db2f76291de5974674f43b51",
+      "references/jhey-tompkins.md": "dfcc542d5b86275bb24ab72a9feacc973927925c4f50dc2e4918a915df2e5a59",
+      "references/motion-cookbook.md": "1be5919557a16a0a85abfc74a3cca2181f23df16d960a38b8838d211f5408e27",
+      "references/output-format.md": "5c0f0f8adc1ff2a858666af592647e4889347c0a09a2105e7ac49645ae6ffde2",
+      "references/performance.md": "f82512adc9aca4de7b880f26a5ba4b487a839d9e85ead9be0acac80d52aedb2a",
+      "references/report-template.html": "08eaa17fa53ae9cff8554a04d253567ea9c9ec39d405d600ecb436bb2489392b",
+      "workflows/audit.md": "a570e7e112781b949da9ce5c1b3934b7c8a3128cc9cb96198293959e97a64d68",
+      "workflows/create.md": "8560fdf2476eeb783b7cf70feb750f5ab743fa644bb0d486388b762868785282"
+    }
+  }
+}

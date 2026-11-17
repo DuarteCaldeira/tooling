@@ -36,3 +36,9 @@ Opt-in architecture, rendered accessibility and dependency-consistency checks sh
 The [app release dashboard](docs/apps-dashboard.md) tracks application versions, tooling versions and release dates, with Vercel hosting and automatic runtime updates without release-triggered builds. Manage its app list in [dashboard/apps.json](dashboard/apps.json).
 
 See [shared preview, package and visual helpers](docs/shared-scripts.md) for reusable library and browser-test scripts.
+
+The repository is also the `dcaldeira` Claude Code marketplace. Its `core` plugin ([docs](docs/claude-plugin.md)) shares rules, skills and validation hooks across projects:
+
+```text
+/plugin install core --marketplace DuarteCaldeira/tooling
+```

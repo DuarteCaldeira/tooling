@@ -1,0 +1,17 @@
+schema_version: '1'
+name: expo-package
+description: 'The core:expo-conventions skill triggers and its rules show up in the answer.'
+context:
+  add_dirs: [fixture]
+execution:
+  max_turns: 10
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). I want to add a camera feature to this app. Which command should I use to add the camera library, and what do I need to check first?'
+graders:
+  - type: tool_used
+    name: skill-loaded
+    tool: Skill
+    input_match: 'expo-conventions'
+  - type: llm
+    name: follows-conventions
+    criteria: 'The answer uses `npx expo install` (not npm install), says to check the installed Expo SDK version and its versioned docs, and mentions that a native module needs a development build rather than Expo Go.'

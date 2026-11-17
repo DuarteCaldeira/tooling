@@ -6,3 +6,6 @@ coverage/
 playwright-report/
 test-results/
 .vercel/
+claude/evals/results/
+.claude/settings.local.json
+.claude/worktrees/

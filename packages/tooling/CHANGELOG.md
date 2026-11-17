@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `repoStandard` option and `tooling doctor --repo-standard`: AGENTS.md sections, CLAUDE.md, `.claude/settings.json` plugins (UI plugins only for frontend repos), no `.ai` kit or `ai-memory`. The reusable `ci.yml` runs it when enabled.
+- Opt-in `duplication` check (jscpd): in every profile only clones touching changed files fail; `--all` runs report existing clones without failing; `duplication.scope: "all"` makes every clone fail.
+- `styles.rules.layoutCss` and `styles.layoutPaths`: report flex layout in component modules so layouts use the shared `Stack`.
+
 ## 0.1.0
 
 Initial release of `@dcaldeira/tooling`.

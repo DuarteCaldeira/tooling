@@ -34,9 +34,11 @@ const valueFlags =
 const boolFlags =
   subcommand === 'generate'
     ? ['dry-run', 'design-system']
-    : subcommand
-      ? []
-      : ['changed', 'all', 'bail', 'install', 'plan', 'watch', 'committed', 'no-cache'];
+    : subcommand === 'doctor'
+      ? ['repo-standard']
+      : subcommand
+        ? []
+        : ['changed', 'all', 'bail', 'install', 'plan', 'watch', 'committed', 'no-cache'];
 const options = {};
 for (let i = 0; i < args.length; i++) {
   const [flag, ...tail] = args[i].replace(/^--/, '').split('=');

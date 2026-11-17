@@ -4,6 +4,7 @@ import { inside, loadConfig, validateConfig } from './config.mjs';
 import { builtins, plan } from './graph.mjs';
 import { executable, packageManifest } from './execute.mjs';
 import { git } from './git.mjs';
+import { repoStandardFindings } from './repo-standard.mjs';
 
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const readJSON = (path) => JSON.parse(readFileSync(path, 'utf8'));
@@ -210,6 +211,7 @@ export function diagnose(root, configPath) {
     )
       add('failed', 'unit: install @vitest/coverage-v8 matching your Vitest version');
   }
+  if (config.repoStandard) findings.push(...repoStandardFindings(root));
   for (const name of ['ci.yml', 'dependabot-merge.yml']) {
     const path = join(root, '.github/workflows', name);
     if (!existsSync(path)) add('failed', `Missing .github/workflows/${name}`);
@@ -231,7 +233,9 @@ export async function setupCommand(command, root, options) {
     );
     return 0;
   }
-  const findings = diagnose(root, options.config);
+  const findings = options['repo-standard']
+    ? repoStandardFindings(root)
+    : diagnose(root, options.config);
   for (const finding of findings) console.log(`${finding.status}: ${finding.message}`);
   return findings.some((finding) => finding.status === 'failed') ? 1 : 0;
 }

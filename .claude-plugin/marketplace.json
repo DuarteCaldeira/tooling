@@ -1,0 +1,14 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "dcaldeira",
+  "description": "Shared Claude Code setup for React/Vite and Expo projects that use @dcaldeira/tooling.",
+  "owner": { "name": "DuarteCaldeira", "url": "https://github.com/DuarteCaldeira" },
+  "plugins": [
+    {
+      "name": "core",
+      "description": "Conventions, workflow, repo standard and validation hooks for React/Vite and Expo projects.",
+      "source": "./claude",
+      "category": "development"
+    }
+  ]
+}

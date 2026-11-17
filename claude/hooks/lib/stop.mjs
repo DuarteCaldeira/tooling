@@ -1,0 +1,186 @@
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { packageBin, readJSON } from './shared.mjs';
+
+const LINTABLE = /\.(c|m)?[jt]sx?$/;
+const CHUNK = 50;
+const TAIL_LINES = 60;
+const NOT_RUN = Symbol('tooling not run');
+const DEFAULT_STATE_DIR = join(tmpdir(), 'claude-core-stop');
+
+const sha1 = (text) => createHash('sha1').update(text).digest('hex');
+const editsPath = (stateDir, sessionId) =>
+  join(stateDir, `${sha1(String(sessionId ?? ''))}.edited`);
+
+function git(cwd, ...args) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (result.status !== 0) throw new Error(result.stderr || `git ${args[0]} failed`);
+  return result.stdout;
+}
+
+function hasHead(root) {
+  try {
+    git(root, 'rev-parse', '--verify', '--quiet', 'HEAD');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Tracked files changed against HEAD plus untracked, non-ignored files that still exist. */
+export function changedFiles(root) {
+  const tracked = hasHead(root) ? git(root, 'diff', '--name-only', '-z', 'HEAD') : '';
+  const untracked = git(root, 'ls-files', '--others', '--exclude-standard', '-z');
+  return [...new Set(`${tracked}${untracked}`.split('\0').filter(Boolean))].filter((file) =>
+    existsSync(join(root, file)),
+  );
+}
+
+/** Identifies the working-tree state, so an unchanged tree is not re-checked every turn. */
+export function fingerprint(root, files) {
+  const hash = createHash('sha1');
+  if (hasHead(root)) hash.update(git(root, 'diff', 'HEAD'));
+  for (const file of files) {
+    const stat = statSync(join(root, file));
+    hash.update(`${file}\0${stat.size}\0${stat.mtimeMs}\0`);
+  }
+  return hash.digest('hex');
+}
+
+/** PostToolUse body: remember a file Claude edited, so the Stop hook formats only Claude's files. */
+export function recordEdit(input, { stateDir = DEFAULT_STATE_DIR } = {}) {
+  const path = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
+  if (!path) return;
+  mkdirSync(stateDir, { recursive: true });
+  const absolute = resolve(input.cwd ?? process.cwd(), path);
+  appendFileSync(editsPath(stateDir, input.session_id), `${absolute}\n`);
+}
+
+/** Files Claude edited since the last Stop that still exist inside `root`, repo-relative. Clears the record. */
+export function takeEdits(sessionId, root, { stateDir = DEFAULT_STATE_DIR } = {}) {
+  const path = editsPath(stateDir, sessionId);
+  if (!existsSync(path)) return [];
+  const lines = readFileSync(path, 'utf8').split(/\r?\n/).filter(Boolean);
+  rmSync(path, { force: true });
+  // Real paths on both sides: Windows 8.3 short names (NAME~1) and symlinks must not
+  // make a file inside the repo look outside it.
+  const realRoot = realpathSync.native(root);
+  const inside = new Set();
+  for (const file of lines) {
+    if (!existsSync(file)) continue;
+    const rel = relative(realRoot, realpathSync.native(file));
+    if (rel && !rel.startsWith('..') && !isAbsolute(rel)) inside.add(rel.split(sep).join('/'));
+  }
+  return [...inside];
+}
+
+function runNode(root, script, args, timeoutMs) {
+  return spawnSync(process.execPath, [script, ...args], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: timeoutMs,
+    maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
+function inChunks(files, run) {
+  for (let i = 0; i < files.length; i += CHUNK) run(files.slice(i, i + CHUNK));
+}
+
+/** Format, then lint-fix, files with the repo's own tools. Failures are left to `tooling`. */
+export function formatFiles(root, files) {
+  const prettier = packageBin(root, 'prettier');
+  if (prettier)
+    inChunks(files, (chunk) =>
+      runNode(
+        root,
+        prettier,
+        ['--write', '--ignore-unknown', '--log-level=warn', ...chunk],
+        60_000,
+      ),
+    );
+  const eslint = packageBin(root, 'eslint');
+  const lintable = files.filter((file) => LINTABLE.test(file));
+  if (eslint && lintable.length)
+    inChunks(lintable, (chunk) =>
+      runNode(root, eslint, ['--fix', '--no-warn-ignored', ...chunk], 120_000),
+    );
+}
+
+function tail(text) {
+  return text.trim().split(/\r?\n/).slice(-TAIL_LINES).join('\n');
+}
+
+/** Run `tooling --profile=dev --changed` without its format check. Returns a failure reason, undefined on pass, or NOT_RUN. */
+export function runTooling(root, timeoutMs) {
+  const config = readJSON(join(root, 'tooling.config.json'));
+  const bin = packageBin(root, '@dcaldeira/tooling', 'tooling');
+  if (!config || !bin) return NOT_RUN;
+  const args = ['--profile=dev', '--changed'];
+  if (config.checks?.format) args.push('--skip=format');
+  const result = runNode(root, bin, args, timeoutMs);
+  const command = `tooling ${args.join(' ')}`;
+  if (result.error?.code === 'ETIMEDOUT' || result.signal)
+    return `\`${command}\` did not finish within ${Math.round(timeoutMs / 1000)} s, so the changes are NOT validated. Run it yourself (in the background) and fix what fails.`;
+  if (result.status !== 0)
+    return `\`${command}\` failed. Fix these before finishing:\n\n${tail(`${result.stdout}\n${result.stderr}`)}`;
+  return undefined;
+}
+
+/** Append one timing record to `.tooling/claude-stop.jsonl` (gitignored with `.tooling/`). */
+function logTiming(root, entry) {
+  const dir = join(root, '.tooling');
+  if (!existsSync(dir)) return;
+  const line = JSON.stringify({ at: new Date().toISOString(), ...entry });
+  appendFileSync(join(dir, 'claude-stop.jsonl'), `${line}\n`);
+}
+
+/**
+ * Stop-hook body. Formats the files Claude edited, then runs `tooling` when the working tree
+ * changed since the last run. Returns `{ decision: 'block', reason }` when Claude must keep
+ * working, otherwise undefined.
+ */
+export function stopCheck(
+  input,
+  {
+    stateDir = DEFAULT_STATE_DIR,
+    timeoutMs = Number(process.env.CORE_STOP_TIMEOUT_MS) || 240_000,
+  } = {},
+) {
+  if (input.stop_hook_active) return undefined;
+  let root;
+  try {
+    root = git(input.cwd ?? process.cwd(), 'rev-parse', '--show-toplevel').trim();
+  } catch {
+    return undefined;
+  }
+  const edited = takeEdits(input.session_id, root, { stateDir });
+  if (edited.length) formatFiles(root, edited);
+
+  const files = changedFiles(root);
+  if (!files.length) return undefined;
+  const statePath = join(stateDir, sha1(`${root}\0${input.session_id ?? ''}`));
+  const previous = existsSync(statePath) ? readFileSync(statePath, 'utf8') : '';
+  const current = fingerprint(root, files);
+  if (previous === current) return undefined;
+
+  const started = Date.now();
+  const result = runTooling(root, timeoutMs);
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(statePath, current);
+  if (result === NOT_RUN) return undefined;
+  logTiming(root, { ms: Date.now() - started, files: files.length, passed: !result });
+  return result ? { decision: 'block', reason: result } : undefined;
+}

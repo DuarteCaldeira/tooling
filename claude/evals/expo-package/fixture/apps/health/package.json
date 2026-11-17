@@ -1,0 +1,8 @@
+{
+  "name": "health",
+  "dependencies": {
+    "expo": "55.0.0",
+    "react-native": "0.83.0",
+    "expo-router": "6.0.0"
+  }
+}

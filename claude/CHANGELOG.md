@@ -1,0 +1,17 @@
+# Changelog
+
+Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
+
+## 0.1.0
+
+- Core rules injected at session start and into every subagent, with the detected stack (vite, expo, next, supabase) and the skills to load.
+- Skills: `react-conventions`, `expo-conventions`, `backend-conventions`, `workflow`, `repo-standard`, `adopt-repo`, and `design-motion-principles` (vendored, MIT, upstream commit `4a9ca879f24a`).
+- Repos enable `mattpocock-skills` next to `core`, plus `ui-ux-pro-max` and `taste-skill` when they have a frontend; UI work loads `ui-ux-pro-max` + `design-taste-frontend`, motion work loads `design-motion-principles`.
+- Layout primitive comes from `AGENTS.md` (default design-system `Stack`); reviewer judges only the diff; design skills only for new screens, components and redesigns, with the design system winning.
+- Search-only subagents (Explore, claude-code-guide, locators) no longer get the rules injected.
+- `caveman` stays in user settings; `ui-ux-pro-max` and `taste-skill` are required only in frontend repos.
+- `vendor.json` pins the bundled skill's files; a test fails if they drift from upstream.
+- No-duplication rule: layouts and shells are built from the design system's `Stack`, one shared app shell, repeated page frames become shared components (core rules, React and Expo conventions, reviewer checklist).
+- Agents: `planner`, `reviewer`, `tester`.
+- Guard: blocks Edit/Write and shell writes to `.env*` (not templates), lockfiles, `dist/`, `coverage/`.
+- Stop hook: formats only the files Claude edited, runs `tooling --profile=dev --changed` when the tree changed, logs timings to `.tooling/claude-stop.jsonl`. Timeout via `CORE_STOP_TIMEOUT_MS` (default 240000).
