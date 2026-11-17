@@ -12,6 +12,8 @@ const threadPrefix = ({ repository, version, item }) =>
   `${appPrefix(repository)}${digest(version)}/${item}/comments/`;
 const statePrefix = ({ repository, version, item }) =>
   `${appPrefix(repository)}${digest(version)}/${item}/state/`;
+const reportedPrefix = ({ repository, version }) =>
+  `${appPrefix(repository)}${digest(version)}/reported/`;
 const uuidPattern = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
 
 async function readBody(request) {
@@ -44,15 +46,22 @@ export function createDiscussionService({
   now = () => new Date(),
   uuid = randomUUID,
 }) {
-  function target(input) {
+  async function target(input) {
     const { repository, version, item = 'release' } = input;
     if (!Object.hasOwn(manifest, repository ?? ''))
       throw new DiscussionError(404, 'Aplicação não encontrada');
-    if (
-      !Object.hasOwn(manifest[repository], version ?? '') ||
-      !manifest[repository][version].includes(item)
-    )
+    if (!Object.hasOwn(manifest[repository], version ?? ''))
       throw new DiscussionError(404, 'Versão ou alteração não encontrada');
+    if (!manifest[repository][version].includes(item)) {
+      const id = typeof item === 'string' ? item.replace(/^reported-/, '') : '';
+      if (
+        typeof item !== 'string' ||
+        !item.startsWith('reported-') ||
+        !uuidPattern.test(id) ||
+        !(await store.get(`${reportedPrefix({ repository, version })}${item}.json`))
+      )
+        throw new DiscussionError(404, 'Versão ou alteração não encontrada');
+    }
     return { repository, version, item };
   }
   async function metadata(prefix) {
@@ -67,17 +76,108 @@ export function createDiscussionService({
     } while (cursor);
     return all;
   }
+  async function rateLimit(client, time) {
+    const bucket = Math.floor(time.getTime() / 60000);
+    const bucketPrefix = `rate-limits/v1/${digest(client)}/${bucket}/`;
+    const occupied = new Set((await metadata(bucketPrefix)).map((blob) => blob.pathname));
+    for (let slot = 0; slot < 10; slot++) {
+      if (occupied.has(`${bucketPrefix}${slot}.json`)) continue;
+      if (
+        await store.create(`rate-limits/v1/${digest(client)}/${bucket}/${slot}.json`, {
+          expiresAt: time.getTime() + 120000,
+        })
+      )
+        return slot;
+    }
+    throw new DiscussionError(429, 'Demasiados comentários. Aguarde um minuto e tente novamente');
+  }
   return {
+    async report(input, client = 'workspace') {
+      const context = await target({ ...input, item: 'release' });
+      const author = typeof input.author === 'string' ? input.author.trim() : '';
+      const text = typeof input.body === 'string' ? input.body.trim() : '';
+      if (author.length < 2 || author.length > 60)
+        throw new DiscussionError(400, 'Indique um nome entre 2 e 60 caracteres');
+      if (!text || text.length > 4000)
+        throw new DiscussionError(400, 'Descreva o problema com até 4 000 caracteres');
+      if (!uuidPattern.test(input.requestId ?? ''))
+        throw new DiscussionError(400, 'Pedido de problema inválido');
+      const id = `reported-${input.requestId}`;
+      const path = `${reportedPrefix(context)}${id}.json`;
+      const existing = await store.get(path);
+      if (existing) {
+        if (existing.text !== text || existing.author !== author)
+          throw new DiscussionError(409, 'Este pedido já foi utilizado');
+        return { item: existing };
+      }
+      const time = now();
+      await rateLimit(client, time);
+      const item = {
+        id,
+        repository: context.repository,
+        version: context.version,
+        text,
+        author,
+        kind: 'issue',
+        createdAt: time.toISOString(),
+        reported: true,
+      };
+      if (!(await store.create(path, item))) {
+        const saved = await store.get(path);
+        if (saved?.text !== text || saved?.author !== author)
+          throw new DiscussionError(409, 'Este pedido já foi utilizado');
+        return { item: saved };
+      }
+      return { item };
+    },
+    async edit(input) {
+      const context = await target(input);
+      if (!uuidPattern.test(input.id ?? '')) throw new DiscussionError(400, 'Comentário inválido');
+      const body = typeof input.body === 'string' ? input.body.trim() : '';
+      if (!body || body.length > 4000)
+        throw new DiscussionError(400, 'Escreva um comentário com até 4 000 caracteres');
+      const path = `${threadPrefix(context)}${input.id}.json`;
+      const existing = await store.get(path);
+      if (!existing) throw new DiscussionError(404, 'Comentário não encontrado');
+      const comment = { ...existing, body, updatedAt: now().toISOString() };
+      await store.set(path, comment);
+      return { comment };
+    },
+    async delete(input) {
+      const context = await target(input);
+      if (!uuidPattern.test(input.id ?? '')) throw new DiscussionError(400, 'Comentário inválido');
+      await store.remove([`${threadPrefix(context)}${input.id}.json`]);
+      return { deleted: true };
+    },
     async summary(repository) {
       if (!Object.hasOwn(manifest, repository ?? ''))
         throw new DiscussionError(404, 'Aplicação não encontrada');
       const blobs = await metadata(appPrefix(repository));
       const summary = {};
       const states = {};
+      const reportedItems = {};
       for (const [version, items] of Object.entries(manifest[repository])) {
+        const reportedBlobs = blobs.filter((blob) =>
+          blob.pathname.startsWith(reportedPrefix({ repository, version })),
+        );
+        const reports = [];
+        for (let start = 0; start < reportedBlobs.length; start += 8) {
+          reports.push(
+            ...(
+              await Promise.all(
+                reportedBlobs
+                  .slice(start, start + 8)
+                  .map((blob) => store.get(blob.pathname, blob.etag)),
+              )
+            ).filter(Boolean),
+          );
+        }
+        reportedItems[version] = reports.sort(
+          (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+        );
         summary[version] = {};
         states[version] = {};
-        for (const item of items) {
+        for (const item of [...items, ...reports.map((report) => report.id)]) {
           const context = { repository, version, item };
           const comments = blobs.filter((blob) => blob.pathname.startsWith(threadPrefix(context)));
           summary[version][item] = comments.length;
@@ -102,14 +202,16 @@ export function createDiscussionService({
           }
         }
       }
-      return { summary, states };
+      return { summary, states, reportedItems };
     },
     async setState(input) {
-      const context = target(input);
+      const context = await target(input);
       if (!['validated', 'closed'].includes(input.field) || typeof input.value !== 'boolean')
         throw new DiscussionError(400, 'Estado de revisão inválido');
       if (
-        (context.item === 'release' || context.item.startsWith('technical-')) &&
+        (context.item === 'release' ||
+          context.item.startsWith('technical-') ||
+          context.item.startsWith('reported-')) &&
         input.field === 'validated'
       )
         throw new DiscussionError(400, 'A validação aplica-se apenas às novidades de produto');
@@ -132,7 +234,7 @@ export function createDiscussionService({
       return { saved: true };
     },
     async list(input) {
-      const context = target(input);
+      const context = await target(input);
       const offset = Number(input.cursor ?? 0);
       if (!Number.isSafeInteger(offset) || offset < 0 || offset > 20000)
         throw new DiscussionError(400, 'Página de comentários inválida');
@@ -141,13 +243,13 @@ export function createDiscussionService({
           new Date(b.uploadedAt) - new Date(a.uploadedAt) || b.pathname.localeCompare(a.pathname),
       );
       const comments = [];
-      for (let start = offset; start < Math.min(offset + 50, blobs.length); start += 8) {
+      for (let start = offset; start < Math.min(offset + 50, blobs.length); start += 16) {
         comments.push(
           ...(
             await Promise.all(
               blobs
-                .slice(start, Math.min(start + 8, offset + 50, blobs.length))
-                .map((blob) => store.get(blob.pathname)),
+                .slice(start, Math.min(start + 16, offset + 50, blobs.length))
+                .map((blob) => store.get(blob.pathname, blob.etag)),
             )
           ).filter(Boolean),
         );
@@ -159,13 +261,10 @@ export function createDiscussionService({
       };
     },
     async post(input, client = 'workspace') {
-      const context = target(input);
+      const context = await target(input);
       const author = typeof input.author === 'string' ? input.author.trim() : '';
       const body = typeof input.body === 'string' ? input.body.trim() : '';
       const kind = input.kind ?? 'comment';
-      const participantId = input.participantId;
-      if (participantId !== undefined && !uuidPattern.test(participantId))
-        throw new DiscussionError(400, 'Identificação do participante inválida');
       if (author.length < 2 || author.length > 60)
         throw new DiscussionError(400, 'Indique um nome entre 2 e 60 caracteres');
       if (!body || body.length > 4000)
@@ -177,54 +276,27 @@ export function createDiscussionService({
       const path = `${threadPrefix(context)}${id}.json`;
       const existing = await store.get(path);
       if (existing) {
-        if (
-          existing.author !== author ||
-          existing.body !== body ||
-          existing.kind !== kind ||
-          existing.participantId !== participantId
-        )
+        if (existing.author !== author || existing.body !== body || existing.kind !== kind)
           throw new DiscussionError(409, 'Este pedido já foi utilizado para outro comentário');
         return existing;
       }
       const time = now();
       const bucket = Math.floor(time.getTime() / 60000);
-      let allowed = false;
-      for (let slot = 0; slot < 10; slot++) {
-        if (
-          await store.create(`rate-limits/v1/${digest(client)}/${bucket}/${slot}.json`, {
-            expiresAt: time.getTime() + 120000,
-          })
-        ) {
-          allowed = true;
-          break;
-        }
-      }
-      if (!allowed)
-        throw new DiscussionError(
-          429,
-          'Demasiados comentários. Aguarde um minuto e tente novamente',
-        );
+      const slot = await rateLimit(client, time);
       const comment = {
         id,
         ...context,
         author,
         body,
         kind,
-        ...(participantId ? { participantId } : {}),
         createdAt: time.toISOString(),
       };
       if (!(await store.create(path, comment))) {
         const saved = await store.get(path);
-        if (
-          saved?.author === author &&
-          saved?.body === body &&
-          saved?.kind === kind &&
-          saved?.participantId === participantId
-        )
-          return saved;
+        if (saved?.author === author && saved?.body === body && saved?.kind === kind) return saved;
         throw new DiscussionError(409, 'Este pedido já foi utilizado');
       }
-      if (store.remove) {
+      if (slot === 0 && store.remove) {
         try {
           const prefix = `rate-limits/v1/${digest(client)}/`;
           const expired = (await metadata(prefix)).filter(
@@ -241,9 +313,30 @@ export function createDiscussionService({
 }
 
 export async function blobStore() {
-  const { put, get, list, del } = await import('@vercel/blob');
+  return createBlobStore(await import('@vercel/blob'));
+}
+
+export function createBlobStore({ put, get, list, del }) {
+  // Only reuse a body when fresh list metadata confirms that its version has not changed.
+  const bodies = new Map();
+  async function read(path) {
+    const file = await get(path, { access: 'private', useCache: false });
+    if (!file) return null;
+    if (file.statusCode !== 200) throw new Error('Private discussion read failed');
+    return new Response(file.stream).json();
+  }
   return {
+    async set(path, value) {
+      bodies.delete(path);
+      await put(path, JSON.stringify(value), {
+        access: 'private',
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType: 'application/json',
+      });
+    },
     async create(path, value) {
+      bodies.delete(path);
       try {
         await put(path, JSON.stringify(value), {
           access: 'private',
@@ -257,16 +350,28 @@ export async function blobStore() {
         throw error;
       }
     },
-    async get(path) {
-      const file = await get(path, { access: 'private', useCache: false });
-      if (!file) return null;
-      if (file.statusCode !== 200) throw new Error('Private discussion read failed');
-      return new Response(file.stream).json();
+    async get(path, version) {
+      if (!version) return read(path);
+      const stamp = String(version);
+      const cached = bodies.get(path);
+      if (cached?.version === stamp) return cached.value;
+      const entry = { version: stamp, value: read(path) };
+      bodies.set(path, entry);
+      if (bodies.size > 256) bodies.delete(bodies.keys().next().value);
+      try {
+        const value = await entry.value;
+        if (!value && bodies.get(path) === entry) bodies.delete(path);
+        return value;
+      } catch (error) {
+        if (bodies.get(path) === entry) bodies.delete(path);
+        throw error;
+      }
     },
     async list(prefix, cursor) {
       return list({ prefix, cursor, limit: 1000 });
     },
     async remove(urls) {
+      for (const path of urls) bodies.delete(path);
       await del(urls);
     },
   };
@@ -301,13 +406,23 @@ export function createHandler(serviceFactory) {
         }
         if (!input || typeof input !== 'object' || Array.isArray(input))
           throw new DiscussionError(400, 'Pedido de comentário inválido');
-        const service = await serviceFactory();
+        const service = await serviceFactory(input);
         const client =
           request.headers.get('x-vercel-forwarded-for') ??
           request.headers.get('x-forwarded-for') ??
           'workspace';
+        if (input.action === 'report')
+          return new Response(JSON.stringify(await service.report(input, client)), {
+            status: 201,
+            headers,
+          });
         if (input.action === 'state')
           return new Response(JSON.stringify(await service.setState(input)), {
+            status: 200,
+            headers,
+          });
+        if (input.action === 'edit' || input.action === 'delete')
+          return new Response(JSON.stringify(await service[input.action](input)), {
             status: 200,
             headers,
           });
@@ -316,8 +431,8 @@ export function createHandler(serviceFactory) {
         const comment = await service.post(input, client);
         return new Response(JSON.stringify({ comment }), { status: 201, headers });
       }
-      const service = await serviceFactory();
       const input = Object.fromEntries(url.searchParams);
+      const service = await serviceFactory(input);
       const result =
         input.view === 'summary'
           ? await service.summary(input.repository)

@@ -4,23 +4,38 @@ import { lockPageScroll } from './lib/scroll-lock.js';
 
 const EMPTY = Object.freeze({});
 
-/** Shared validation state and comment counts, loaded per repository. */
 export function useReview() {
   const [summaries, setSummaries] = useState({});
   const [states, setStates] = useState({});
   const [errors, setErrors] = useState({});
+  const [reportedItems, setReportedItems] = useState({});
 
-  const refresh = useCallback(async (repository) => {
-    try {
-      const result = await api({ repository, view: 'summary' });
-      setSummaries((current) => ({ ...current, [repository]: result.summary ?? EMPTY }));
-      setStates((current) => ({ ...current, [repository]: result.states ?? EMPTY }));
-      setErrors((current) => ({ ...current, [repository]: false }));
-      return true;
-    } catch {
-      setErrors((current) => ({ ...current, [repository]: true }));
-      return false;
-    }
+  const requests = useRef(new Map());
+  const refresh = useCallback((repository, { force = false } = {}) => {
+    const active = requests.current.get(repository);
+    if (active && !force) return active;
+    const request = api({ repository, view: 'summary' })
+      .then((result) => {
+        if (requests.current.get(repository) !== request) return true;
+        setSummaries((current) => ({ ...current, [repository]: result.summary ?? EMPTY }));
+        setStates((current) => ({ ...current, [repository]: result.states ?? EMPTY }));
+        setReportedItems((current) => ({
+          ...current,
+          [repository]: result.reportedItems ?? EMPTY,
+        }));
+        setErrors((current) => ({ ...current, [repository]: false }));
+        return true;
+      })
+      .catch(() => {
+        if (requests.current.get(repository) === request)
+          setErrors((current) => ({ ...current, [repository]: true }));
+        return false;
+      })
+      .finally(() => {
+        if (requests.current.get(repository) === request) requests.current.delete(repository);
+      });
+    requests.current.set(repository, request);
+    return request;
   }, []);
 
   const stateOf = useCallback(
@@ -49,8 +64,20 @@ export function useReview() {
           requestId: crypto.randomUUID(),
         },
       );
-      if (!(await refresh(context.repository)))
-        throw new Error('Estado guardado. Atualize a revisão para o confirmar.');
+      setStates((current) => ({
+        ...current,
+        [context.repository]: {
+          ...current[context.repository],
+          [context.version]: {
+            ...current[context.repository]?.[context.version],
+            [context.item]: {
+              ...current[context.repository]?.[context.version]?.[context.item],
+              [field]: value,
+            },
+          },
+        },
+      }));
+      refresh(context.repository, { force: true });
     },
     [refresh],
   );
@@ -58,6 +85,7 @@ export function useReview() {
   return {
     refresh,
     stateOf,
+    reportedItemsOf: (repository, version) => reportedItems[repository]?.[version] ?? [],
     setField,
     isLoaded: (repository) => repository in summaries,
     hasError: (repository) => Boolean(errors[repository]),
@@ -79,7 +107,9 @@ export function usePolling(callback, ms, enabled) {
 
 /** A string kept in sync with the URL query, e.g. `?topic-filter=ux`. */
 export function useQueryState(key, fallback) {
-  const [value, setValue] = useState(() => new URLSearchParams(location.search).get(key) ?? fallback);
+  const [value, setValue] = useState(
+    () => new URLSearchParams(location.search).get(key) ?? fallback,
+  );
   return [value, setValue];
 }
 

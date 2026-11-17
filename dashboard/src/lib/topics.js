@@ -64,7 +64,7 @@ const appAreas = [
 // Every change gets at least one tag besides its area: when no theme matches, the kind of
 // change is used instead, so the same few tags can be reused across apps.
 const changeTypes = {
-  novidade: { id: 'novidade', label: 'Novidade', emoji: '🆕', kind: 'type' },
+  novidade: { id: 'novidade', label: 'Issues', emoji: '🆕', kind: 'type' },
   correcao: { id: 'correcao', label: 'Correção', emoji: '🐛', kind: 'type' },
   melhoria: { id: 'melhoria', label: 'Melhoria', emoji: '📈', kind: 'type' },
   manutencao: { id: 'manutencao', label: 'Manutenção', emoji: '🛠️', kind: 'neutral' },
@@ -121,7 +121,4 @@ export function itemTopics(text, technical = false) {
 }
 
 export const normalize = (text) =>
-  text
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLocaleLowerCase('pt-PT');
+  text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-PT');

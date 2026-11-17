@@ -1,16 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "vite build && node build.mjs",
+  "regions": ["fra1"],
+  "buildCommand": "vite build",
   "installCommand": "npm ci --ignore-scripts --workspaces=false",
   "outputDirectory": "dist",
   "functions": {
-    "api/discussions.js": { "includeFiles": "server/discussion-manifest.json", "maxDuration": 30 }
-  },
-  "headers": [
-    {
-      "source": "/data.json",
-      "headers": [{ "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }]
-    }
-  ]
+    "api/*.js": { "includeFiles": "{apps.json,release-notes.json}", "maxDuration": 60 }
+  }
 }
+

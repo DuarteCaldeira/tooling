@@ -7,10 +7,16 @@ import {
   SelectFilter,
   Tag,
 } from '@dcaldeira/design-system';
-import { ChevronRight } from 'lucide-react';
 import { itemTopics, normalize, portugueseDate } from '../lib/topics.js';
+import { ArrowUpRight, Bug, Chat, Check, Refresh } from './Icons.jsx';
 
-const FILTER_KEYS = ['notes-search', 'review-filter', 'discussion-filter', 'content-filter', 'topic-filter'];
+const FILTER_KEYS = [
+  'notes-search',
+  'review-filter',
+  'discussion-filter',
+  'content-filter',
+  'topic-filter',
+];
 const DEFAULTS = {
   'notes-search': '',
   'review-filter': 'all',
@@ -36,11 +42,11 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
   const state = review.stateOf(context);
   const [feedback, setFeedback] = useState('');
   const [pending, setPending] = useState(false);
-  const { text, technical, areaLabel } = context;
+  const { text, technical, areaLabel, reported } = context;
   const split = text.indexOf(': ');
   const repeated =
     split > 0 && areaLabel && normalize(text.slice(0, split)) === normalize(areaLabel);
-  const tags = itemTopics(text, technical).filter((topic) => topic.kind !== 'area');
+  const tags = reported ? [] : itemTopics(text, technical).filter((topic) => topic.kind !== 'area');
 
   async function toggleValidation() {
     setPending(true);
@@ -74,11 +80,13 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
             text
           )}
         </span>
-        <ChevronRight className="item-arrow" size={20} aria-hidden="true" />
       </button>
       <div className="item-meta">
-        {tags.length ? (
+        {tags.length || reported ? (
           <div className="item-topics">
+            {reported ? (
+              <span className="comment-kind comment-kind--issue">Problema</span>
+            ) : null}
             {tags.map((topic) => (
               <button
                 key={topic.id}
@@ -88,13 +96,13 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
                 aria-pressed={activeTopic === topic.id}
                 onClick={() => onTopic(topic.id)}
               >
-                <Tag size="sm">{`${topic.emoji} ${topic.label}`}</Tag>
+                <Tag size="sm">{topic.label}</Tag>
               </button>
             ))}
           </div>
         ) : null}
         <div className="item-actions">
-          {technical ? null : (
+          {technical || reported ? null : (
             <Button
               variant="secondary"
               size="sm"
@@ -103,13 +111,24 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
               disabled={pending || !review.isLoaded(context.repository)}
               onClick={toggleValidation}
             >
-              {state.validated ? '✓ Validado' : '○ Por validar'}
+              {state.validated ? (
+                <>
+                  <Check /> Validado
+                </>
+              ) : (
+                'Validar'
+              )}
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={() => onOpen(context)}>
+            <Chat />
             {state.count
-              ? `💬 ${state.count} · ${state.closed ? 'Resolvida' : 'Em aberto'}`
-              : '💬 Comentar'}
+              ? `${state.count} · ${state.closed ? 'Resolvida' : 'Em aberto'}`
+              : reported
+                ? state.closed
+                  ? 'Resolvido'
+                  : 'Em aberto'
+                : 'Comentar'}
           </Button>
         </div>
       </div>
@@ -122,7 +141,7 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
   );
 }
 
-function AreaGroups({ items, technical, groupKey, release, app, review, ui, onOpen, onTopic, topic }) {
+function AreaGroups({ items, technical, release, app, review, onOpen, onTopic, topic }) {
   const groups = new Map();
   for (const item of items) {
     const area = itemTopics(item.text, technical).find((entry) => entry.kind === 'area') ?? {
@@ -138,7 +157,6 @@ function AreaGroups({ items, technical, groupKey, release, app, review, ui, onOp
       (a.area.id === 'geral') - (b.area.id === 'geral') ||
       a.area.label.localeCompare(b.area.label, 'pt-PT'),
   );
-  const loaded = review.isLoaded(app.repository);
   const context = (item, areaLabel) => ({
     repository: app.repository,
     version: release.version,
@@ -148,50 +166,26 @@ function AreaGroups({ items, technical, groupKey, release, app, review, ui, onOp
     technical,
     areaLabel,
   });
-  const entries = ordered.map(({ area, items: group }) => {
-    const id = `${groupKey}/area/${area.id}`;
-    const checked = technical
-      ? 0
-      : group.filter((item) => review.stateOf(context(item)).validated).length;
-    const done = !technical && loaded && checked === group.length;
-    return {
-      id,
-      open: ui.expanded[id] ?? (ui.filtering || ordered.length === 1 || !done),
-      header: (
-        <span className="area-heading">
-          <span aria-hidden="true">{area.emoji}</span>
-          <span className="area-title">{area.label}</span>
-          <Badge
-            variant={done ? 'success' : 'neutral'}
-            size="sm"
-            text={technical || !loaded ? `${group.length}` : `${checked}/${group.length} validadas`}
+  return ordered.map(({ area, items: group }) => (
+    <section className="release-area" key={area.id} aria-label={area.label}>
+      <header className="release-area-heading">
+        <h3>{area.label}</h3>
+        <span>{group.length === 1 ? '1 alteração' : `${group.length} alterações`}</span>
+      </header>
+      <ul className="change-list" lang={release.language ?? 'pt-PT'}>
+        {group.map((item) => (
+          <ChangeItem
+            key={item.id}
+            context={context(item, area.label)}
+            review={review}
+            onOpen={onOpen}
+            onTopic={onTopic}
+            activeTopic={topic}
           />
-        </span>
-      ),
-      content: (
-        <ul className="change-list" lang={release.language ?? 'pt-PT'}>
-          {group.map((item) => (
-            <ChangeItem
-              key={item.id}
-              context={context(item, area.label)}
-              review={review}
-              onOpen={onOpen}
-              onTopic={onTopic}
-              activeTopic={topic}
-            />
-          ))}
-        </ul>
-      ),
-    };
-  });
-  return (
-    <Accordion
-      type="multiple"
-      items={entries.map(({ id, header, content }) => ({ id, header, content }))}
-      value={entries.filter((entry) => entry.open).map((entry) => entry.id)}
-      onChange={(value) => ui.setOpen(entries.map((entry) => entry.id), [value].flat())}
-    />
-  );
+        ))}
+      </ul>
+    </section>
+  ));
 }
 
 export function ReleaseHub({ apps, app, review, onOpen }) {
@@ -204,7 +198,11 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
   const repository = app?.repository;
   const loaded = review.isLoaded(repository);
   const search = normalize(filters['notes-search'].trim());
-  const { 'review-filter': filter, 'discussion-filter': conversation, 'content-filter': content } = filters;
+  const {
+    'review-filter': filter,
+    'discussion-filter': conversation,
+    'content-filter': content,
+  } = filters;
   const topic = filters['topic-filter'];
 
   // Changing app resets paging, filters and open state, like a fresh page.
@@ -272,7 +270,8 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     conversation === 'all' ||
     (loaded && state.count > 0 && (conversation === 'open' ? !state.closed : state.closed));
   const itemMatches = (release, item, technical = false) => {
-    if (technical && filter !== 'all') return false;
+    if ((technical || item.reported) && filter !== 'all') return false;
+    if (item.reported && topic !== 'all') return false;
     const entries = itemTopics(item.text, technical);
     if (topic !== 'all' && !entries.some((entry) => entry.id === topic)) return false;
     const state = review.stateOf(context(release, item.id, item.text));
@@ -288,6 +287,12 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
   };
   const matches = all
     .map((release) => {
+      const reported =
+        content === 'technical'
+          ? []
+          : review
+              .reportedItemsOf(repository, release.version)
+              .filter((item) => itemMatches(release, item));
       const items =
         content === 'technical'
           ? []
@@ -315,12 +320,13 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         release,
         items,
         technical,
-        visible: items.length || technical.length || releaseMatch || emptyMatch,
+        reported,
+        visible: items.length || technical.length || reported.length || releaseMatch || emptyMatch,
       };
     })
     .filter((entry) => entry.visible);
   const resultCount = matches.reduce(
-    (count, entry) => count + entry.items.length + entry.technical.length,
+    (count, entry) => count + entry.items.length + entry.technical.length + entry.reported.length,
     0,
   );
   const shown = matches.slice(0, limit);
@@ -328,15 +334,21 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
   const releaseId = (release) => `${repository}/${release.version}`;
   const entryOpen = (entry) => {
     const product = entry.release.items ?? [];
-    const checked = product.filter((item) =>
-      review.stateOf(context(entry.release, item.id, item.text)).validated,
+    const checked = product.filter(
+      (item) => review.stateOf(context(entry.release, item.id, item.text)).validated,
     ).length;
     const fully = loaded && product.length > 0 && checked === product.length;
     return {
       product,
       checked,
       fully,
-      open: expanded[releaseId(entry.release)] ?? (filtering || (!fully && product.length > 0)),
+      open:
+        expanded[releaseId(entry.release)] ??
+        (filtering ||
+          (!fully && product.length > 0) ||
+          entry.reported.some(
+            (item) => !review.stateOf(context(entry.release, item.id, item.text)).closed,
+          )),
     };
   };
   const states = shown.map((entry) => ({ entry, ...entryOpen(entry) }));
@@ -346,7 +358,6 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
       for (const id of ids) next[id] = openIds.includes(id);
       return next;
     });
-  const ui = { expanded, filtering, setOpen };
   const message =
     app?.status === 'unavailable'
       ? 'Não foi possível consultar esta aplicação.'
@@ -361,27 +372,35 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             : '';
 
   const accordionItems = states.map(({ entry, product, checked, fully }) => {
-    const { release, items, technical } = entry;
+    const { release, items, technical, reported } = entry;
     const key = releaseId(release);
     const technicalKey = `${key}/technical`;
     const technicalOpen =
-      expanded[technicalKey] ?? (content === 'technical' || conversation !== 'all' || Boolean(search));
-    const groupProps = { release, app, review, ui, onOpen, topic, onTopic: (id) => update('topic-filter', id) };
+      expanded[technicalKey] ??
+      (content === 'technical' || conversation !== 'all' || Boolean(search));
+    const groupProps = {
+      release,
+      app,
+      review,
+      onOpen,
+      topic,
+      onTopic: (id) => update('topic-filter', id),
+    };
     return {
       id: key,
       header: (
         <span className="release-heading">
           <span className="release-identity">
-            <span className="release-icon" aria-hidden="true">
-              {fully ? '✅' : '🚀'}
-            </span>
             <span className="release-version">{release.version}</span>
             {release === all[0] ? <Badge variant="success" size="sm" text="Mais recente" /> : null}
-            {release.prerelease ? <Badge variant="neutral" size="sm" text="Pré-lançamento" /> : null}
+            {release.prerelease ? (
+              <Badge variant="neutral" size="sm" text="Pré-lançamento" />
+            ) : null}
           </span>
           <span className="release-meta">
             <ReleaseDate value={release.releasedAt} />
             <span className={`release-review${fully ? ' complete' : ''}`}>
+              <i className="status-dot" aria-hidden="true" />
               {!product.length
                 ? 'Sem validação necessária'
                 : loaded
@@ -399,12 +418,31 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         <div className="release-body">
           {items.length ? (
             <div className="area-groups">
-              <AreaGroups items={items} technical={false} groupKey={key} {...groupProps} />
+              <AreaGroups items={items} technical={false} {...groupProps} />
             </div>
-          ) : !technical.length && !needsState ? (
+          ) : !technical.length && !reported.length && !needsState ? (
             <p className="source-note">
               {release.summaryContext ?? 'Esta versão não tem novidades de produto descritas.'}
             </p>
+          ) : null}
+          {reported.length ? (
+            <section className="area-groups release-area" aria-label="Problemas reportados">
+              <header className="release-area-heading">
+                <h3>Problemas reportados</h3>
+              </header>
+              <ul className="change-list">
+                {reported.map((item) => (
+                  <ChangeItem
+                    key={item.id}
+                    context={{ ...context(release, item.id, item.text), reported: true }}
+                    review={review}
+                    onOpen={onOpen}
+                    onTopic={(id) => update('topic-filter', id)}
+                    activeTopic={topic}
+                  />
+                ))}
+              </ul>
+            </section>
           ) : null}
           {technical.length ? (
             <Accordion
@@ -412,15 +450,14 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
               items={[
                 {
                   id: technicalKey,
-                  header: <span className="area-heading">{`🛠️ Detalhes técnicos · ${technical.length}`}</span>,
+                  header: (
+                    <span className="area-heading">
+                      Detalhes técnicos <span className="count">{technical.length}</span>
+                    </span>
+                  ),
                   content: (
                     <div className="area-groups">
-                      <AreaGroups
-                        items={technical}
-                        technical
-                        groupKey={technicalKey}
-                        {...groupProps}
-                      />
+                      <AreaGroups items={technical} technical {...groupProps} />
                     </div>
                   ),
                 },
@@ -436,17 +473,15 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
               onClick={() =>
                 onOpen({
                   ...context(release, 'release', 'Conversa sobre esta versão e novas descobertas'),
+                  report: true,
                 })
               }
             >
-              {(() => {
-                const count = review.stateOf(context(release, 'release', '')).count;
-                return count ? `🐛 Reportar bug (${count})` : '🐛 Reportar bug';
-              })()}
+              <Bug /> Reportar bug
             </Button>
             {githubUrl(release.url) ? (
               <a className="text-link" href={release.url}>
-                Ver no GitHub ↗
+                Ver no GitHub <ArrowUpRight />
               </a>
             ) : null}
           </div>
@@ -459,6 +494,32 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     <section id="release-notes" aria-labelledby="notes-title">
       <div className="notes-heading">
         <h2 id="notes-title">Histórico de versões</h2>
+        <div className="feed-toolbar">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setOpen(
+                states.map(({ entry }) => releaseId(entry.release)),
+                states.map(({ entry }) => releaseId(entry.release)),
+              )
+            }
+          >
+            Expandir tudo
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setOpen(
+                states.map(({ entry }) => releaseId(entry.release)),
+                [],
+              )
+            }
+          >
+            Recolher tudo
+          </Button>
+        </div>
       </div>
       <div className="filter-panel" role="group" aria-label="Filtrar alterações">
         <SearchFilter
@@ -475,7 +536,10 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             value={topics.some((entry) => entry.id === topic) ? topic : 'all'}
             options={[
               { value: 'all', label: 'Todos' },
-              ...topics.map((entry) => ({ value: entry.id, label: `${entry.emoji} ${entry.label}` })),
+              ...topics.map((entry) => ({
+                value: entry.id,
+                label: entry.label,
+              })),
             ]}
             onChange={(value) => update('topic-filter', value)}
           />
@@ -523,35 +587,15 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             </Button>
           ) : null}
           <Button variant="ghost" size="sm" onClick={() => review.refresh(repository)}>
-            ↻ Atualizar
+            <Refresh /> Atualizar
           </Button>
         </div>
-      </div>
-      <div className="feed-toolbar">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() =>
-            setOpen(
-              states.map(({ entry }) => releaseId(entry.release)),
-              states.map(({ entry }) => releaseId(entry.release)),
-            )
-          }
-        >
-          Expandir tudo
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setOpen(states.map(({ entry }) => releaseId(entry.release)), [])}
-        >
-          Recolher tudo
-        </Button>
       </div>
       <p id="notes-message" role="status" aria-live="polite">
         {message}
       </p>
       {accordionItems.length ? (
+        <div className="release-feed">
         <Accordion
           type="multiple"
           items={accordionItems}
@@ -563,14 +607,16 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             )
           }
         />
+        </div>
       ) : null}
       {matches.length > limit ? (
         <div className="load-more">
           <Button variant="pill" onClick={() => setLimit(limit + PAGE)}>
-            Mostrar versões anteriores ↓
+            Mostrar versões anteriores
           </Button>
         </div>
       ) : null}
     </section>
   );
 }
+

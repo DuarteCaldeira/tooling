@@ -2,8 +2,6 @@ name: Refresh app dashboard
 on:
   repository_dispatch:
     types: [app-released]
-  schedule:
-    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,14 +14,5 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Request a Vercel deployment
-        env:
-          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
-        run: node dashboard/refresh.mjs
+      - name: Report automatic runtime refresh
+        run: echo "Release data refreshes at runtime with a 60-second cache. No deployment is needed." >> "$GITHUB_STEP_SUMMARY"

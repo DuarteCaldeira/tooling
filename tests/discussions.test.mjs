@@ -1,9 +1,58 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { createDiscussionService, createHandler } from '../dashboard/server/discussions.mjs';
+import {
+  createBlobStore,
+  createDiscussionService,
+  createHandler,
+} from '../dashboard/server/discussions.mjs';
 import { changelogSections, technicalNotes, itemId } from '../dashboard/release-items.mjs';
 import { portugueseDate, itemTopics } from '../dashboard/src/lib/topics.js';
+
+test('blob reads reuse unchanged ETags and invalidate on edits, external updates and deletions', async () => {
+  let body = { body: 'Original' };
+  let reads = 0;
+  let fail = false;
+  const gate = Promise.withResolvers();
+  const store = createBlobStore({
+    async get() {
+      reads++;
+      await gate.promise;
+      if (fail) throw new Error('Read failed');
+      return body ? { statusCode: 200, stream: Response.json(body).body } : null;
+    },
+    async put(_path, text) {
+      body = JSON.parse(text);
+    },
+    async del() {
+      body = null;
+    },
+    async list() {
+      return { blobs: [] };
+    },
+  });
+  const first = store.get('comment', 'etag-1');
+  const duplicate = store.get('comment', 'etag-1');
+  assert.equal(reads, 1);
+  gate.resolve();
+  assert.deepEqual(await first, await duplicate);
+  await store.get('comment', 'etag-1');
+  assert.equal(reads, 1);
+  body = { body: 'Edited elsewhere' };
+  assert.equal((await store.get('comment', 'etag-2')).body, 'Edited elsewhere');
+  assert.equal(reads, 2);
+  await store.set('comment', { body: 'Edited here' });
+  assert.equal((await store.get('comment', 'etag-2')).body, 'Edited here');
+  await store.get('comment');
+  assert.equal(reads, 4);
+  await store.remove(['comment']);
+  assert.equal(await store.get('comment', 'etag-2'), null);
+  fail = true;
+  await assert.rejects(store.get('comment', 'etag-3'), /Read failed/);
+  fail = false;
+  body = { body: 'Recovered' };
+  assert.equal((await store.get('comment', 'etag-3')).body, 'Recovered');
+});
 
 test('topic tags identify product areas and cross-cutting concerns without changing item IDs', () => {
   const text = 'Exames: importar relatórios fica mais rápido e com mais contraste.';
@@ -36,7 +85,7 @@ test('every change gets a tag besides its area, falling back to a reusable chang
   assert.ok(kinds('Texto qualquer sem tema').length >= 1);
 });
 
-test('technical changes do not accept validation and participant IDs distinguish identical names', async () => {
+test('technical changes reject validation and comments use display names without browser identity', async () => {
   const { service, input } = fixture();
   await assert.rejects(
     service.setState({
@@ -57,15 +106,11 @@ test('technical changes do not accept validation and participant IDs distinguish
     'two',
   );
   assert.equal(first.author, second.author);
-  assert.notEqual(first.participantId, second.participantId);
-  await assert.rejects(
-    service.post({ ...input, participantId: 'not-an-id' }),
-    (error) => error.status === 400,
-  );
-  await assert.rejects(
-    service.post({ ...input, requestId: first.id, participantId: second.participantId }),
-    (error) => error.status === 409,
-  );
+  assert.notEqual(first.id, second.id);
+  assert.equal('participantId' in first, false);
+  assert.equal('participantId' in second, false);
+  const retry = await service.post({ ...input, requestId: first.id, participantId: randomUUID() });
+  assert.equal(retry.id, first.id);
 });
 
 test('Portuguese dates include release time and follow Lisbon daylight saving time', () => {
@@ -122,6 +167,12 @@ test('validation and resolved conversations are shared, reversible and scoped to
 function fixture() {
   const data = new Map();
   const store = {
+    async set(path, value) {
+      data.set(path, structuredClone(value));
+    },
+    async remove(paths) {
+      for (const path of paths) data.delete(path);
+    },
     async create(path, value) {
       if (data.has(path)) return false;
       data.set(path, structuredClone(value));
@@ -134,7 +185,11 @@ function fixture() {
       return {
         blobs: [...data.keys()]
           .filter((path) => path.startsWith(prefix))
-          .map((pathname) => ({ pathname, uploadedAt: data.get(pathname).createdAt })),
+          .map((pathname) => ({
+            pathname,
+            url: pathname,
+            uploadedAt: data.get(pathname).createdAt,
+          })),
         hasMore: false,
       };
     },
@@ -160,6 +215,46 @@ function fixture() {
   };
   return { data, store, manifest, service, input };
 }
+
+test('reported bugs persist in the selected version with independent discussion and review state', async () => {
+  const { service, input, store, manifest } = fixture();
+  const report = { ...input, version: 'v2.0.0', requestId: randomUUID() };
+  const [first, retry] = await Promise.all([service.report(report), service.report(report)]);
+  assert.equal(first.item.id, retry.item.id);
+  assert.equal(first.item.kind, 'issue');
+  const other = createDiscussionService({ store, manifest });
+  const shared = await other.summary(input.repository);
+  assert.equal(shared.reportedItems['v1.0.0'].length, 0);
+  assert.equal(shared.reportedItems['v2.0.0'].length, 1);
+  assert.equal(shared.reportedItems['v2.0.0'][0].text, input.body);
+  const context = { ...input, version: 'v2.0.0', item: first.item.id };
+  await other.post({ ...context, body: 'Reproduzido na mesma versão' });
+  assert.equal((await service.list(context)).comments[0].body, 'Reproduzido na mesma versão');
+  await assert.rejects(service.list({ ...context, version: 'v1.0.0' }), (e) => e.status === 404);
+  await assert.rejects(
+    service.list({ ...context, item: 'reported-' + randomUUID() }),
+    (e) => e.status === 404,
+  );
+  await other.setState({ ...context, field: 'closed', value: true, requestId: randomUUID() });
+  assert.equal(
+    (await service.summary(input.repository)).states['v2.0.0'][first.item.id].closed,
+    true,
+  );
+  await assert.rejects(
+    other.setState({ ...context, field: 'validated', value: true, requestId: randomUUID() }),
+    (e) => e.status === 400,
+  );
+  await assert.rejects(
+    service.report({ ...report, body: 'Different report' }),
+    (e) => e.status === 409,
+  );
+  await assert.rejects(service.report({ ...report, version: 'v3.0.0' }), (e) => e.status === 404);
+  await assert.rejects(
+    service.report({ ...report, requestId: '../escape' }),
+    (e) => e.status === 400,
+  );
+  await assert.rejects(service.report({ ...report, body: ' ' }), (e) => e.status === 400);
+});
 
 test('shared release/item comments remain separate and survive a new service instance', async () => {
   const { store, manifest, service, input } = fixture();
@@ -207,14 +302,22 @@ test('unknown apps, releases and item IDs cannot write to storage', async () => 
 
 test('rate limit is shared across service instances and does not discard saved comments', async () => {
   const { service, input, store, manifest } = fixture();
+  const create = store.create;
+  let slotWrites = 0;
+  store.create = async (path, value) => {
+    if (path.startsWith('rate-limits/')) slotWrites++;
+    return create(path, value);
+  };
   for (let index = 0; index < 10; index++)
     await service.post({ ...input, body: `Message ${index}` }, 'same-client');
+  assert.equal(slotWrites, 10);
   const second = createDiscussionService({
     store,
     manifest,
     now: () => new Date('2026-11-15T00:00:00Z'),
   });
   await assert.rejects(second.post(input, 'same-client'), (error) => error.status === 429);
+  assert.equal(slotWrites, 10);
   assert.equal((await service.list(input)).comments.length, 10);
 });
 
@@ -291,4 +394,40 @@ test('changelog versions and technical notes are split without inventing product
   assert.deepEqual(technicalNotes(sections['1.0.0']), ['Bump library']);
   assert.equal(itemId('A change'), itemId('A change'));
   assert.notEqual(itemId('A change'), itemId('A change', 'technical'));
+});
+
+test('comments can be edited and deleted persistently without changing their identity or other threads', async () => {
+  const { service, store, manifest, input } = fixture();
+  const original = await service.post(input);
+  const context = { ...input, id: original.id };
+  const handler = createHandler(async () => service);
+  const mutate = (action, extra = {}) =>
+    handler(
+      new Request('https://hub.test/api/discussions', {
+        method: 'POST',
+        headers: { origin: 'https://hub.test', 'content-type': 'application/json' },
+        body: JSON.stringify({ ...context, action, ...extra }),
+      }),
+    );
+  assert.equal((await mutate('edit', { body: '  Corrected finding  ' })).status, 200);
+  const other = createDiscussionService({ store, manifest });
+  const updated = (await other.list(input)).comments[0];
+  assert.equal(updated.body, 'Corrected finding');
+  assert.equal(updated.id, original.id);
+  assert.equal(updated.author, original.author);
+  assert.equal('participantId' in updated, false);
+  assert.equal(updated.createdAt, original.createdAt);
+  assert.ok(updated.updatedAt);
+  assert.equal((await mutate('edit', { body: ' ' })).status, 400);
+  assert.equal((await mutate('edit', { body: 'x'.repeat(4001) })).status, 400);
+  assert.equal((await mutate('edit', { item: 'release', body: 'Wrong thread' })).status, 404);
+  assert.equal((await mutate('delete', { item: '../../outside' })).status, 404);
+  await service.post({ ...input, item: 'release', requestId: original.id });
+  assert.equal((await mutate('delete')).status, 200);
+  assert.equal((await other.list(input)).total, 0);
+  assert.equal((await other.summary(input.repository)).summary[input.version][input.item], 0);
+  assert.equal((await other.list({ ...input, item: 'release' })).total, 1);
+  assert.equal((await mutate('delete')).status, 200);
+  assert.equal((await mutate('edit', { body: 'Missing comment' })).status, 404);
+  assert.equal((await mutate('delete', { id: '../escape' })).status, 400);
 });

@@ -37,4 +37,7 @@ jobs:
       - name: Check rendered accessibility
         if: runner.os == 'Linux'
         run: npm run test:browser
+      - name: Check runtime release updates
+        if: runner.os == 'Linux'
+        run: npm run test:dashboard:runtime
       - run: npm run pack:tooling
