@@ -307,9 +307,55 @@ test(
         });
       await scan();
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).click();
+      const selectedRelease = page.locator('.release-body').nth(1);
+      await selectedRelease.getByRole('button', { name: /Reportar bug/ }).click();
+      const bugDialog = page.getByRole('dialog');
+      await bugDialog.getByRole('heading', { name: '🐛 Reportar bug', exact: true }).waitFor();
+      assert.match(await bugDialog.locator('.drawer-version').textContent(), /Saudinha · v1.20.0/);
+      assert.equal(await bugDialog.locator('#comment-kind').textContent(), 'Problema');
+      await bugDialog
+        .getByRole('textbox', { name: 'Mensagem', exact: true })
+        .fill('O botão de guardar não responde');
+      await bugDialog.getByRole('button', { name: 'Adicionar à versão', exact: true }).click();
+      await bugDialog.getByRole('heading', { name: '💬 Conversa', exact: true }).waitFor();
+      assert.match(
+        await bugDialog.locator('.conversation-quote').textContent(),
+        /guardar não responde/,
+      );
+      await bugDialog.getByRole('button', { name: 'Fechar', exact: true }).click();
+      await selectedRelease.getByRole('region', { name: 'Problemas reportados' }).waitFor();
+      assert.equal(
+        await page
+          .locator('.release-body')
+          .first()
+          .getByRole('region', { name: 'Problemas reportados' })
+          .count(),
+        0,
+      );
+      await page.reload();
+      await page
+        .getByRole('button', {
+          name: 'Abrir conversa: O botão de guardar não responde',
+          exact: true,
+        })
+        .waitFor();
+      const report = (await service.summary('owner/app')).reportedItems['v1.20.0'][0];
+      const linked = await context.newPage();
+      await linked.goto(
+        'https://tooling.test/?app=owner%2Fapp&release=v1.20.0&item=' + report.id + '#discussion',
+      );
+      await linked.getByRole('dialog').waitFor();
+      assert.match(await linked.locator('.drawer-version').textContent(), /v1.20.0/);
+      assert.match(
+        await linked.locator('.conversation-quote').textContent(),
+        /guardar não responde/,
+      );
+      await linked.close();
       assert.deepEqual(errors, []);
     } finally {
       await browser.close();
     }
   },
 );
+

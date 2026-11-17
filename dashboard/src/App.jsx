@@ -10,6 +10,7 @@ import {
 } from '@dcaldeira/design-system';
 import { ConversationDrawer } from './components/ConversationDrawer.jsx';
 import { ReleaseDate, ReleaseHub } from './components/ReleaseHub.jsx';
+import { api } from './lib/api.js';
 import { portugueseDate } from './lib/topics.js';
 import { usePolling, useReview } from './hooks.js';
 
@@ -437,9 +438,16 @@ export function App() {
         const app = apps.find((entry) => entry.repository === params.get('app'));
         const release = app?.releases.find((entry) => entry.version === params.get('release'));
         const item = params.get('item');
-        const entry = [...(release?.items ?? []), ...(release?.technicalItems ?? [])].find(
+        let entry = [...(release?.items ?? []), ...(release?.technicalItems ?? [])].find(
           (candidate) => candidate.id === item,
         );
+        if (!entry && release && item?.startsWith('reported-')) {
+          const shared = await api({ repository: app.repository, view: 'summary' });
+          if (cancelled) return;
+          entry = shared.reportedItems?.[release.version]?.find(
+            (candidate) => candidate.id === item,
+          );
+        }
         if (release && (item === 'release' || entry))
           setConversation({
             repository: app.repository,
@@ -448,6 +456,7 @@ export function App() {
             appName: app.name,
             text: entry?.text ?? 'Conversa sobre esta versão e novas descobertas',
             technical: Boolean(entry?.id?.startsWith('technical-')),
+            reported: Boolean(entry?.reported),
           });
       } catch {
         if (!cancelled) setFailed(true);
@@ -550,8 +559,19 @@ export function App() {
         context={conversation}
         onClose={() => setConversation(null)}
         review={review}
+        onReported={(item) =>
+          setConversation({
+            repository: item.repository,
+            version: item.version,
+            item: item.id,
+            text: item.text,
+            appName: conversation.appName,
+            reported: true,
+          })
+        }
         drafts={drafts}
       />
     </>
   );
 }
+

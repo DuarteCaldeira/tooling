@@ -57,7 +57,7 @@ function Section({ title, aside, children, className = '' }) {
   );
 }
 
-export function ConversationDrawer({ context, onClose, review, drafts }) {
+export function ConversationDrawer({ context, onClose, review, drafts, onReported }) {
   const open = Boolean(context);
   const contentRef = useRef(null);
   useConversationOverlay(open, contentRef);
@@ -81,7 +81,8 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
 
   const state = context ? review.stateOf(context) : { closed: false, validated: false };
   const isRelease = context?.item === 'release';
-  const canValidate = Boolean(context) && !isRelease && !context.technical;
+  const isReport = Boolean(context?.report);
+  const canValidate = Boolean(context) && !isRelease && !context.technical && !context.reported;
 
   const load = useCallback(
     async ({ earlier = false, quiet = false, from = cursor } = {}) => {
@@ -130,7 +131,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
   );
 
   // Open / switch conversation: reset, restore the draft, load comments.
-  const key = context ? itemKey(context) : null;
+  const key = context ? `${itemKey(context)}${isReport ? '/report' : ''}` : null;
   useEffect(() => {
     generation.current++;
     setComments([]);
@@ -145,8 +146,8 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
     const draft = drafts.current.get(key);
     request.current = draft?.request ?? null;
     setBody(draft?.body ?? '');
-    setKind(draft?.kind ?? 'comment');
-    load({ from: null });
+    setKind(draft?.kind ?? (isReport ? 'issue' : 'comment'));
+    if (!isReport) load({ from: null });
     return () => {
       drafts.current.set(key, {
         body: latest.current.body,
@@ -163,7 +164,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
       review.refresh(context.repository);
     },
     15000,
-    open && !busy,
+    open && !busy && !isReport,
   );
 
   const shareUrl = useMemo(() => {
@@ -211,6 +212,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
       author: author.trim(),
       body: body.trim(),
       kind,
+      ...(isReport ? { action: 'report' } : {}),
     };
     const signature = JSON.stringify(value);
     if (request.current?.signature !== signature)
@@ -221,6 +223,16 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
     try {
       const result = await api({}, { ...value, requestId: request.current.id });
       drafts.current.delete(key);
+      if (isReport) {
+        if (current === generation.current) {
+          setBody('');
+          request.current = null;
+          latest.current = { ...latest.current, body: '' };
+          onReported(result.item);
+        }
+        review.refresh(context.repository, { force: true });
+        return;
+      }
       if (current === generation.current) {
         setComments((existing) => [
           ...existing.filter((comment) => comment.id !== result.comment.id),
@@ -284,189 +296,210 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
     <Drawer
       isOpen={open}
       onClose={onClose}
-      title={isRelease ? '🐛 Reportar bug' : '💬 Conversa'}
+      title={isReport ? '🐛 Reportar bug' : '💬 Conversa'}
       subtitle={context ? `${context.appName} · ${context.version}` : undefined}
       closeLabel="Fechar"
       size="lg"
     >
       {context ? (
         <div className="conversation" ref={contentRef}>
-          <Section title={isRelease ? 'Versão' : 'Alteração'} className="drawer-context">
-            {isRelease ? null : <TopicTags text={context.text} technical={context.technical} />}
-            <blockquote className="conversation-quote">{context.text}</blockquote>
-          </Section>
-
-          <Section title="Ações" className="drawer-actions">
-            <div className="action-list">
-              {canValidate ? (
-                <ToggleSwitch
-                  id="conversation-validated"
-                  label="Validada"
-                  helperText="Confirma que esta novidade está correta."
-                  checked={state.validated}
-                  disabled={busy || !review.isLoaded(context.repository)}
-                  onChange={(event) =>
-                    change(
-                      'validated',
-                      event.target.checked,
-                      event.target.checked ? 'Marcada como validada' : 'Validação removida',
-                    )
-                  }
-                />
-              ) : null}
-              <ToggleSwitch
-                id="conversation-resolved"
-                label="Conversa resolvida"
-                helperText="Marca esta conversa como tratada. Pode reabri-la quando quiser."
-                checked={state.closed}
-                disabled={busy || !review.isLoaded(context.repository)}
-                onChange={(event) =>
-                  change(
-                    'closed',
-                    event.target.checked,
-                    event.target.checked ? 'Conversa resolvida' : 'Conversa reaberta',
-                  )
-                }
-              />
-            </div>
-            <div className="action-buttons">
-              <Button variant="secondary" size="sm" onClick={copyLink}>
-                Copiar ligação
-              </Button>
-              <Button variant="secondary" size="sm" disabled={busy} onClick={() => load()}>
-                Atualizar comentários
-              </Button>
-            </div>
-            <p className="drawer-notice" role="status" aria-live="polite">
-              {notice}
+          <Section title="Versão" className="drawer-version">
+            <p className="conversation-version">
+              <strong>
+                {context.appName} · {context.version}
+              </strong>
             </p>
           </Section>
+          {!isReport ? (
+            <>
+              <Section
+                title={isRelease ? 'Conversa da versão' : 'Alteração'}
+                className="drawer-context"
+              >
+                {isRelease ? null : <TopicTags text={context.text} technical={context.technical} />}
+                <blockquote className="conversation-quote">{context.text}</blockquote>
+              </Section>
 
-          <Section
-            title="Comentários"
-            aside={<Badge variant="neutral" size="sm" text={`${sorted.length}`} />}
-          >
-            <p className="drawer-status" role="status" aria-live="polite">
-              {status}
-            </p>
-            {sorted.length ? (
-              <ol className="comment-list">
-                {sorted.map((comment) => {
-                  return (
-                    <li
-                      key={comment.id}
-                      className={`comment${comment.author === 'QAren' ? ' comment-qa' : ''}`}
-                    >
-                      <header className="comment-heading">
-                        <div className="comment-author-line">
-                          <strong className="comment-author">{comment.author}</strong>
-                          <CommentKind kind={comment.kind} />
-                        </div>
-                        <time dateTime={comment.createdAt}>
-                          {portugueseDate(comment.createdAt)}
-                        </time>
-                      </header>
-                      {edit?.id === comment.id ? (
-                        <form
-                          className="comment-editor"
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            mutateComment(comment, 'edit');
-                          }}
+              <Section title="Ações" className="drawer-actions">
+                <div className="action-list">
+                  {canValidate ? (
+                    <ToggleSwitch
+                      id="conversation-validated"
+                      label="Validada"
+                      helperText="Confirma que esta novidade está correta."
+                      checked={state.validated}
+                      disabled={busy || !review.isLoaded(context.repository)}
+                      onChange={(event) =>
+                        change(
+                          'validated',
+                          event.target.checked,
+                          event.target.checked ? 'Marcada como validada' : 'Validação removida',
+                        )
+                      }
+                    />
+                  ) : null}
+                  <ToggleSwitch
+                    id="conversation-resolved"
+                    label="Conversa resolvida"
+                    helperText="Marca esta conversa como tratada. Pode reabri-la quando quiser."
+                    checked={state.closed}
+                    disabled={busy || !review.isLoaded(context.repository)}
+                    onChange={(event) =>
+                      change(
+                        'closed',
+                        event.target.checked,
+                        event.target.checked ? 'Conversa resolvida' : 'Conversa reaberta',
+                      )
+                    }
+                  />
+                </div>
+                <div className="action-buttons">
+                  <Button variant="secondary" size="sm" onClick={copyLink}>
+                    Copiar ligação
+                  </Button>
+                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => load()}>
+                    Atualizar comentários
+                  </Button>
+                </div>
+                <p className="drawer-notice" role="status" aria-live="polite">
+                  {notice}
+                </p>
+              </Section>
+
+              <Section
+                title="Comentários"
+                aside={<Badge variant="neutral" size="sm" text={`${sorted.length}`} />}
+              >
+                <p className="drawer-status" role="status" aria-live="polite">
+                  {status}
+                </p>
+                {sorted.length ? (
+                  <ol className="comment-list">
+                    {sorted.map((comment) => {
+                      return (
+                        <li
+                          key={comment.id}
+                          className={`comment${comment.author === 'QAren' ? ' comment-qa' : ''}`}
                         >
-                          <Textarea
-                            id={`comment-edit-${comment.id}`}
-                            label="Editar mensagem"
-                            value={edit.body}
-                            onChange={(event) =>
-                              setEdit({ id: comment.id, body: event.target.value })
-                            }
-                            required
-                            maxLength={4000}
-                            rows={4}
-                          />
-                          <div className="action-buttons">
-                            <Button type="submit" size="sm" disabled={busy || !edit.body.trim()}>
-                              Guardar
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() => setEdit(null)}
+                          <header className="comment-heading">
+                            <div className="comment-author-line">
+                              <strong className="comment-author">{comment.author}</strong>
+                              <CommentKind kind={comment.kind} />
+                            </div>
+                            <time dateTime={comment.createdAt}>
+                              {portugueseDate(comment.createdAt)}
+                            </time>
+                          </header>
+                          {edit?.id === comment.id ? (
+                            <form
+                              className="comment-editor"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                mutateComment(comment, 'edit');
+                              }}
                             >
-                              Cancelar
-                            </Button>
-                          </div>
-                        </form>
-                      ) : (
-                        <p className="comment-body">{comment.body}</p>
-                      )}
-                      {comment.updatedAt ? <span className="comment-edited">Editado</span> : null}
-                      {deleting === comment.id ? (
-                        <div className="comment-editor">
-                          <p>Eliminar este comentário?</p>
-                          <div className="action-buttons">
-                            <Button
-                              size="sm"
-                              disabled={busy}
-                              onClick={() => mutateComment(comment, 'delete')}
-                            >
-                              Confirmar eliminação
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() => setDeleting(null)}
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
-                        </div>
-                      ) : edit?.id === comment.id ? null : (
-                        <div className="comment-actions">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => {
-                              setEdit({ id: comment.id, body: comment.body });
-                              setDeleting(null);
-                            }}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => {
-                              setDeleting(comment.id);
-                              setEdit(null);
-                            }}
-                            className="comment-delete"
-                          >
-                            Eliminar
-                          </Button>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            ) : status ? null : (
-              <p className="drawer-empty">Ainda não há comentários. Comece a conversa abaixo.</p>
-            )}
-            {cursor ? (
-              <Button variant="ghost" size="sm" onClick={() => load({ earlier: true })}>
-                Carregar comentários anteriores
-              </Button>
-            ) : null}
-          </Section>
-
-          <Section title="Novo comentário" className="drawer-form">
+                              <Textarea
+                                id={`comment-edit-${comment.id}`}
+                                label="Editar mensagem"
+                                value={edit.body}
+                                onChange={(event) =>
+                                  setEdit({ id: comment.id, body: event.target.value })
+                                }
+                                required
+                                maxLength={4000}
+                                rows={4}
+                              />
+                              <div className="action-buttons">
+                                <Button
+                                  type="submit"
+                                  size="sm"
+                                  disabled={busy || !edit.body.trim()}
+                                >
+                                  Guardar
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() => setEdit(null)}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </form>
+                          ) : (
+                            <p className="comment-body">{comment.body}</p>
+                          )}
+                          {comment.updatedAt ? (
+                            <span className="comment-edited">Editado</span>
+                          ) : null}
+                          {deleting === comment.id ? (
+                            <div className="comment-editor">
+                              <p>Eliminar este comentário?</p>
+                              <div className="action-buttons">
+                                <Button
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => mutateComment(comment, 'delete')}
+                                >
+                                  Confirmar eliminação
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() => setDeleting(null)}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          ) : edit?.id === comment.id ? null : (
+                            <div className="comment-actions">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => {
+                                  setEdit({ id: comment.id, body: comment.body });
+                                  setDeleting(null);
+                                }}
+                              >
+                                Editar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => {
+                                  setDeleting(comment.id);
+                                  setEdit(null);
+                                }}
+                                className="comment-delete"
+                              >
+                                Eliminar
+                              </Button>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                ) : status ? null : (
+                  <p className="drawer-empty">
+                    Ainda não há comentários. Comece a conversa abaixo.
+                  </p>
+                )}
+                {cursor ? (
+                  <Button variant="ghost" size="sm" onClick={() => load({ earlier: true })}>
+                    Carregar comentários anteriores
+                  </Button>
+                ) : null}
+              </Section>
+            </>
+          ) : null}
+          <Section title={isReport ? 'Novo problema' : 'Novo comentário'} className="drawer-form">
             <form className="comment-form" onSubmit={submit} aria-busy={busy}>
               <Select
                 id="comment-author"
@@ -494,8 +527,9 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
                 placeholder="O que aconteceu? O que esperava? Se for um problema, indique os passos para o reproduzir."
               />
               <Button type="submit" variant="primary" isLoading={busy}>
-                Enviar comentário
+                {isReport ? 'Adicionar à versão' : 'Enviar comentário'}
               </Button>
+              {isReport && status ? <p role="status">{status}</p> : null}
             </form>
           </Section>
         </div>
@@ -503,3 +537,4 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
     </Drawer>
   ) : null;
 }
+

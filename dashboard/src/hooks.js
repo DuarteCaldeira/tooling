@@ -8,6 +8,7 @@ export function useReview() {
   const [summaries, setSummaries] = useState({});
   const [states, setStates] = useState({});
   const [errors, setErrors] = useState({});
+  const [reportedItems, setReportedItems] = useState({});
 
   const requests = useRef(new Map());
   const refresh = useCallback((repository, { force = false } = {}) => {
@@ -18,6 +19,10 @@ export function useReview() {
         if (requests.current.get(repository) !== request) return true;
         setSummaries((current) => ({ ...current, [repository]: result.summary ?? EMPTY }));
         setStates((current) => ({ ...current, [repository]: result.states ?? EMPTY }));
+        setReportedItems((current) => ({
+          ...current,
+          [repository]: result.reportedItems ?? EMPTY,
+        }));
         setErrors((current) => ({ ...current, [repository]: false }));
         return true;
       })
@@ -80,6 +85,7 @@ export function useReview() {
   return {
     refresh,
     stateOf,
+    reportedItemsOf: (repository, version) => reportedItems[repository]?.[version] ?? [],
     setField,
     isLoaded: (repository) => repository in summaries,
     hasError: (repository) => Boolean(errors[repository]),
