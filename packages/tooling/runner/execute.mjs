@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { inside } from './config.mjs';
 import { matches } from './graph.mjs';
@@ -227,6 +227,18 @@ export async function execute(
         ? '1'
         : '',
     };
+    // Full-profile runs of change-scoped checks still get the selected files, as a list file
+    // (a command line could overflow on large diffs). `--all` runs leave it unset.
+    if (
+      (check.kind ?? check.id) === 'duplication' &&
+      Array.isArray(selectedFiles) &&
+      !files.length
+    ) {
+      const list = join(root, '.tooling/state', `${check.id}-changed.txt`);
+      mkdirSync(dirname(list), { recursive: true });
+      writeFileSync(list, selectedFiles.join('\n'));
+      env.TOOLING_CHANGED_FILES = list;
+    }
     if ((check.kind ?? check.id) === 'unit' && process.env.TOOLING_REPORT_DIR)
       env.TOOLING_UNIT_OUTPUT_DIR = join(process.env.TOOLING_REPORT_DIR, `${check.id}-results`);
     if (['e2e', 'visual'].includes(check.kind ?? check.id) && process.env.TOOLING_REPORT_DIR) {

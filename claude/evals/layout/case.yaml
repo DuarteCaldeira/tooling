@@ -1,0 +1,17 @@
+schema_version: '1'
+name: layout
+description: 'New pages reuse the app shell and Stack instead of new layout CSS.'
+context:
+  add_dirs: [fixture]
+execution:
+  max_turns: 10
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). Plan a new Settings page with a title, a Save button on the right of the title, and three sections stacked vertically. Show the JSX you would write for its layout. Do not write files.'
+graders:
+  - type: tool_used
+    name: skill-loaded
+    tool: Skill
+    input_match: 'react-conventions'
+  - type: llm
+    name: reuses-stack-and-shell
+    criteria: 'The page renders inside the existing AppShell (does not re-create header or page padding), and builds its layout with nested Stack components using direction/gap/justify/align props instead of new wrapper divs with flex or gap CSS in a SCSS module.'

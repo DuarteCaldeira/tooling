@@ -152,6 +152,12 @@ export const builtins = {
     resources: ['browser'],
     platforms: ['linux'],
   }),
+  duplication: check(script('duplication'), ['app', 'styles'], {
+    profiles: all,
+    devCommand: script('duplication'),
+    devFiles: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.mjs', '**/*.scss', '**/*.css'],
+    tools: ['jscpd'],
+  }),
 };
 
 const optIn = {
@@ -159,6 +165,7 @@ const optIn = {
   architecture: 'architecture',
   'dependency-consistency': 'dependencyConsistency',
   a11y: 'a11y',
+  duplication: 'duplication',
 };
 
 export function plan(config, { files = 'all', profile = 'ci', only = [], skip = [] } = {}) {

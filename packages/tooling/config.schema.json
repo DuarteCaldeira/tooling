@@ -255,7 +255,8 @@
                   "architecture",
                   "a11y",
                   "dependency-consistency",
-                  "sass"
+                  "sass",
+                  "duplication"
                 ]
               }
             }
@@ -332,7 +333,19 @@
             },
             "palette": {
               "type": "boolean"
+            },
+            "layoutCss": {
+              "type": "boolean",
+              "description": "Report flex layout (display:flex, gap, justify-content, align-items …) in *.module.scss: use the layout primitive (Stack)."
             }
+          }
+        },
+        "layoutPaths": {
+          "type": "array",
+          "description": "Globs of shared layout components exempt from layoutCss.",
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "colourTokenPaths": {
@@ -879,6 +892,43 @@
           "minimum": 0
         }
       }
+    },
+    "duplication": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Opt-in copy/paste detection with jscpd. By default only clones touching the changed files fail, in every profile.",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "minTokens": {
+          "type": "integer",
+          "minimum": 10
+        },
+        "scope": {
+          "enum": [
+            "changed",
+            "all"
+          ],
+          "description": "changed (default): only clones touching changed files fail; all: every clone fails."
+        },
+        "ignore": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "repoStandard": {
+      "type": "boolean",
+      "description": "Doctor checks the shared repo standard: AGENTS.md shape, CLAUDE.md, .claude/settings.json enabling core@dcaldeira, no .ai kit or ai-memory."
     },
     "sass": {
       "type": "object",

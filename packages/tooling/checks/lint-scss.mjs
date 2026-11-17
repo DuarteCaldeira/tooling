@@ -18,6 +18,10 @@ const BEM =
 const rookie = options.preset === 'rookie';
 const rules = { bem: rookie, componentName: rookie, palette: rookie, ...options.rules };
 const COLOUR_FREE = /[/\\](_palette|themes)[/\\]/;
+// Flex layout a `Stack`-style primitive already expresses. Grid stays allowed (areas, templates).
+const LAYOUT_PROPS =
+  /^(display|gap|row-gap|column-gap|flex-direction|flex-wrap|justify-content|align-items)$/;
+const LAYOUT_VALUE = (prop, value) => prop !== 'display' || /^\s*(inline-)?flex\s*$/.test(value);
 const MAX_DEPTH = options.maxDepth ?? 3;
 const CONTROL = new Set(['for', 'each', 'while', 'if', 'else']);
 const MAX_SPECIFICITY = options.maxSpecificity ?? [0, 4, 2];
@@ -133,6 +137,10 @@ const lintFile = (file, fix) => {
           .replace(/(?<!^)(?=[A-Z])/g, '-')
           .toLowerCase()
       : null;
+  const layoutChecked =
+    rules.layoutCss &&
+    /\.module\.scss$/.test(file) &&
+    !(options.layoutPaths ?? []).some((pattern) => matches(relative(repo, file), pattern));
   const disabled = new Map();
   root.walkComments((c) => {
     const m = /lint-scss-disable-next-line\s+([\w-]+)/.exec(c.text);
@@ -246,6 +254,12 @@ const lintFile = (file, fix) => {
 
       if (node.type === 'decl') {
         const value = stripValue(node.value);
+        if (layoutChecked && LAYOUT_PROPS.test(node.prop) && LAYOUT_VALUE(node.prop, value))
+          report(
+            node,
+            'layout-css',
+            `${node.prop}: ${node.value} in a component module: use the layout primitive (Stack) props, or move it to a shared layout component listed in styles.layoutPaths`,
+          );
         if (!colourFree) {
           if (
             /#[0-9a-fA-F]{3,8}\b/.test(value) &&

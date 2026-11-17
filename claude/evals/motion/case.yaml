@@ -1,0 +1,17 @@
+schema_version: '1'
+name: motion
+description: 'The core:design-motion-principles skill triggers for animation work.'
+context:
+  add_dirs: [fixture]
+execution:
+  max_turns: 10
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). The Drawer component in src/components/Drawer opens instantly. Describe how you would animate it opening and closing. Do not write files.'
+graders:
+  - type: tool_used
+    name: skill-loaded
+    tool: Skill
+    input_match: 'design-motion-principles'
+  - type: llm
+    name: purposeful-motion
+    criteria: 'The answer animates transform/opacity (not layout properties), uses a short duration and an ease-out style curve for entering, handles exit, and respects prefers-reduced-motion.'

@@ -76,6 +76,13 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - name: Check repo standard
+        env:
+          CONFIG: ${{ inputs.config-path }}
+        run: |
+          if node -e "process.exit(JSON.parse(require('fs').readFileSync(process.env.CONFIG, 'utf8')).repoStandard === true ? 0 : 1)"; then
+            node .tooling/source/packages/tooling/runner/cli.mjs doctor --repo-standard
+          fi
       - name: Plan the entire PR diff
         env:
           BASE: ${{ needs.route.outputs.base }}

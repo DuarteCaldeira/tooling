@@ -1,0 +1,6 @@
+{
+  "name": "legacy",
+  "devDependencies": {
+    "vite": "8.0.0"
+  }
+}
