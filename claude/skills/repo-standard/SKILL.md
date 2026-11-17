@@ -84,7 +84,7 @@ Every repo:
 }
 ```
 
-Repos with a frontend (React, Vite, Next or Expo in any workspace) also add:
+Repos with a frontend (React, React Native, Vite, Next or Expo in the root, a workspace, any top-level folder, `apps/*` or `packages/*`) also add:
 
 ```json
 {

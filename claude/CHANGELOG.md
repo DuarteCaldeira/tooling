@@ -2,6 +2,11 @@
 
 Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
 
+## 0.1.1
+
+- Frontend-only rules (layout primitive, render/effects, i18n, design and motion skills, test queries) move to a `Frontend` section that is injected only when the repo depends on React, React Native, Expo, Vite or Next. Other repos get about a third less session context.
+- Stack detection scans every top-level folder with a `package.json` (plus workspaces, `apps/*`, `packages/*`), so apps in folders like `dashboard/` are found. `tooling doctor --repo-standard` uses the same rule, so the plugin and the doctor agree on which repos are frontend repos.
+
 ## 0.1.0
 
 - Core rules injected at session start and into every subagent, with the detected stack (vite, expo, next, supabase) and the skills to load.

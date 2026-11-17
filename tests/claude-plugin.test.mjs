@@ -99,7 +99,12 @@ test('stack detection reads workspace packages', () => {
   put(expo, 'package.json', { workspaces: ['apps/*', 'packages/*'] });
   put(expo, 'apps/health/package.json', { dependencies: { expo: '55' } });
   put(expo, 'tooling.config.json', {});
-  assert.deepEqual(detectStack(expo), { js: true, stacks: ['expo'], tooling: true });
+  assert.deepEqual(detectStack(expo), {
+    js: true,
+    stacks: ['expo'],
+    frontend: true,
+    tooling: true,
+  });
 
   const full = temp();
   put(full, 'package.json', { workspaces: ['frontend', 'backend', 'shared'] });
@@ -119,7 +124,20 @@ test('session start injects rules and stack in JS repos and nothing elsewhere', 
   assert.match(context, /Core rules/);
   assert.match(context, /Detected stack: vite/);
   assert.match(context, /core:react-conventions/);
+  assert.match(context, /\*\*Frontend\*\*/);
+  assert.doesNotMatch(context, /<!--/);
   assert.equal(hook('session-start.mjs', { cwd: temp() }).stdout, '');
+});
+
+test('session start leaves frontend rules out of non-frontend repos', () => {
+  const root = temp();
+  put(root, 'package.json', { devDependencies: { typescript: '6' } });
+  const context = JSON.parse(hook('session-start.mjs', { cwd: root }).stdout).hookSpecificOutput
+    .additionalContext;
+  assert.match(context, /\*\*Code\*\*/);
+  assert.match(context, /\*\*Tests\*\*/);
+  assert.doesNotMatch(context, /Frontend|ui-ux-pro-max|Stack|<!--/);
+  assert.doesNotMatch(context, /\n{3,}/);
 });
 
 test('stop check skips re-entry, clean trees and unchanged trees', () => {
@@ -285,6 +303,26 @@ test('UI plugins are required only in repos with a frontend', () => {
   const messages = repoStandardFindings(backend).map((f) => f.message);
   assert.ok(messages.some((m) => m.endsWith('must enable taste-skill@taste-skill')));
   assert.ok(!messages.some((m) => m.includes('caveman')));
+});
+
+test('plugin and doctor agree on which repos have a frontend', () => {
+  const cases = [
+    [{}, {}],
+    [{ 'dashboard/package.json': { dependencies: { react: '19' } } }, {}],
+    [{ 'web/package.json': { devDependencies: { vite: '8' } } }, {}],
+    [{ 'apps/mobile/package.json': { dependencies: { expo: '55' } } }, {}],
+    [{}, { peerDependencies: { react: '19' } }],
+    [{ 'api/package.json': { dependencies: { hono: '4' } } }, {}],
+    [{ 'node_modules/react/package.json': { dependencies: { react: '19' } } }, {}],
+  ];
+  const expected = [false, true, true, true, true, false, false];
+  cases.forEach(([files, rootManifest], index) => {
+    const root = temp();
+    put(root, 'package.json', rootManifest);
+    for (const [path, manifest] of Object.entries(files)) put(root, path, manifest);
+    assert.equal(detectStack(root).frontend, expected[index], `plugin, case ${index}`);
+    assert.equal(hasFrontend(root), expected[index], `doctor, case ${index}`);
+  });
 });
 
 test('doctor runs the repo standard only when opted in', () => {

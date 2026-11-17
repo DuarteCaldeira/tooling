@@ -2,8 +2,9 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { listDirs, readJSON } from './shared.mjs';
 
-const FALLBACK_DIRS = ['frontend', 'backend', 'shared', 'app', 'web', 'mobile'];
+// Keep in sync with `hasFrontend` in packages/tooling/runner/repo-standard.mjs (a test compares them).
 const FALLBACK_GLOBS = ['apps', 'packages'];
+const FRONTEND_DEPS = ['react', 'react-native', 'expo', 'vite', 'next'];
 
 function workspaceDirs(root, manifest) {
   const patterns = Array.isArray(manifest?.workspaces)
@@ -15,7 +16,7 @@ function workspaceDirs(root, manifest) {
       for (const dir of listDirs(join(root, pattern.slice(0, -2)))) dirs.add(dir);
     else dirs.add(join(root, pattern));
   }
-  for (const name of FALLBACK_DIRS) dirs.add(join(root, name));
+  for (const dir of listDirs(root)) dirs.add(dir);
   for (const name of FALLBACK_GLOBS) for (const dir of listDirs(join(root, name))) dirs.add(dir);
   return [...dirs].filter((dir) => existsSync(join(dir, 'package.json')));
 }
@@ -55,6 +56,7 @@ export function detectStack(root) {
   return {
     js: true,
     stacks,
+    frontend: FRONTEND_DEPS.some((name) => deps.has(name)),
     tooling: existsSync(join(root, 'tooling.config.json')),
   };
 }

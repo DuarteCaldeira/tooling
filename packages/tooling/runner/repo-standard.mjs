@@ -25,22 +25,31 @@ const subdirs = (path) => {
   }
 };
 
-/** True when the root or any workspace package depends on a frontend framework. */
+/**
+ * True when the root, a workspace, any top-level folder or `apps/*`/`packages/*` depends on a
+ * frontend framework. Keep in sync with `detectStack` in claude/hooks/lib/detect.mjs (a test
+ * compares them).
+ */
 export function hasFrontend(root) {
   const rootManifest = json(join(root, 'package.json'));
   const patterns = [
     ...(Array.isArray(rootManifest?.workspaces)
       ? rootManifest.workspaces
       : (rootManifest?.workspaces?.packages ?? [])),
-    'frontend',
+    '*',
     'apps/*',
     'packages/*',
   ];
   const dirs = patterns.flatMap((pattern) =>
-    pattern.endsWith('/*') ? subdirs(join(root, pattern.slice(0, -2))) : [join(root, pattern)],
+    pattern.endsWith('*') ? subdirs(join(root, pattern.slice(0, -1))) : [join(root, pattern)],
   );
   return [rootManifest, ...dirs.map((dir) => json(join(dir, 'package.json')))].some((manifest) =>
-    FRONTEND_DEPS.some((dep) => manifest?.dependencies?.[dep] || manifest?.devDependencies?.[dep]),
+    FRONTEND_DEPS.some(
+      (dep) =>
+        manifest?.dependencies?.[dep] ||
+        manifest?.devDependencies?.[dep] ||
+        manifest?.peerDependencies?.[dep],
+    ),
   );
 }
 const exists = (path) => {

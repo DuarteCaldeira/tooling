@@ -15,7 +15,15 @@ const root = findUp(cwd, '.git') ?? findUp(cwd, 'package.json') ?? cwd;
 const detected = detectStack(root);
 if (!detected.js) process.exit(0);
 
-const rules = readFileSync(new URL('../core-rules.md', import.meta.url), 'utf8').trim();
+// Frontend-only rules sit between `<!-- frontend -->` markers; other repos don't pay for them.
+const source = readFileSync(new URL('../core-rules.md', import.meta.url), 'utf8');
+const rules = (
+  detected.frontend
+    ? source.replace(/^<!-- \/?frontend -->\r?\n/gm, '')
+    : source.replace(/<!-- frontend -->[\s\S]*?<!-- \/frontend -->/g, '')
+)
+  .replace(/(\r?\n){3,}/g, '\n\n')
+  .trim();
 const skills = [...new Set(detected.stacks.map((stack) => SKILLS[stack]).filter(Boolean))];
 const lines = [
   rules,

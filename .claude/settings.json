@@ -29,6 +29,7 @@
     "core@dcaldeira": true,
     "mattpocock-skills@mattpocock": true,
     "ui-ux-pro-max@ui-ux-pro-max-skill": true,
-    "taste-skill@taste-skill": true
+    "taste-skill@taste-skill": true,
+    "vercel@claude-plugins-official": true
   }
 }
