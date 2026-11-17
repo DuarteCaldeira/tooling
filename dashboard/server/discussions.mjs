@@ -87,7 +87,7 @@ export function createDiscussionService({
           expiresAt: time.getTime() + 120000,
         })
       )
-        return;
+        return slot;
     }
     throw new DiscussionError(429, 'Demasiados comentários. Aguarde um minuto e tente novamente');
   }
@@ -165,7 +165,9 @@ export function createDiscussionService({
           reports.push(
             ...(
               await Promise.all(
-                reportedBlobs.slice(start, start + 8).map((blob) => store.get(blob.pathname)),
+                reportedBlobs
+                  .slice(start, start + 8)
+                  .map((blob) => store.get(blob.pathname, blob.etag)),
               )
             ).filter(Boolean),
           );
@@ -241,13 +243,13 @@ export function createDiscussionService({
           new Date(b.uploadedAt) - new Date(a.uploadedAt) || b.pathname.localeCompare(a.pathname),
       );
       const comments = [];
-      for (let start = offset; start < Math.min(offset + 50, blobs.length); start += 8) {
+      for (let start = offset; start < Math.min(offset + 50, blobs.length); start += 16) {
         comments.push(
           ...(
             await Promise.all(
               blobs
-                .slice(start, Math.min(start + 8, offset + 50, blobs.length))
-                .map((blob) => store.get(blob.pathname)),
+                .slice(start, Math.min(start + 16, offset + 50, blobs.length))
+                .map((blob) => store.get(blob.pathname, blob.etag)),
             )
           ).filter(Boolean),
         );
@@ -280,7 +282,7 @@ export function createDiscussionService({
       }
       const time = now();
       const bucket = Math.floor(time.getTime() / 60000);
-      await rateLimit(client, time);
+      const slot = await rateLimit(client, time);
       const comment = {
         id,
         ...context,
@@ -294,7 +296,7 @@ export function createDiscussionService({
         if (saved?.author === author && saved?.body === body && saved?.kind === kind) return saved;
         throw new DiscussionError(409, 'Este pedido já foi utilizado');
       }
-      if (store.remove) {
+      if (slot === 0 && store.remove) {
         try {
           const prefix = `rate-limits/v1/${digest(client)}/`;
           const expired = (await metadata(prefix)).filter(
@@ -311,9 +313,21 @@ export function createDiscussionService({
 }
 
 export async function blobStore() {
-  const { put, get, list, del } = await import('@vercel/blob');
+  return createBlobStore(await import('@vercel/blob'));
+}
+
+export function createBlobStore({ put, get, list, del }) {
+  // Only reuse a body when fresh list metadata confirms that its version has not changed.
+  const bodies = new Map();
+  async function read(path) {
+    const file = await get(path, { access: 'private', useCache: false });
+    if (!file) return null;
+    if (file.statusCode !== 200) throw new Error('Private discussion read failed');
+    return new Response(file.stream).json();
+  }
   return {
     async set(path, value) {
+      bodies.delete(path);
       await put(path, JSON.stringify(value), {
         access: 'private',
         addRandomSuffix: false,
@@ -322,6 +336,7 @@ export async function blobStore() {
       });
     },
     async create(path, value) {
+      bodies.delete(path);
       try {
         await put(path, JSON.stringify(value), {
           access: 'private',
@@ -335,16 +350,28 @@ export async function blobStore() {
         throw error;
       }
     },
-    async get(path) {
-      const file = await get(path, { access: 'private', useCache: false });
-      if (!file) return null;
-      if (file.statusCode !== 200) throw new Error('Private discussion read failed');
-      return new Response(file.stream).json();
+    async get(path, version) {
+      if (!version) return read(path);
+      const stamp = String(version);
+      const cached = bodies.get(path);
+      if (cached?.version === stamp) return cached.value;
+      const entry = { version: stamp, value: read(path) };
+      bodies.set(path, entry);
+      if (bodies.size > 256) bodies.delete(bodies.keys().next().value);
+      try {
+        const value = await entry.value;
+        if (!value && bodies.get(path) === entry) bodies.delete(path);
+        return value;
+      } catch (error) {
+        if (bodies.get(path) === entry) bodies.delete(path);
+        throw error;
+      }
     },
     async list(prefix, cursor) {
       return list({ prefix, cursor, limit: 1000 });
     },
     async remove(urls) {
+      for (const path of urls) bodies.delete(path);
       await del(urls);
     },
   };

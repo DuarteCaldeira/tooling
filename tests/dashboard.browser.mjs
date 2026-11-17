@@ -237,7 +237,25 @@ test(
       await other.getByRole('button', { name: 'Atualizar comentários', exact: true }).click();
       await other.getByText('Descoberta corrigida', { exact: true }).waitFor();
       await comment.getByRole('button', { name: 'Eliminar', exact: true }).click();
-      await comment.getByRole('button', { name: 'Confirmar eliminação', exact: true }).click();
+      const confirmation = page.getByRole('dialog', { name: 'Eliminar comentário', exact: true });
+      await confirmation.waitFor();
+      await scan();
+      failWrites = true;
+      await confirmation.getByRole('button', { name: 'Eliminar comentário', exact: true }).click();
+      await confirmation.getByRole('alert').getByText('Falha temporária').waitFor();
+      assert.equal(
+        (
+          await service.list({
+            repository: 'owner/app',
+            version: 'v1.21.1',
+            item: itemId(texts[0]),
+          })
+        ).total,
+        1,
+      );
+      failWrites = false;
+      await confirmation.getByRole('button', { name: 'Eliminar comentário', exact: true }).click();
+      await confirmation.waitFor({ state: 'detached' });
       await dialog.getByText('Comentário eliminado', { exact: true }).waitFor();
       await other.getByRole('button', { name: 'Atualizar comentários', exact: true }).click();
       await other
@@ -358,4 +376,3 @@ test(
     }
   },
 );
-
