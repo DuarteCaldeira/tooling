@@ -250,6 +250,44 @@ test(
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       }
       await page.getByRole('button', { name: 'Abrir conversa: ' + texts[0], exact: true }).click();
+      const conversation = page.getByRole('dialog');
+      for (const [kind, message] of [
+        ['Pergunta', 'Como posso reproduzir este caso?'],
+        ['Problema', 'A data muda depois de guardar o registo.'],
+      ]) {
+        await select('comment-author', kind === 'Pergunta' ? 'DUveloper' : 'QAren');
+        await select('comment-kind', kind);
+        await conversation.getByRole('textbox', { name: /^Mensagem/ }).fill(message);
+        await conversation.getByRole('button', { name: 'Enviar comentário', exact: true }).click();
+        await conversation.getByText(message, { exact: true }).waitFor();
+      }
+      const question = conversation.locator('.comment-kind--question');
+      const issue = conversation.locator('.comment-kind--issue');
+      assert.match(await question.textContent(), /Pergunta/);
+      assert.match(await issue.textContent(), /Problema/);
+      assert.notEqual(
+        await question.evaluate((element) => getComputedStyle(element).color),
+        await issue.evaluate((element) => getComputedStyle(element).color),
+      );
+      assert.notEqual(
+        await question.evaluate((element) => getComputedStyle(element).backgroundColor),
+        await issue.evaluate((element) => getComputedStyle(element).backgroundColor),
+      );
+      assert.equal(await conversation.locator('.comment-actions').count(), 2);
+      assert.equal(
+        await conversation
+          .locator('.comment-actions')
+          .first()
+          .evaluate((element) => getComputedStyle(element).flexDirection),
+        'row',
+      );
+      assert.equal(await conversation.locator('.comment-qa').count(), 1);
+      assert.equal(await conversation.locator('.comment:not(.comment-qa)').count(), 1);
+      assert.equal(await conversation.getByText('Tu', { exact: true }).count(), 0);
+      if (process.env.TOOLING_DASHBOARD_SCREENSHOTS)
+        await conversation.locator('.comment-list').screenshot({
+          path: process.env.TOOLING_DASHBOARD_SCREENSHOTS + '/messages.png',
+        });
       await scan();
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       assert.deepEqual(errors, []);

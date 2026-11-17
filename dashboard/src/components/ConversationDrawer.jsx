@@ -18,6 +18,18 @@ const kinds = [
   { value: 'issue', label: 'Problema' },
 ];
 const kindLabels = { comment: 'Comentário', question: 'Pergunta', issue: 'Problema' };
+function CommentKind({ kind }) {
+  if (!['question', 'issue'].includes(kind)) return null;
+  return (
+    <span className={`comment-kind comment-kind--${kind}`}>
+      <span className="comment-kind__symbol" aria-hidden="true">
+        {kind === 'issue' ? '!' : '?'}
+      </span>
+      {kindLabels[kind]}
+    </span>
+  );
+}
+
 const authors = ['QAren', 'DUveloper'].map((value) => ({ value, label: value }));
 
 export function TopicTags({ text, technical }) {
@@ -339,17 +351,15 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
                       key={comment.id}
                       className={`comment${comment.author === 'QAren' ? ' comment-qa' : ''}`}
                     >
-                      <div className="comment-heading">
-                        <strong>{comment.author}</strong>
-                        {comment.kind !== 'comment' ? (
-                          <span className="comment-kind">
-                            {kindLabels[comment.kind] ?? comment.kind}
-                          </span>
-                        ) : null}
+                      <header className="comment-heading">
+                        <div className="comment-author-line">
+                          <strong className="comment-author">{comment.author}</strong>
+                          <CommentKind kind={comment.kind} />
+                        </div>
                         <time dateTime={comment.createdAt}>
                           {portugueseDate(comment.createdAt)}
                         </time>
-                      </div>
+                      </header>
                       {edit?.id === comment.id ? (
                         <form
                           className="comment-editor"
@@ -385,7 +395,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
                           </div>
                         </form>
                       ) : (
-                        <p>{comment.body}</p>
+                        <p className="comment-body">{comment.body}</p>
                       )}
                       {comment.updatedAt ? <span className="comment-edited">Editado</span> : null}
                       {deleting === comment.id ? (
@@ -410,7 +420,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
                           </div>
                         </div>
                       ) : edit?.id === comment.id ? null : (
-                        <div className="action-buttons">
+                        <div className="comment-actions">
                           <Button
                             size="sm"
                             variant="ghost"
@@ -430,6 +440,7 @@ export function ConversationDrawer({ context, onClose, review, drafts }) {
                               setDeleting(comment.id);
                               setEdit(null);
                             }}
+                            className="comment-delete"
                           >
                             Eliminar
                           </Button>
