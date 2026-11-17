@@ -93,8 +93,19 @@ function Ticker({ apps }) {
 }
 
 function AppTabs({ apps, selected, onSelect }) {
+  const nav = useRef(null);
+  // Keep the chosen app visible in the scrolling strip (matters on phones).
+  useEffect(() => {
+    const tab = nav.current?.querySelector('[aria-pressed="true"]');
+    if (!tab || !nav.current) return;
+    const strip = nav.current;
+    strip.scrollTo({
+      left: tab.offsetLeft - (strip.clientWidth - tab.offsetWidth) / 2,
+      behavior: 'smooth',
+    });
+  }, [selected]);
   return (
-    <nav id="app-nav" className="app-tabs" aria-label="Escolher uma aplicação">
+    <nav ref={nav} id="app-nav" className="app-tabs" aria-label="Escolher uma aplicação">
       {apps.map((app, index) => (
         <button
           key={app.repository}
@@ -575,8 +586,8 @@ export function App() {
             </a>
           </div>
         </div>
-        {snapshot ? <AppTabs apps={apps} selected={selected} onSelect={setSelected} /> : null}
       </header>
+      {snapshot ? <AppTabs apps={apps} selected={selected} onSelect={setSelected} /> : null}
       <main className="workspace">
         <div className="main-area">
           <h1 className="visually-hidden">Novidades</h1>

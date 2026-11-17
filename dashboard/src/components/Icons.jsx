@@ -62,3 +62,15 @@ export const Mark = ({ size = 28 }) => (
     <circle cx="23.5" cy="22.5" r="2.6" fill="var(--accent)" />
   </svg>
 );
+
+export const Dot = (props) => (
+  <svg {...base} {...props}>
+    <circle cx="10" cy="10" r="2.5" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+export const Filter = (props) => (
+  <svg {...base} {...props}>
+    <path d="M3.5 5.5h13M6 10h8M8.5 14.5h3" />
+  </svg>
+);

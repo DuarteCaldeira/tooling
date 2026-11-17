@@ -8,7 +8,7 @@ import {
   Tag,
 } from '@dcaldeira/design-system';
 import { itemTopics, normalize, portugueseDate } from '../lib/topics.js';
-import { ArrowUpRight, Bug, Chat, Check, Refresh } from './Icons.jsx';
+import { ArrowUpRight, Bug, Chat, Check, Dot, Filter, Refresh } from './Icons.jsx';
 
 const FILTER_KEYS = [
   'notes-search',
@@ -60,76 +60,85 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
     }
   }
 
+  const status = reported
+    ? 'is-reported'
+    : technical
+      ? 'is-technical'
+      : state.validated
+        ? 'is-validated'
+        : 'is-pending';
   return (
-    <li className={`change-item${state.validated && !technical ? ' is-validated' : ''}`}>
-      <button
-        type="button"
-        className="item-trigger"
-        aria-label={`Abrir conversa: ${text}`}
-        onClick={() => onOpen(context)}
-      >
-        <span className="change-copy">
-          {repeated ? (
-            text.slice(split + 2)
-          ) : split > 0 && split < 45 ? (
-            <>
-              <strong>{text.slice(0, split + 1)}</strong>
-              {text.slice(split + 1)}
-            </>
-          ) : (
-            text
-          )}
-        </span>
-      </button>
-      <div className="item-meta">
-        {tags.length || reported ? (
-          <div className="item-topics">
-            {reported ? (
-              <span className="comment-kind comment-kind--issue">Problema</span>
-            ) : null}
-            {tags.map((topic) => (
-              <button
-                key={topic.id}
-                type="button"
-                className="tag-button"
-                aria-label={`Filtrar por ${topic.label}`}
-                aria-pressed={activeTopic === topic.id}
-                onClick={() => onTopic(topic.id)}
-              >
-                <Tag size="sm">{topic.label}</Tag>
-              </button>
-            ))}
-          </div>
-        ) : null}
-        <div className="item-actions">
-          {technical || reported ? null : (
-            <Button
-              variant="secondary"
-              size="sm"
-              aria-pressed={state.validated}
-              aria-label={(state.validated ? 'Retirar validação: ' : 'Validar: ') + text}
-              disabled={pending || !review.isLoaded(context.repository)}
-              onClick={toggleValidation}
-            >
-              {state.validated ? (
-                <>
-                  <Check /> Validado
-                </>
-              ) : (
-                'Validar'
-              )}
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={() => onOpen(context)}>
-            <Chat />
-            {state.count
-              ? `${state.count} · ${state.closed ? 'Resolvida' : 'Em aberto'}`
-              : reported
-                ? state.closed
-                  ? 'Resolvido'
-                  : 'Em aberto'
-                : 'Comentar'}
+    <li className={`change-item ${status}${state.count && !state.closed ? ' has-open' : ''}`}>
+      <span className="check-wrap">
+        {technical || reported ? (
+          <span className="item-bullet" aria-hidden="true">
+            {reported ? <Bug /> : <Dot />}
+          </span>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-pressed={state.validated}
+            aria-label={(state.validated ? 'Retirar validação: ' : 'Validar: ') + text}
+            disabled={pending || !review.isLoaded(context.repository)}
+            onClick={toggleValidation}
+          >
+            <Check />
           </Button>
+        )}
+      </span>
+      <div className="item-main">
+        <button
+          type="button"
+          className="item-trigger"
+          aria-label={`Abrir conversa: ${text}`}
+          onClick={() => onOpen(context)}
+        >
+          <span className="change-copy">
+            {repeated ? (
+              text.slice(split + 2)
+            ) : split > 0 && split < 45 ? (
+              <>
+                <strong>{text.slice(0, split + 1)}</strong>
+                {text.slice(split + 1)}
+              </>
+            ) : (
+              text
+            )}
+          </span>
+        </button>
+        <div className="item-meta">
+          {tags.length || reported ? (
+            <div className="item-topics">
+              {reported ? (
+                <span className="comment-kind comment-kind--issue">Problema</span>
+              ) : null}
+              {tags.map((topic) => (
+                <button
+                  key={topic.id}
+                  type="button"
+                  className="tag-button"
+                  aria-label={`Filtrar por ${topic.label}`}
+                  aria-pressed={activeTopic === topic.id}
+                  onClick={() => onTopic(topic.id)}
+                >
+                  <Tag size="sm">{topic.label}</Tag>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="item-actions">
+            <Button variant="ghost" size="sm" onClick={() => onOpen(context)}>
+              <Chat />
+              {state.count
+                ? `${state.count} · ${state.closed ? 'Resolvida' : 'Em aberto'}`
+                : reported
+                  ? state.closed
+                    ? 'Resolvido'
+                    : 'Em aberto'
+                  : 'Comentar'}
+            </Button>
+          </div>
         </div>
       </div>
       {feedback ? (
@@ -195,6 +204,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
   });
   const [limit, setLimit] = useState(PAGE);
   const [expanded, setExpanded] = useState({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const repository = app?.repository;
   const loaded = review.isLoaded(repository);
   const search = normalize(filters['notes-search'].trim());
@@ -529,7 +539,17 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
           value={filters['notes-search']}
           onChange={(value) => update('notes-search', value)}
         />
-        <div className="review-controls">
+        <Button
+          variant="secondary"
+          size="sm"
+          className="filters-toggle"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((value) => !value)}
+        >
+          <Filter /> Filtros
+          {filtering ? <span className="count">ativos</span> : null}
+        </Button>
+        <div className={`review-controls${filtersOpen ? ' is-open' : ''}`}>
           <SelectFilter
             id="topic-filter"
             label="Tema"
