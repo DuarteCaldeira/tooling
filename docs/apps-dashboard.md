@@ -61,6 +61,16 @@ Discussion validation uses the same runtime source, so newly discovered releases
 
 New releases, edited release bodies, deletions and released tooling versions need no deployment. Changing the app allowlist, reviewed summaries in `release-notes.json`, dashboard code or the design-system dependency still requires a deployment. Versions continue to represent published releases and the tooling dependency at each release commit, not unpublished changes on main.
 
+## API latency
+
+Functions run in Frankfurt (`fra1`), next to the private Blob store. This uses a single region. See the [function-region configuration](https://vercel.com/docs/functions/configuring-functions/region).
+
+Discussion requests validate known threads against the cached release manifest rather than waiting for a full GitHub collection. Shared snapshots are checked at most once per minute per function instance. A previously unknown release or item takes the normal refresh path before it can be accepted; no unlisted target bypasses manifest validation. The release endpoint still refreshes live GitHub data, with its existing outage fallback and retry backoff.
+
+Only the selected app loads and polls its review summary. Concurrent summary requests are coalesced; a refresh after a write supersedes earlier responses. Confirmed validation changes update immediately, while a summary refresh runs separately. Quiet comment polling does not overlap an in-flight read, and posting invalidates earlier reads so they cannot erase a newly saved comment.
+
+Rate limiting still uses atomic claims across function instances. Each post lists the current minute's occupied slots before claiming a free one, avoiding repeated failed uploads to earlier slots. The ten-comments-per-minute limit, request idempotency, and expired-slot cleanup remain in place.
+
 ## Deployment
 
 1. Import `DuarteCaldeira/tooling` into Vercel. Set **Root Directory** to `dashboard`, **Framework Preset** to **Other**, **Node.js** to **22.x**, and **Production Branch** to `main`.

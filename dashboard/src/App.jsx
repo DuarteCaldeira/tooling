@@ -11,7 +11,7 @@ import {
 import { ConversationDrawer } from './components/ConversationDrawer.jsx';
 import { ReleaseDate, ReleaseHub } from './components/ReleaseHub.jsx';
 import { portugueseDate } from './lib/topics.js';
-import { useReview } from './hooks.js';
+import { usePolling, useReview } from './hooks.js';
 
 const githubUrl = (url) =>
   typeof url === 'string' && url.startsWith('https://github.com/') ? url : undefined;
@@ -431,7 +431,6 @@ export function App() {
               apps[0]?.repository ??
               ''),
         );
-        for (const app of apps) review.refresh(app.repository);
         if (initialized) return;
         initialized = true;
         // A shared link opens the conversation it points at.
@@ -472,6 +471,12 @@ export function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (selected) review.refresh(selected);
+  }, [selected, review.refresh]);
+
+  usePolling(() => review.refresh(selected), 30_000, Boolean(selected));
 
   const apps = snapshot?.apps ?? [];
   const chooseApp = (repository) => {

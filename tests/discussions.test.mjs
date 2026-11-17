@@ -213,14 +213,22 @@ test('unknown apps, releases and item IDs cannot write to storage', async () => 
 
 test('rate limit is shared across service instances and does not discard saved comments', async () => {
   const { service, input, store, manifest } = fixture();
+  const create = store.create;
+  let slotWrites = 0;
+  store.create = async (path, value) => {
+    if (path.startsWith('rate-limits/')) slotWrites++;
+    return create(path, value);
+  };
   for (let index = 0; index < 10; index++)
     await service.post({ ...input, body: `Message ${index}` }, 'same-client');
+  assert.equal(slotWrites, 10);
   const second = createDiscussionService({
     store,
     manifest,
     now: () => new Date('2026-11-15T00:00:00Z'),
   });
   await assert.rejects(second.post(input, 'same-client'), (error) => error.status === 429);
+  assert.equal(slotWrites, 10);
   assert.equal((await service.list(input)).comments.length, 10);
 });
 
