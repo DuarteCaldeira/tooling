@@ -1,0 +1,92 @@
+name: Release tooling package
+on:
+  workflow_dispatch:
+  push:
+    branches: ['release/package-*']
+permissions:
+  contents: read
+concurrency:
+  group: tooling-package-release
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/package-')
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run pack:tooling
+      - name: Verify release version
+        id: version
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('packages/tooling/package.json', 'utf8'));
+          const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+          if (!/^\d+\.\d+\.\d+$/.test(pkg.version))
+            throw new Error('Expected a stable semantic package version');
+          if (lock.packages['packages/tooling'].version !== pkg.version)
+            throw new Error('Package manifest and lockfile versions differ');
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${pkg.version}\n`);
+          NODE
+  release:
+    needs: validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Create version tag and GitHub release
+        run: |
+          set -euo pipefail
+          tag="v$VERSION"
+          if existing=$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null); then
+            test "$existing" = "$GITHUB_SHA" || {
+              echo "Tag $tag already points at a different commit; refusing to move it."
+              exit 1
+            }
+          else
+            gh api --method POST "repos/$GH_REPO/git/refs" \
+              -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA"
+          fi
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --verify-tag --title "$tag" \
+              --notes-file packages/tooling/CHANGELOG.md
+          fi
+  publish:
+    needs: [validate, release]
+    runs-on: ubuntu-24.04
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm install --global npm@11.5.1
+      - run: npm ci --ignore-scripts
+      # Tags created with GITHUB_TOKEN do not trigger the separate tag-push workflow.
+      - run: npm publish -w packages/tooling --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
