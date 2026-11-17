@@ -7,10 +7,15 @@ import {
   SelectFilter,
   Tag,
 } from '@dcaldeira/design-system';
-import { ChevronRight } from 'lucide-react';
 import { itemTopics, normalize, portugueseDate } from '../lib/topics.js';
 
-const FILTER_KEYS = ['notes-search', 'review-filter', 'discussion-filter', 'content-filter', 'topic-filter'];
+const FILTER_KEYS = [
+  'notes-search',
+  'review-filter',
+  'discussion-filter',
+  'content-filter',
+  'topic-filter',
+];
 const DEFAULTS = {
   'notes-search': '',
   'review-filter': 'all',
@@ -74,7 +79,6 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
             text
           )}
         </span>
-        <ChevronRight className="item-arrow" size={20} aria-hidden="true" />
       </button>
       <div className="item-meta">
         {tags.length ? (
@@ -122,7 +126,7 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
   );
 }
 
-function AreaGroups({ items, technical, groupKey, release, app, review, ui, onOpen, onTopic, topic }) {
+function AreaGroups({ items, technical, release, app, review, onOpen, onTopic, topic }) {
   const groups = new Map();
   for (const item of items) {
     const area = itemTopics(item.text, technical).find((entry) => entry.kind === 'area') ?? {
@@ -138,7 +142,6 @@ function AreaGroups({ items, technical, groupKey, release, app, review, ui, onOp
       (a.area.id === 'geral') - (b.area.id === 'geral') ||
       a.area.label.localeCompare(b.area.label, 'pt-PT'),
   );
-  const loaded = review.isLoaded(app.repository);
   const context = (item, areaLabel) => ({
     repository: app.repository,
     version: release.version,
@@ -148,50 +151,26 @@ function AreaGroups({ items, technical, groupKey, release, app, review, ui, onOp
     technical,
     areaLabel,
   });
-  const entries = ordered.map(({ area, items: group }) => {
-    const id = `${groupKey}/area/${area.id}`;
-    const checked = technical
-      ? 0
-      : group.filter((item) => review.stateOf(context(item)).validated).length;
-    const done = !technical && loaded && checked === group.length;
-    return {
-      id,
-      open: ui.expanded[id] ?? (ui.filtering || ordered.length === 1 || !done),
-      header: (
-        <span className="area-heading">
-          <span aria-hidden="true">{area.emoji}</span>
-          <span className="area-title">{area.label}</span>
-          <Badge
-            variant={done ? 'success' : 'neutral'}
-            size="sm"
-            text={technical || !loaded ? `${group.length}` : `${checked}/${group.length} validadas`}
+  return ordered.map(({ area, items: group }) => (
+    <section className="release-area" key={area.id} aria-label={area.label}>
+      <header className="release-area-heading">
+        <h3>{area.label}</h3>
+        {group.length > 1 ? <span>{group.length} alterações</span> : null}
+      </header>
+      <ul className="change-list" lang={release.language ?? 'pt-PT'}>
+        {group.map((item) => (
+          <ChangeItem
+            key={item.id}
+            context={context(item, area.label)}
+            review={review}
+            onOpen={onOpen}
+            onTopic={onTopic}
+            activeTopic={topic}
           />
-        </span>
-      ),
-      content: (
-        <ul className="change-list" lang={release.language ?? 'pt-PT'}>
-          {group.map((item) => (
-            <ChangeItem
-              key={item.id}
-              context={context(item, area.label)}
-              review={review}
-              onOpen={onOpen}
-              onTopic={onTopic}
-              activeTopic={topic}
-            />
-          ))}
-        </ul>
-      ),
-    };
-  });
-  return (
-    <Accordion
-      type="multiple"
-      items={entries.map(({ id, header, content }) => ({ id, header, content }))}
-      value={entries.filter((entry) => entry.open).map((entry) => entry.id)}
-      onChange={(value) => ui.setOpen(entries.map((entry) => entry.id), [value].flat())}
-    />
-  );
+        ))}
+      </ul>
+    </section>
+  ));
 }
 
 export function ReleaseHub({ apps, app, review, onOpen }) {
@@ -204,7 +183,11 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
   const repository = app?.repository;
   const loaded = review.isLoaded(repository);
   const search = normalize(filters['notes-search'].trim());
-  const { 'review-filter': filter, 'discussion-filter': conversation, 'content-filter': content } = filters;
+  const {
+    'review-filter': filter,
+    'discussion-filter': conversation,
+    'content-filter': content,
+  } = filters;
   const topic = filters['topic-filter'];
 
   // Changing app resets paging, filters and open state, like a fresh page.
@@ -328,8 +311,8 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
   const releaseId = (release) => `${repository}/${release.version}`;
   const entryOpen = (entry) => {
     const product = entry.release.items ?? [];
-    const checked = product.filter((item) =>
-      review.stateOf(context(entry.release, item.id, item.text)).validated,
+    const checked = product.filter(
+      (item) => review.stateOf(context(entry.release, item.id, item.text)).validated,
     ).length;
     const fully = loaded && product.length > 0 && checked === product.length;
     return {
@@ -346,7 +329,6 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
       for (const id of ids) next[id] = openIds.includes(id);
       return next;
     });
-  const ui = { expanded, filtering, setOpen };
   const message =
     app?.status === 'unavailable'
       ? 'Não foi possível consultar esta aplicação.'
@@ -365,8 +347,16 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     const key = releaseId(release);
     const technicalKey = `${key}/technical`;
     const technicalOpen =
-      expanded[technicalKey] ?? (content === 'technical' || conversation !== 'all' || Boolean(search));
-    const groupProps = { release, app, review, ui, onOpen, topic, onTopic: (id) => update('topic-filter', id) };
+      expanded[technicalKey] ??
+      (content === 'technical' || conversation !== 'all' || Boolean(search));
+    const groupProps = {
+      release,
+      app,
+      review,
+      onOpen,
+      topic,
+      onTopic: (id) => update('topic-filter', id),
+    };
     return {
       id: key,
       header: (
@@ -377,7 +367,9 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             </span>
             <span className="release-version">{release.version}</span>
             {release === all[0] ? <Badge variant="success" size="sm" text="Mais recente" /> : null}
-            {release.prerelease ? <Badge variant="neutral" size="sm" text="Pré-lançamento" /> : null}
+            {release.prerelease ? (
+              <Badge variant="neutral" size="sm" text="Pré-lançamento" />
+            ) : null}
           </span>
           <span className="release-meta">
             <ReleaseDate value={release.releasedAt} />
@@ -399,7 +391,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         <div className="release-body">
           {items.length ? (
             <div className="area-groups">
-              <AreaGroups items={items} technical={false} groupKey={key} {...groupProps} />
+              <AreaGroups items={items} technical={false} {...groupProps} />
             </div>
           ) : !technical.length && !needsState ? (
             <p className="source-note">
@@ -412,15 +404,12 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
               items={[
                 {
                   id: technicalKey,
-                  header: <span className="area-heading">{`🛠️ Detalhes técnicos · ${technical.length}`}</span>,
+                  header: (
+                    <span className="area-heading">{`🛠️ Detalhes técnicos · ${technical.length}`}</span>
+                  ),
                   content: (
                     <div className="area-groups">
-                      <AreaGroups
-                        items={technical}
-                        technical
-                        groupKey={technicalKey}
-                        {...groupProps}
-                      />
+                      <AreaGroups items={technical} technical {...groupProps} />
                     </div>
                   ),
                 },
@@ -475,7 +464,10 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             value={topics.some((entry) => entry.id === topic) ? topic : 'all'}
             options={[
               { value: 'all', label: 'Todos' },
-              ...topics.map((entry) => ({ value: entry.id, label: `${entry.emoji} ${entry.label}` })),
+              ...topics.map((entry) => ({
+                value: entry.id,
+                label: `${entry.emoji} ${entry.label}`,
+              })),
             ]}
             onChange={(value) => update('topic-filter', value)}
           />
@@ -543,7 +535,12 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setOpen(states.map(({ entry }) => releaseId(entry.release)), [])}
+          onClick={() =>
+            setOpen(
+              states.map(({ entry }) => releaseId(entry.release)),
+              [],
+            )
+          }
         >
           Recolher tudo
         </Button>

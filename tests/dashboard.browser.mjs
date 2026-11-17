@@ -1,396 +1,251 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { extname } from 'node:path';
 import { chromium } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { itemId, discussionManifest } from '../dashboard/release-items.mjs';
 import { createDiscussionService, createHandler } from '../dashboard/server/discussions.mjs';
 
 test(
-  'release hub supports product reading, app selection, search, filters and accessible mobile layouts',
-  { timeout: 60000 },
+  'release hub supports filters, validation, shared comment editing and accessible responsive layouts',
+  { timeout: 90000 },
   async () => {
-    const source = new URL('../dashboard/', import.meta.url);
-    const config = JSON.parse(await readFile(new URL('apps.json', source), 'utf8'));
-    const notes = JSON.parse(await readFile(new URL('release-notes.json', source), 'utf8'));
+    const texts = [
+      'Análises: unidade dos Leucócitos corrigida e datas certas nos gráficos',
+      'Cópia de segurança: novo cartão para guardar numa pasta',
+      'Perfil: escolha do grupo sanguíneo mais simples.',
+    ];
+    const release = (version, items = texts) => ({
+      version,
+      releasedAt: '2026-11-04T13:11:13Z',
+      language: 'pt-PT',
+      source: 'edited',
+      url: 'https://github.com/owner/app/releases/tag/' + version,
+      items: items.map((text) => ({ id: itemId(text), text })),
+      technicalItems: [],
+      originalNotes: '<script>globalThis.injected = true</script>',
+    });
+    const technical = release('v1.0.0', []);
+    technical.technicalItems = [
+      { id: itemId('chore: update dependencies', 'technical'), text: 'chore: update dependencies' },
+    ];
     const fixture = {
       schemaVersion: 1,
       generatedAt: new Date().toISOString(),
-      defaultApp: config.defaultApp,
-      apps: config.apps.map((app) => ({
-        ...app,
-        status: app.name === 'Saudinha' || app.name === 'Rookie' ? 'released' : 'unreleased',
-        repositoryUrl: `https://github.com/${app.repository}`,
-        version: app.name === 'Saudinha' ? 'v1.21.1' : app.name === 'Rookie' ? 'v1.27.1' : null,
-        releasedAt:
-          app.name === 'Saudinha' || app.name === 'Rookie' ? '2026-11-04T13:11:13Z' : null,
-        tooling: { status: 'not-adopted', version: null },
-        releases: Object.entries(notes[app.repository] ?? {})
-          .sort(([a], [b]) => b.localeCompare(a, undefined, { numeric: true }))
-          .slice(0, 10)
-          .map(([version, note]) => ({
-            version: `v${version}`,
-            releasedAt: '2026-11-04T13:11:13Z',
-            notes: note.changes,
-            language: note.language,
-            source: 'edited',
-            originalNotes: '',
-            items: note.changes.map((text, index) => ({
-              id: note.itemIds?.[index] ?? itemId(text),
-              text,
-            })),
-            technicalItems: [],
-            url: `https://github.com/${app.repository}/releases/tag/v${version}`,
-          })),
-      })),
-    };
-    const saudinha = fixture.apps.find((app) => app.name === 'Saudinha');
-    saudinha.releases.push({
-      version: 'v1.0.0',
-      releasedAt: '2026-01-01T00:00:00Z',
-      notes: [],
-      items: [],
-      technicalItems: [
+      defaultApp: 'owner/app',
+      apps: [
         {
-          id: itemId('Dependências: bibliotecas atualizadas.', 'technical'),
-          text: 'Dependências: bibliotecas atualizadas.',
+          name: 'Saudinha',
+          repository: 'owner/app',
+          version: 'v1.21.1',
+          status: 'released',
+          emoji: '🩺',
+          releasedAt: '2026-11-04T13:11:13Z',
+          tooling: { status: 'not-adopted' },
+          releases: [
+            release('v1.21.1'),
+            ...Array.from({ length: 9 }, (_, i) =>
+              release('v1.' + (20 - i) + '.0', ['Consultas: novos lembretes antes da consulta']),
+            ),
+            technical,
+          ],
+        },
+        {
+          name: 'Billy',
+          repository: 'owner/billy',
+          version: null,
+          status: 'unreleased',
+          tooling: { status: 'not-adopted' },
+          releases: [],
         },
       ],
-      source: 'github',
-      originalNotes: '<script>globalThis.injected = true</script>',
-      url: 'https://github.com/DuarteCaldeira/saudinha-pnn/releases/tag/v1.0.0',
-    });
-    const files = { '/data.json': JSON.stringify(fixture) };
-    for (const name of [
-      'index.html',
-      'design-system.css',
-      'styles.css',
-      'discussions.css',
-      'app.js',
-      'discussions.js',
-    ])
-      files[`/${name}`] = await readFile(new URL(name, source), 'utf8');
-    const browser = await chromium.launch({
-      headless: true,
-      ...(process.env.TOOLING_BROWSER_CHANNEL
-        ? { channel: process.env.TOOLING_BROWSER_CHANNEL }
-        : {}),
-    });
-    try {
-      const context = await browser.newContext({ viewport: { width: 1440, height: 1050 } });
-      const page = await context.newPage();
-      const saved = new Map();
-      const store = {
-        async create(path, value) {
-          if (saved.has(path)) return false;
-          saved.set(path, value);
-          return true;
-        },
-        async get(path) {
-          return saved.get(path) ?? null;
-        },
-        async list(prefix) {
-          return {
-            blobs: [...saved.keys()]
-              .filter((path) => path.startsWith(prefix))
-              .map((pathname) => ({ pathname, uploadedAt: saved.get(pathname).createdAt })),
-            hasMore: false,
-          };
-        },
-      };
-      const handler = createHandler(async () =>
-        createDiscussionService({ store, manifest: discussionManifest(fixture) }),
-      );
-      const routeHandler = async (route) => {
-        const path = new URL(route.request().url()).pathname;
-        if (path === '/api/discussions') {
-          const original = route.request();
-          const response = await handler(
-            new Request(original.url(), {
-              method: original.method(),
-              headers: await original.allHeaders(),
-              ...(original.method() === 'POST' ? { body: original.postData() } : {}),
-            }),
-          );
-          await route.fulfill({
-            status: response.status,
-            headers: Object.fromEntries(response.headers),
-            body: await response.text(),
-          });
-          return;
-        }
-        const file = path === '/' ? '/index.html' : path;
-        await route.fulfill({
-          status: files[file] ? 200 : 404,
-          contentType: file.endsWith('.js')
-            ? 'application/javascript'
-            : file.endsWith('.css')
-              ? 'text/css'
-              : file.endsWith('.json')
-                ? 'application/json'
-                : 'text/html',
-          body: files[file] ?? 'Not found',
+    };
+    const saved = new Map();
+    const store = {
+      async create(path, value) {
+        if (saved.has(path)) return false;
+        saved.set(path, structuredClone(value));
+        return true;
+      },
+      async set(path, value) {
+        saved.set(path, structuredClone(value));
+      },
+      async remove(paths) {
+        for (const path of paths) saved.delete(path);
+      },
+      async get(path) {
+        return saved.get(path) ?? null;
+      },
+      async list(prefix) {
+        return {
+          blobs: [...saved.keys()]
+            .filter((p) => p.startsWith(prefix))
+            .map((pathname) => ({
+              pathname,
+              url: pathname,
+              uploadedAt: saved.get(pathname).createdAt,
+            })),
+          hasMore: false,
+        };
+      },
+    };
+    const service = createDiscussionService({ store, manifest: discussionManifest(fixture) });
+    const handler = createHandler(async () => service);
+    let failWrites = false;
+    const routeHandler = async (route) => {
+      const original = route.request();
+      const url = new URL(original.url());
+      if (url.pathname === '/api/releases') return route.fulfill({ json: fixture });
+      if (url.pathname === '/api/discussions') {
+        if (failWrites && original.method() === 'POST')
+          return route.fulfill({ status: 503, json: { error: 'Falha temporária' } });
+        const response = await handler(
+          new Request(original.url(), {
+            method: original.method(),
+            headers: await original.allHeaders(),
+            ...(original.method() === 'POST' ? { body: original.postData() } : {}),
+          }),
+        );
+        return route.fulfill({
+          status: response.status,
+          headers: Object.fromEntries(response.headers),
+          body: await response.text(),
         });
-      };
+      }
+      const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
+      return route.fulfill({
+        contentType: { '.js': 'application/javascript', '.css': 'text/css', '.html': 'text/html' }[
+          extname(file)
+        ],
+        body: await readFile(new URL('../dashboard/dist/' + file, import.meta.url)),
+      });
+    };
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const context = await browser.newContext({
+        viewport: { width: 1440, height: 1050 },
+        reducedMotion: 'reduce',
+      });
       await context.route('https://tooling.test/**', routeHandler);
+      const page = await context.newPage();
+      page.setDefaultTimeout(10000);
+      const errors = [];
+      page.on('pageerror', (error) => errors.push(error.message));
       await page.goto('https://tooling.test/');
-      await page.waitForSelector('.release-entry');
-      assert.equal(await page.locator('#total').textContent(), '6');
-      assert.equal(await page.locator('#release-app').inputValue(), saudinha.repository);
-      assert.equal(await page.locator('.release-entry').count(), 10);
-      assert.match(
-        await page.locator('.release-entry').first().textContent(),
-        /unidade dos Leucócitos/,
-      );
-      assert.equal(await page.locator('.change-list').first().getAttribute('lang'), 'pt-PT');
-      assert.equal(await page.locator('#release-app option').count(), 6);
-      assert.equal(await page.locator('.release-icon').first().textContent(), '🚀');
-      assert.equal(await page.locator('#selected-emoji').textContent(), '💚');
-      assert.ok(
-        !(await page
-          .locator('body')
-          .textContent()
-          .then((text) => /swipeit/i.test(text))),
-      );
+      await page.locator('.release-area').first().waitFor();
+      const select = async (id, name) => {
+        await page.locator('#' + id).click();
+        await page.getByRole('option', { name, exact: true }).click();
+      };
       const scan = async () => {
-        const report = await new AxeBuilder({ page })
+        const result = await new AxeBuilder({ page })
           .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
           .analyze();
         assert.deepEqual(
-          report.violations.map(({ id, nodes }) => ({
+          result.violations.map(({ id, nodes }) => ({
             id,
-            nodes: nodes.map((node) => node.target),
+            targets: nodes.map((node) => node.target),
           })),
           [],
         );
       };
-      assert.equal(await page.locator('#notes-context').count(), 0);
-      assert.equal(await page.locator('.interaction-hint').count(), 0);
-      assert.equal(await page.locator('#share-app').count(), 0);
-      await page.getByRole('button', { name: 'Filtrar por Dados', exact: true }).first().click();
-      assert.equal(await page.locator('#topic-filter').inputValue(), 'dados');
-      assert.match(page.url(), /topic-filter=dados/);
-      assert.equal(
-        await page.locator('.topic-tag[aria-pressed=true]').count(),
-        await page.locator('.change-item').count(),
-      );
-      await page.locator('#clear-filters').click();
-      await scan();
-      if (process.env.TOOLING_DASHBOARD_SCREENSHOTS) {
-        await mkdir(process.env.TOOLING_DASHBOARD_SCREENSHOTS, { recursive: true });
-        await page.screenshot({
-          path: join(process.env.TOOLING_DASHBOARD_SCREENSHOTS, 'dashboard-desktop.png'),
-        });
-      }
-      await page.locator('#load-more').click();
-      assert.equal(await page.locator('.release-entry').count(), 11);
-      assert.equal(
-        await page.locator('.release-entry').first().locator('.technical-notes').count(),
-        0,
-      );
-      assert.equal(await page.locator('.technical-notes').last().getAttribute('open'), null);
-      await page.locator('.release-entry').last().locator(':scope > summary').click();
-      await page.locator('.technical-notes').last().locator(':scope > summary').click();
-      assert.equal(await page.locator('.technical-list .validation-button').count(), 0);
-      assert.equal(await page.locator('.original-notes').count(), 0);
-      assert.equal(await page.getByText('Read original changelog').count(), 0);
-      assert.equal(await page.locator('html').getAttribute('lang'), 'pt-PT');
-      assert.equal(
+      assert.equal(await page.locator('.release-heading').count(), 10);
+      assert.equal(await page.locator('.release-area button[aria-expanded]').count(), 0);
+      assert.match(
         await page.locator('.release-heading time').first().textContent(),
-        '4 de novembro, 2026 13:11',
+        /4 de novembro, 2026 13:11/,
       );
-      assert.ok(
-        (await page
-          .locator('.change-copy')
-          .first()
-          .evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 16,
-      );
-      const originalTotal = await page.locator('.change-item').count();
-      await page.locator('.validation-button').first().click();
-      await page.locator('.validation-button[aria-pressed="true"]').waitFor();
-      await page.locator('#review-filter').selectOption('pending');
-      assert.equal(await page.locator('.validation-button[aria-pressed="true"]').count(), 0);
-      assert.ok((await page.locator('.change-item').count()) < originalTotal);
-      await page.locator('#review-filter').selectOption('all');
+      await scan();
+      await page.getByRole('button', { name: 'Mostrar versões anteriores', exact: false }).click();
+      assert.equal(await page.locator('.release-heading').count(), 11);
+      await select('content-filter', 'Só técnica');
+      assert.equal(await page.getByRole('button', { name: /^Validar:/ }).count(), 0);
+      await page.getByRole('button', { name: 'Expandir tudo', exact: true }).click();
+      await page.getByText(/Detalhes técnicos/).click();
+      assert.match(await page.locator('.change-copy').textContent(), /update dependencies/);
       assert.equal(await page.evaluate(() => globalThis.injected), undefined);
+      await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
+      await page.getByRole('button', { name: 'Filtrar por Dados', exact: true }).first().click();
+      assert.match(page.url(), /topic-filter=dados/);
+      assert.equal(await page.locator('.change-item').count(), 1);
+      await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
+      const validate = page.getByRole('button', { name: 'Validar: ' + texts[0], exact: true });
+      await validate.click();
       await page
-        .locator('.release-entry')
-        .first()
-        .locator('.change-list .item-trigger')
-        .first()
+        .getByRole('button', { name: 'Retirar validação: ' + texts[0], exact: true })
+        .waitFor();
+      await select('review-filter', 'Por validar');
+      assert.equal(await page.getByRole('button', { name: /^Retirar validação:/ }).count(), 0);
+      await select('review-filter', 'Todos');
+      await page.getByRole('button', { name: 'Abrir conversa: ' + texts[0], exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.waitFor();
+      assert.equal(await dialog.locator('#comment-author').textContent(), 'QAren');
+      await dialog.getByRole('textbox', { name: /^Mensagem/ }).fill('Uma descoberta partilhada');
+      await dialog.getByRole('button', { name: 'Enviar comentário', exact: true }).click();
+      await dialog.getByText('Comentário enviado', { exact: true }).waitFor();
+      assert.equal(await dialog.locator('.comment-mine').count(), 1);
+      await scan();
+      const secondContext = await browser.newContext();
+      await secondContext.route('https://tooling.test/**', routeHandler);
+      const other = await secondContext.newPage();
+      const link =
+        'https://tooling.test/?app=owner%2Fapp&release=v1.21.1&item=' +
+        itemId(texts[0]) +
+        '#discussion';
+      await other.goto(link);
+      await other.getByRole('dialog').locator('.comment').waitFor();
+      assert.equal(await other.locator('.comment-mine').count(), 0);
+      const comment = dialog.locator('.comment').first();
+      await comment.getByRole('button', { name: 'Editar', exact: true }).click();
+      await comment.getByRole('textbox', { name: 'Editar mensagem' }).fill('Descoberta corrigida');
+      failWrites = true;
+      await comment.getByRole('button', { name: 'Guardar', exact: true }).click();
+      await dialog.getByText('Falha temporária', { exact: true }).waitFor();
+      assert.equal(
+        await comment.getByRole('textbox', { name: 'Editar mensagem' }).inputValue(),
+        'Descoberta corrigida',
+      );
+      failWrites = false;
+      await comment.getByRole('button', { name: 'Guardar', exact: true }).click();
+      await dialog.getByText('Comentário atualizado', { exact: true }).waitFor();
+      await other.getByRole('button', { name: 'Atualizar comentários', exact: true }).click();
+      await other.getByText('Descoberta corrigida', { exact: true }).waitFor();
+      await comment.getByRole('button', { name: 'Eliminar', exact: true }).click();
+      await comment.getByRole('button', { name: 'Confirmar eliminação', exact: true }).click();
+      await dialog.getByText('Comentário eliminado', { exact: true }).waitFor();
+      await other.getByRole('button', { name: 'Atualizar comentários', exact: true }).click();
+      await other
+        .getByText('Ainda não há comentários. Comece a conversa abaixo.', { exact: true })
+        .waitFor();
+      await secondContext.close();
+      await dialog.getByRole('button', { name: 'Fechar', exact: true }).click();
+      await dialog.waitFor({ state: 'detached' });
+      await page
+        .locator('#app-nav')
+        .getByRole('button', { name: /^Billy/ })
         .click();
-      await page.locator('input[name="author"]').fill('QA reviewer');
-      await page.locator('select[name="kind"]').selectOption('issue');
       await page
-        .locator('textarea[name="body"]')
-        .fill('The imported date changes after saving. Expected the original day.');
-      await page.locator('.submit-comment').click();
-      await page.getByText('Comentário enviado', { exact: true }).waitFor();
-      assert.match(await page.locator('.comment-list').textContent(), /QA reviewer/);
-      assert.equal(await page.locator('.comment-mine .comment-self').textContent(), 'Tu');
-      const link = await page.locator('.discussion-toolbar a').getAttribute('href');
-      const another = await context.newPage();
-      await another.goto(link);
-      await another.locator('.comment-list .comment').waitFor();
-      assert.match(await another.locator('.comment-list').textContent(), /imported date changes/);
-      assert.equal(await another.locator('.validation-button[aria-pressed="true"]').count(), 1);
-      assert.equal(await another.locator('.comment-mine').count(), 1);
-      await another.close();
-      const otherContext = await browser.newContext();
-      await otherContext.route('https://tooling.test/**', routeHandler);
-      const otherPerson = await otherContext.newPage();
-      await otherPerson.goto(link);
-      await otherPerson.locator('.comment-list .comment').waitFor();
-      assert.equal(await otherPerson.locator('.comment-mine').count(), 0);
-      await otherPerson.locator('input[name="author"]').fill('QA reviewer');
-      await otherPerson
-        .locator('textarea[name="body"]')
-        .fill('Another person with the same display name.');
-      await otherPerson.locator('.submit-comment').click();
-      await otherPerson.getByText('Comentário enviado', { exact: true }).waitFor();
-      assert.equal(await otherPerson.locator('.comment-mine').count(), 1);
-      assert.equal(await otherPerson.locator('.comment-other').count(), 1);
-      await otherContext.close();
-      await page.getByRole('button', { name: 'Atualizar', exact: true }).click();
-      await page.locator('.comment-other').waitFor();
-      assert.equal(await page.locator('.comment-mine').count(), 1);
-      await scan();
-      await page.getByRole('button', { name: 'Marcar como resolvida', exact: true }).click();
-      await page.getByText('Conversa resolvida', { exact: true }).waitFor();
-      await page.locator('.discussion-heading button').click();
-      await page.locator('#discussion-filter').selectOption('open');
-      assert.equal(await page.locator('.release-entry').count(), 0);
-      await page.locator('#discussion-filter').selectOption('all');
-      await page.locator('.item-trigger').first().click();
-      await page.getByRole('button', { name: 'Reabrir conversa', exact: true }).click();
-      await page.getByText('Conversa reaberta', { exact: true }).waitFor();
-      await page.locator('.discussion-heading button').click();
-      await page.locator('#discussion-filter').selectOption('open');
-      assert.equal(await page.locator('.release-entry').count(), 1);
-      assert.equal(await page.locator('.change-item').count(), 1);
-      await page.locator('#review-filter').selectOption('pending');
-      assert.equal(await page.locator('.release-entry').count(), 0);
-      await page.locator('#review-filter').selectOption('validated');
-      assert.equal(await page.locator('.change-item').count(), 1);
-      await page.locator('#clear-filters').click();
-      await page.locator('#content-filter').selectOption('product');
-      assert.equal(await page.locator('.release-entry').count(), 10);
-      await page.locator('#notes-search').fill('copia seguranca');
-      assert.ok((await page.locator('.change-item').count()) > 0);
-      await page.locator('#clear-filters').click();
-      const firstRelease = page.locator('.release-entry').first();
-      const remaining = await firstRelease
-        .locator('.validation-button[aria-pressed="false"]')
-        .count();
-      for (let index = 0; index < remaining; index++) {
-        const before = await firstRelease
-          .locator('.validation-button[aria-pressed="false"]')
-          .count();
-        await firstRelease.locator('.validation-button[aria-pressed="false"]').first().click();
-        await page.waitForFunction(
-          (count) =>
-            document
-              .querySelector('.release-entry')
-              .querySelectorAll('.validation-button[aria-pressed="false"]').length < count,
-          before,
-        );
-      }
-      await page.waitForFunction(() => !document.querySelector('.release-entry').open);
-      assert.match(await firstRelease.locator(':scope > summary').textContent(), /Tudo validado/);
-      const reopened = await context.newPage();
-      await reopened.goto('https://tooling.test/');
-      await reopened.waitForFunction(
-        () =>
-          document.querySelector('.release-entry.release-complete') &&
-          !document.querySelector('.release-entry').open,
-      );
-      await reopened.close();
-      await firstRelease.locator(':scope > summary').click();
-      await page.locator('#refresh-review').click();
-      assert.equal(await firstRelease.evaluate((el) => el.open), true);
-      await firstRelease.locator('.validation-button[aria-pressed="true"]').first().click();
-      await firstRelease.locator('.validation-button[aria-pressed="false"]').waitFor();
-      await page.locator('#collapse-all').click();
-      assert.equal(await page.locator('.release-entry[open]').count(), 0);
-      await page.locator('#expand-all').click();
-      assert.equal(
-        await page.locator('.release-entry[open]').count(),
-        await page.locator('.release-entry').count(),
-      );
-      await page.locator('#content-filter').selectOption('product');
-      await page.locator('#notes-search').fill('Vacinas');
-      assert.equal(await page.locator('.release-entry').count(), 1);
+        .getByText('Ainda não há versões publicadas. As novidades vão aparecer aqui.', {
+          exact: true,
+        })
+        .waitFor();
+      await page
+        .locator('#app-nav')
+        .getByRole('button', { name: /^Saudinha/ })
+        .click();
       await page.locator('#notes-search').fill('nothing-matches');
-      assert.equal(await page.locator('.release-entry').count(), 0);
-      assert.match(
-        await page.locator('#notes-message').textContent(),
-        /Nenhuma alteração corresponde/,
-      );
-      await page.locator('#release-app').selectOption('DuarteCaldeira/billy');
-      assert.match(
-        await page.locator('#notes-message').textContent(),
-        /Ainda não há versões publicadas/,
-      );
-      assert.match(page.url(), /app=DuarteCaldeira%2Fbilly/);
-      assert.equal(await page.locator('#share-app').count(), 0);
-      await page.locator('#release-app').selectOption(saudinha.repository);
-      await page.locator('[data-app="DuarteCaldeira/design-system"]').click();
-      assert.equal(await page.locator('#selected-emoji').textContent(), '🎨');
-      assert.equal(await page.locator('#release-app').inputValue(), 'DuarteCaldeira/design-system');
-      await page.locator('[data-app="DuarteCaldeira/saudinha-pnn"]').click();
-      await page.locator('#apps > summary').click();
-      assert.equal(await page.locator('.app-card').count(), 6);
-      await page.locator('[data-filter="released"]').click();
-      assert.equal(await page.locator('.app-card').count(), 2);
-      await page.locator('[data-filter="unreleased"]').click();
-      assert.equal(await page.locator('.app-card').count(), 4);
-      await page.locator('[data-filter="all"]').click();
-      await page.locator('#search').fill('Rookie');
-      assert.equal(await page.locator('.app-card').count(), 1);
-      await page.locator('#search').fill('');
-      await page.locator('#sort').selectOption('name');
-      assert.match(await page.locator('.app-card').first().textContent(), /Billy/);
-      await page.locator('#apps > summary').click();
-      await page.setViewportSize({ width: 1920, height: 1080 });
-      assert.equal(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        true,
-      );
-      await page.setViewportSize({ width: 1024, height: 900 });
-      assert.equal(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        true,
-      );
-      await page.emulateMedia({ reducedMotion: 'reduce' });
-      assert.equal(
-        await page.locator('#selected-emoji').evaluate((el) => getComputedStyle(el).animationName),
-        'none',
-      );
-      assert.equal(
-        await page
-          .locator('.topic-tag')
-          .first()
-          .evaluate((el) => getComputedStyle(el).transitionDuration),
-        '0s',
-      );
-      await page.setViewportSize({ width: 390, height: 844 });
-      await page.evaluate(() => window.scrollTo(0, 0));
-      assert.equal(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        true,
-      );
-      await page.locator('.item-trigger').first().click();
+      await page.getByText(/Nenhuma alteração corresponde/).waitFor();
+      await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
+      for (const width of [1920, 1024, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      }
+      await page.getByRole('button', { name: 'Abrir conversa: ' + texts[0], exact: true }).click();
       await scan();
-      assert.equal(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        true,
-      );
-      await page.locator('.discussion-heading button').click();
-      if (process.env.TOOLING_DASHBOARD_SCREENSHOTS)
-        await page.screenshot({
-          path: join(process.env.TOOLING_DASHBOARD_SCREENSHOTS, 'dashboard-mobile.png'),
-        });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      assert.deepEqual(errors, []);
     } finally {
       await browser.close();
     }

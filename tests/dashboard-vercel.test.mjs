@@ -71,7 +71,8 @@ test('Vercel data build writes only data.json; the web bundle comes from the pre
     ])
       await cp(new URL(name, source), join(root, name));
     const settings = JSON.parse(await readFile(join(root, 'vercel.json'), 'utf8'));
-    assert.equal(settings.buildCommand, 'vite build && node build.mjs');
+    assert.equal(settings.buildCommand, 'vite build');
+    assert.equal(settings.functions['api/*.js'].includeFiles, '{apps.json,release-notes.json}');
     assert.equal(settings.framework, null);
     assert.equal(settings.outputDirectory, 'dist');
     const mock = `globalThis.fetch = async (url) => ({ok:true,status:200,json:async()=>String(url).includes('/releases?')?[]:{id:1}});`;
@@ -99,17 +100,18 @@ test('Vercel data build writes only data.json; the web bundle comes from the pre
   }
 });
 
-test('release refresh keeps notification triggers and has no Pages permissions or deploy steps', async () => {
+test('release notifications remain compatible without scheduling or requesting deployments', async () => {
   const text = await readFile(
     new URL('../.github/workflows/apps-dashboard.yml', import.meta.url),
     'utf8',
   );
   const workflow = parseDocument(text).toJS();
   assert.deepEqual(workflow.on.repository_dispatch.types, ['app-released']);
-  assert.ok(workflow.on.schedule.length);
+  assert.equal(workflow.on.schedule, undefined);
   assert.equal(workflow.permissions.contents, 'read');
   assert.equal(workflow.permissions.pages, undefined);
-  assert.ok(text.includes('secrets.VERCEL_DEPLOY_HOOK'));
+  assert.ok(!text.includes('secrets.VERCEL_DEPLOY_HOOK'));
+  assert.ok(!text.includes('node dashboard/refresh.mjs'));
   assert.ok(!text.includes('APPS_READ_TOKEN'));
   assert.ok(!text.includes('deploy-pages'));
 });

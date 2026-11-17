@@ -18,11 +18,17 @@ const githubUrl = (url) =>
   typeof url === 'string' && url.startsWith('https://github.com/') ? url : undefined;
 
 function ToolingValue({ tooling }) {
-  const labels = { 'not-adopted': 'Não utilizado', unresolved: 'Por resolver', unknown: 'Indisponível' };
+  const labels = {
+    'not-adopted': 'Não utilizado',
+    unresolved: 'Por resolver',
+    unknown: 'Indisponível',
+  };
   return (
     <div>
       <span className="value">{tooling.version ?? labels[tooling.status] ?? 'Indisponível'}</span>
-      {tooling.revision ? <small className="detail mono">{tooling.revision.slice(0, 7)}</small> : null}
+      {tooling.revision ? (
+        <small className="detail mono">{tooling.revision.slice(0, 7)}</small>
+      ) : null}
     </div>
   );
 }
@@ -124,7 +130,12 @@ function ReviewOverview({ app, review }) {
   let validated = 0;
   let open = 0;
   for (const release of app?.releases ?? []) {
-    const context = (item) => ({ repository, version: release.version, item: item.id, text: item.text });
+    const context = (item) => ({
+      repository,
+      version: release.version,
+      item: item.id,
+      text: item.text,
+    });
     for (const item of release.items ?? []) {
       total++;
       if (review.stateOf(context(item)).validated) validated++;
@@ -165,11 +176,13 @@ function ReviewOverview({ app, review }) {
           size="md"
           value={validated}
           max={total || 1}
-          label={loaded
-            ? `${validated} de ${total} novidades validadas`
-            : review.hasError(repository)
-              ? 'Revisão indisponível de momento'
-              : 'A carregar a revisão…'}
+          label={
+            loaded
+              ? `${validated} de ${total} novidades validadas`
+              : review.hasError(repository)
+                ? 'Revisão indisponível de momento'
+                : 'A carregar a revisão…'
+          }
         />
       </div>
     </div>
@@ -291,7 +304,13 @@ function Portfolio({ apps, snapshot, onSelect }) {
                 </p>
                 <div className="app-grid">
                   {visible.map((app) => (
-                    <Card key={app.repository} as="article" padding="lg" gap="md" className="app-card">
+                    <Card
+                      key={app.repository}
+                      as="article"
+                      padding="lg"
+                      gap="md"
+                      className="app-card"
+                    >
                       <div className="identity">
                         <span className="app-icon">{app.emoji ?? '📦'}</span>
                         <h3>
@@ -387,9 +406,17 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    let loading = false;
+    let initialized = false;
+    const controller = new AbortController();
+    const refresh = async () => {
+      if (loading || cancelled) return;
+      loading = true;
       try {
-        const response = await fetch('./data.json', { cache: 'no-store' });
+        const response = await fetch('/api/releases', {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error();
         const data = await response.json();
         if (data.schemaVersion !== 1 || !Array.isArray(data.apps)) throw new Error();
@@ -397,13 +424,18 @@ export function App() {
         const params = new URLSearchParams(location.search);
         const apps = data.apps;
         setSnapshot(data);
-        setSelected(
-          apps.find((app) => app.repository === params.get('app'))?.repository ??
-            apps.find((app) => app.repository === data.defaultApp)?.repository ??
-            apps[0]?.repository ??
-            '',
+        setFailed(false);
+        setSelected((current) =>
+          apps.some((app) => app.repository === current)
+            ? current
+            : (apps.find((app) => app.repository === params.get('app'))?.repository ??
+              apps.find((app) => app.repository === data.defaultApp)?.repository ??
+              apps[0]?.repository ??
+              ''),
         );
         for (const app of apps) review.refresh(app.repository);
+        if (initialized) return;
+        initialized = true;
         // A shared link opens the conversation it points at.
         const app = apps.find((entry) => entry.repository === params.get('app'));
         const release = app?.releases.find((entry) => entry.version === params.get('release'));
@@ -422,10 +454,23 @@ export function App() {
           });
       } catch {
         if (!cancelled) setFailed(true);
+      } finally {
+        loading = false;
       }
-    })();
+    };
+    const whenVisible = () => {
+      if (!document.hidden) refresh();
+    };
+    refresh();
+    const interval = setInterval(whenVisible, 30_000);
+    document.addEventListener('visibilitychange', whenVisible);
+    window.addEventListener('focus', whenVisible);
     return () => {
       cancelled = true;
+      controller.abort();
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', whenVisible);
+      window.removeEventListener('focus', whenVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -434,7 +479,9 @@ export function App() {
   const chooseApp = (repository) => {
     setSelected(repository);
     requestAnimationFrame(() =>
-      document.getElementById('release-notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      document
+        .getElementById('release-notes')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
     );
   };
   const app = apps.find((entry) => entry.repository === selected);
@@ -442,7 +489,7 @@ export function App() {
     ? 'Informação indisponível'
     : snapshot
       ? portugueseDate(snapshot.generatedAt) +
-        (Date.now() - Date.parse(snapshot.generatedAt) > 7200000 ? ' · Atualização em atraso' : '')
+        (Date.now() - Date.parse(snapshot.generatedAt) > 120000 ? ' · Atualização em atraso' : '')
       : 'A carregar as versões…';
 
   return (
@@ -471,10 +518,11 @@ export function App() {
             <p className="subtitle">Cada novidade, uma conversa. Cada detalhe, no seu lugar. ✨</p>
           </div>
           {failed ? (
-            <p role="status" id="notes-message">
+            <p role="status" id="release-refresh-error">
               Não foi possível carregar as versões. Tente novamente dentro de instantes.
             </p>
-          ) : !snapshot ? (
+          ) : null}
+          {!snapshot && !failed ? (
             <p className="loading" role="status">
               A carregar as versões…
             </p>
@@ -490,7 +538,7 @@ export function App() {
             <span>Feito para acompanhar, conversar e validar. ✨</span>
             <span>
               Hora de Portugal continental <span aria-hidden="true">·</span>{' '}
-              <a href="./data.json">Dados das versões ↗</a>
+              <a href="/api/releases">Dados das versões ↗</a>
             </span>
           </footer>
         </div>

@@ -1,11 +1,9 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { releaseSnapshot } from '../server/releases.mjs';
+import { discussionManifest } from '../release-items.mjs';
 import { blobStore, createDiscussionService, createHandler } from '../server/discussions.mjs';
 
 const handler = createHandler(async () => {
-  const manifest = JSON.parse(
-    await readFile(join(process.cwd(), 'server/discussion-manifest.json'), 'utf8'),
-  );
+  const manifest = discussionManifest(await releaseSnapshot());
   return createDiscussionService({ store: await blobStore(), manifest });
 });
 
