@@ -3,7 +3,8 @@
 ## Unreleased
 
 - `repoStandard` option and `tooling doctor --repo-standard`: AGENTS.md sections, CLAUDE.md, `.claude/settings.json` plugins (UI plugins only for frontend repos), no `.ai` kit or `ai-memory`. The reusable `ci.yml` runs it when enabled.
-- Opt-in `duplication` check (jscpd): in every profile only clones touching changed files fail; `--all` runs report existing clones without failing; `duplication.scope: "all"` makes every clone fail.
+- Opt-in `duplication` check (jscpd): in every profile only clones touching changed files fail; `--all` runs report existing clones without failing; `duplication.scope: "all"` makes every clone fail. It fails when none of `duplication.paths` exist (for example the default `src` in a monorepo) instead of passing without scanning.
+- Releases run only through `package-release.yml`; the tag-triggered `publish-npm.yml` is removed, so every published version passes the semver and lockfile checks.
 - `styles.rules.layoutCss` and `styles.layoutPaths`: report flex layout in component modules so layouts use the shared `Stack`.
 
 ## 0.1.0

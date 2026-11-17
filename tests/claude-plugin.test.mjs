@@ -2,10 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
@@ -140,18 +142,18 @@ test('session start leaves frontend rules out of non-frontend repos', () => {
   assert.doesNotMatch(context, /\n{3,}/);
 });
 
-test('stop check skips re-entry, clean trees and unchanged trees', () => {
+test('stop check skips re-entry, clean trees and unchanged trees', async () => {
   const stateDir = temp();
   const root = gitRepo();
-  assert.equal(stopCheck({ cwd: root, stop_hook_active: true }, { stateDir }), undefined);
-  assert.equal(stopCheck({ cwd: root }, { stateDir }), undefined);
-  assert.equal(stopCheck({ cwd: temp() }, { stateDir }), undefined);
+  assert.equal(await stopCheck({ cwd: root, stop_hook_active: true }, { stateDir }), undefined);
+  assert.equal(await stopCheck({ cwd: root }, { stateDir }), undefined);
+  assert.equal(await stopCheck({ cwd: temp() }, { stateDir }), undefined);
   put(root, 'b.txt', 'b');
-  assert.equal(stopCheck({ cwd: root, session_id: 's' }, { stateDir }), undefined);
+  assert.equal(await stopCheck({ cwd: root, session_id: 's' }, { stateDir }), undefined);
   assert.equal(readdirSync(stateDir).length, 1, 'records the checked tree');
 });
 
-test('stop check blocks on tooling failure and reports a timeout as unfinished', () => {
+test('stop check blocks on tooling failure and reports a timeout as unfinished', async () => {
   const root = gitRepo();
   put(root, 'tooling.config.json', { checks: { format: {} } });
   const bin = 'node_modules/@dcaldeira/tooling';
@@ -159,17 +161,30 @@ test('stop check blocks on tooling failure and reports a timeout as unfinished',
   put(root, '.gitignore', 'node_modules\n');
 
   put(root, `${bin}/cli.mjs`, 'console.log(process.argv.slice(2).join(" ")); process.exit(1);');
-  const failed = stopCheck({ cwd: root, session_id: 'fail' }, { stateDir: temp() });
+  const failed = await stopCheck({ cwd: root, session_id: 'fail' }, { stateDir: temp() });
   assert.equal(failed.decision, 'block');
   assert.match(failed.reason, /--profile=dev --changed --skip=format/);
 
-  put(root, `${bin}/cli.mjs`, 'setTimeout(() => {}, 10_000);');
-  const slow = stopCheck({ cwd: root, session_id: 'slow' }, { stateDir: temp(), timeoutMs: 500 });
+  // A hung run is killed with its children (test workers), not only the tooling process.
+  const marker = join(root, 'orphan.txt');
+  put(
+    root,
+    `${bin}/cli.mjs`,
+    `import { spawn } from 'node:child_process';
+spawn(process.execPath, ['-e', ${JSON.stringify(`setTimeout(() => require('fs').writeFileSync(${JSON.stringify(marker)}, 'x'), 2000)`)}], { stdio: 'inherit' });
+setTimeout(() => {}, 10_000);`,
+  );
+  const slow = await stopCheck(
+    { cwd: root, session_id: 'slow' },
+    { stateDir: temp(), timeoutMs: 800 },
+  );
   assert.match(slow.reason, /did not finish/);
   assert.match(slow.reason, /NOT validated/);
+  await new Promise((done) => setTimeout(done, 2500));
+  assert.ok(!existsSync(marker), 'child of the timed-out run kept running');
 });
 
-test('stop check formats only files Claude edited and logs tooling timings', () => {
+test('stop check formats only files Claude edited and logs tooling timings', async () => {
   const root = gitRepo();
   const stateDir = temp();
   put(root, '.gitignore', 'node_modules\n');
@@ -194,7 +209,7 @@ test('stop check formats only files Claude edited and logs tooling timings', () 
     { session_id: 'e', tool_input: { file_path: join(tmpdir(), 'outside.ts') } },
     { stateDir },
   );
-  assert.equal(stopCheck({ cwd: root, session_id: 'e' }, { stateDir }), undefined);
+  assert.equal(await stopCheck({ cwd: root, session_id: 'e' }, { stateDir }), undefined);
 
   assert.equal(readFileSync(join(root, 'formatted.log'), 'utf8').trim(), 'src/claude.ts');
   assert.deepEqual(takeEdits('e', root, { stateDir }), [], 'edit record is cleared');
@@ -471,6 +486,13 @@ require('fs').writeFileSync(require('path').join(out, 'jscpd-report.json'), ${JS
   });
   assert.equal(run().status, 1);
   assert.equal(run(['src/unrelated.ts']).status, 1);
+
+  // no configured folder exists (monorepo with the default "src"): fail, never a silent pass
+  put(root, 'tooling.config.json', { schemaVersion: 1, duplication: {} });
+  rmSync(join(root, 'src'), { recursive: true });
+  const missing = run(['frontend/src/a.ts']);
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /none of src exist; set duplication\.paths/);
 });
 
 test('ci profile hands the branch changes to the duplication check', () => {

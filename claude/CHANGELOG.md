@@ -2,6 +2,10 @@
 
 Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
 
+## 0.1.2
+
+- Stop hook: a `tooling` run that hits the time limit is killed together with its children (test workers, `tsc`), so they no longer keep running and slow down later runs.
+
 ## 0.1.1
 
 - Frontend-only rules (layout primitive, render/effects, i18n, design and motion skills, test queries) move to a `Frontend` section that is injected only when the repo depends on React, React Native, Expo, Vite or Next. Other repos get about a third less session context.

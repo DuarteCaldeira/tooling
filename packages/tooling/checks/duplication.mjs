@@ -78,10 +78,14 @@ function main() {
   const scopeAll = options.scope === 'all';
   const reportOnly = !scopeAll && given === undefined;
   if (!scopeAll && given !== undefined && !changed.length) return 0;
+  const configured = options.paths ?? ['src'];
+  const paths = configured.filter((path) => existsSync(join(repo, path)));
+  if (!paths.length) {
+    console.error(`duplication: none of ${configured.join(', ')} exist; set duplication.paths`);
+    return 1;
+  }
   const output = mkdtempSync(join(tmpdir(), 'tooling-jscpd-'));
   try {
-    const paths = (options.paths ?? ['src']).filter((path) => existsSync(join(repo, path)));
-    if (!paths.length) return 0;
     const result = spawnSync(
       process.execPath,
       [

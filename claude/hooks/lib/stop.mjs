@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   appendFileSync,
@@ -123,19 +123,53 @@ function tail(text) {
   return text.trim().split(/\r?\n/).slice(-TAIL_LINES).join('\n');
 }
 
+/**
+ * Run a Node script with a time limit. On timeout the whole process tree is killed: killing only
+ * the parent would leave its test workers and `tsc` running, slowing every later run.
+ */
+function runTree(root, script, args, timeoutMs) {
+  return new Promise((done) => {
+    const child = spawn(process.execPath, [script, ...args], {
+      cwd: root,
+      detached: process.platform !== 'win32', // own process group, so `kill(-pid)` reaches children
+      windowsHide: true,
+    });
+    let output = '';
+    const keep = (chunk) => (output = (output + chunk).slice(-200_000));
+    child.stdout.on('data', keep);
+    child.stderr.on('data', keep);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      if (process.platform === 'win32')
+        spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      else
+        try {
+          process.kill(-child.pid, 'SIGKILL');
+        } catch {}
+    }, timeoutMs);
+    const finish = (status) => {
+      clearTimeout(timer);
+      done({ status, output, timedOut });
+    };
+    child.once('error', () => finish(null));
+    child.once('close', finish);
+  });
+}
+
 /** Run `tooling --profile=dev --changed` without its format check. Returns a failure reason, undefined on pass, or NOT_RUN. */
-export function runTooling(root, timeoutMs) {
+export async function runTooling(root, timeoutMs) {
   const config = readJSON(join(root, 'tooling.config.json'));
   const bin = packageBin(root, '@dcaldeira/tooling', 'tooling');
   if (!config || !bin) return NOT_RUN;
   const args = ['--profile=dev', '--changed'];
   if (config.checks?.format) args.push('--skip=format');
-  const result = runNode(root, bin, args, timeoutMs);
+  const result = await runTree(root, bin, args, timeoutMs);
   const command = `tooling ${args.join(' ')}`;
-  if (result.error?.code === 'ETIMEDOUT' || result.signal)
+  if (result.timedOut)
     return `\`${command}\` did not finish within ${Math.round(timeoutMs / 1000)} s, so the changes are NOT validated. Run it yourself (in the background) and fix what fails.`;
   if (result.status !== 0)
-    return `\`${command}\` failed. Fix these before finishing:\n\n${tail(`${result.stdout}\n${result.stderr}`)}`;
+    return `\`${command}\` failed. Fix these before finishing:\n\n${tail(result.output)}`;
   return undefined;
 }
 
@@ -152,7 +186,7 @@ function logTiming(root, entry) {
  * changed since the last run. Returns `{ decision: 'block', reason }` when Claude must keep
  * working, otherwise undefined.
  */
-export function stopCheck(
+export async function stopCheck(
   input,
   {
     stateDir = DEFAULT_STATE_DIR,
@@ -177,7 +211,7 @@ export function stopCheck(
   if (previous === current) return undefined;
 
   const started = Date.now();
-  const result = runTooling(root, timeoutMs);
+  const result = await runTooling(root, timeoutMs);
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(statePath, current);
   if (result === NOT_RUN) return undefined;
