@@ -10,7 +10,6 @@ import {
 } from '@dcaldeira/design-system';
 import { ConversationDrawer } from './components/ConversationDrawer.jsx';
 import { ReleaseDate, ReleaseHub } from './components/ReleaseHub.jsx';
-import { participantId } from './lib/api.js';
 import { portugueseDate } from './lib/topics.js';
 import { useReview } from './hooks.js';
 
@@ -402,7 +401,6 @@ export function App() {
   const [conversation, setConversation] = useState(null);
   const review = useReview();
   const drafts = useRef(new Map());
-  const participant = useMemo(() => participantId(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -547,7 +545,6 @@ export function App() {
         context={conversation}
         onClose={() => setConversation(null)}
         review={review}
-        participantId={participant}
         drafts={drafts}
       />
     </>

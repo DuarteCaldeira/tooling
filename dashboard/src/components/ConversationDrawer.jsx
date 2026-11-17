@@ -8,7 +8,7 @@ import {
   Textarea,
   ToggleSwitch,
 } from '@dcaldeira/design-system';
-import { api, itemKey, readStorage, writeStorage } from '../lib/api.js';
+import { api, itemKey } from '../lib/api.js';
 import { itemTopics, portugueseDate } from '../lib/topics.js';
 import { useConversationOverlay, usePolling } from '../hooks.js';
 
@@ -18,7 +18,6 @@ const kinds = [
   { value: 'issue', label: 'Problema' },
 ];
 const kindLabels = { comment: 'Comentário', question: 'Pergunta', issue: 'Problema' };
-const NAME_KEY = 'tooling-discussion-name';
 const authors = ['QAren', 'DUveloper'].map((value) => ({ value, label: value }));
 
 export function TopicTags({ text, technical }) {
@@ -46,7 +45,7 @@ function Section({ title, aside, children, className = '' }) {
   );
 }
 
-export function ConversationDrawer({ context, onClose, review, participantId, drafts }) {
+export function ConversationDrawer({ context, onClose, review, drafts }) {
   const open = Boolean(context);
   const contentRef = useRef(null);
   useConversationOverlay(open, contentRef);
@@ -55,10 +54,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
   const [status, setStatus] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [author, setAuthor] = useState(() => {
-    const saved = readStorage(NAME_KEY);
-    return authors.some(({ value }) => value === saved) ? saved : 'QAren';
-  });
+  const [author, setAuthor] = useState('QAren');
   const [edit, setEdit] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const loadedCount = useRef(0);
@@ -197,7 +193,6 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
       author: author.trim(),
       body: body.trim(),
       kind,
-      participantId,
     };
     const signature = JSON.stringify(value);
     if (request.current?.signature !== signature)
@@ -207,7 +202,6 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
     setStatus('A enviar o comentário…');
     try {
       const result = await api({}, { ...value, requestId: request.current.id });
-      writeStorage(NAME_KEY, value.author);
       drafts.current.delete(key);
       if (current === generation.current) {
         setComments((existing) => [
@@ -340,12 +334,13 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
             {sorted.length ? (
               <ol className="comment-list">
                 {sorted.map((comment) => {
-                  const mine = comment.participantId === participantId;
                   return (
-                    <li key={comment.id} className={`comment ${mine ? 'comment-mine' : ''}`}>
+                    <li
+                      key={comment.id}
+                      className={`comment${comment.author === 'QAren' ? ' comment-qa' : ''}`}
+                    >
                       <div className="comment-heading">
                         <strong>{comment.author}</strong>
-                        {mine ? <span className="comment-self">Tu</span> : null}
                         {comment.kind !== 'comment' ? (
                           <span className="comment-kind">
                             {kindLabels[comment.kind] ?? comment.kind}
@@ -461,10 +456,7 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                 label="Nome"
                 options={authors}
                 value={author}
-                onChange={(value) => {
-                  setAuthor(value);
-                  writeStorage(NAME_KEY, value);
-                }}
+                onChange={setAuthor}
               />
               <Select
                 id="comment-kind"
@@ -484,10 +476,6 @@ export function ConversationDrawer({ context, onClose, review, participantId, dr
                 rows={4}
                 placeholder="O que aconteceu? O que esperava? Se for um problema, indique os passos para o reproduzir."
               />
-              <p className="identity-note">
-                Os seus comentários aparecem como «Tu» neste navegador. Os nomes são indicados pelos
-                participantes.
-              </p>
               <Button type="submit" variant="primary" isLoading={busy}>
                 Enviar comentário
               </Button>

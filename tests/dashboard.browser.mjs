@@ -185,7 +185,14 @@ test(
       await dialog.getByRole('textbox', { name: /^Mensagem/ }).fill('Uma descoberta partilhada');
       await dialog.getByRole('button', { name: 'Enviar comentário', exact: true }).click();
       await dialog.getByText('Comentário enviado', { exact: true }).waitFor();
-      assert.equal(await dialog.locator('.comment-mine').count(), 1);
+      assert.equal(await dialog.locator('.comment-self').count(), 0);
+      assert.equal(await dialog.getByText('Tu', { exact: true }).count(), 0);
+      assert.deepEqual(
+        await page.evaluate(() =>
+          Object.keys(localStorage).filter((key) => key.startsWith('tooling-discussion')),
+        ),
+        [],
+      );
       await scan();
       const secondContext = await browser.newContext();
       await secondContext.route('https://tooling.test/**', routeHandler);
