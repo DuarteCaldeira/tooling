@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- `budgets.bundle.files`: `[path part, label, KB]` allowances for files with no source map, such as a pre-built map worker, which otherwise count against `chunkKB`.
+
 ## 0.2.0
 
 - `repoStandard` option and `tooling doctor --repo-standard`: AGENTS.md sections, CLAUDE.md, `.claude/settings.json` plugins (UI plugins only for frontend repos), no `.ai` kit or `ai-memory`. The reusable `ci.yml` runs it when enabled.
