@@ -63,7 +63,7 @@ Check before merging:
 claude plugin validate --strict claude
 claude plugin validate --strict .
 node --test tests/claude-plugin.test.mjs
-claude plugin eval claude --runs 1   # skill triggering on fixture projects; uses your Claude credits
+claude plugin eval claude --runs 1 --allow-tools Bash   # fixture projects, with and without the plugin; uses your Claude credits
 ```
 
 ## Turn it off

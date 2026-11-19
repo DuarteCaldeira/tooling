@@ -26,14 +26,14 @@ Shared check runner (`@dcaldeira/tooling`, public on npm), reusable GitHub Actio
 
 ## Commands
 
-| Purpose       | Command                                                                       |
-| ------------- | ----------------------------------------------------------------------------- |
-| unit tests    | `npm test`                                                                    |
-| formatting    | `npm run format:check`                                                        |
-| browser tests | `npm run test:browser` (needs Playwright browsers)                            |
-| package       | `npm run pack:tooling`                                                        |
-| plugin        | `claude plugin validate --strict claude && claude plugin validate --strict .` |
-| plugin evals  | `claude plugin eval claude --runs 1` (uses Claude credits)                    |
+| Purpose       | Command                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| unit tests    | `npm test`                                                                                                                |
+| formatting    | `npm run format:check`                                                                                                    |
+| browser tests | `npm run test:browser` (needs Playwright browsers)                                                                        |
+| package       | `npm run pack:tooling`                                                                                                    |
+| plugin        | `claude plugin validate --strict claude && claude plugin validate --strict .`                                             |
+| plugin evals  | `claude plugin eval claude --runs 1 --allow-tools Bash` (uses Claude credits; runs each case with and without the plugin) |
 
 ## Tests per area
 
