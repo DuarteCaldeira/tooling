@@ -5,7 +5,7 @@ description: Writes or updates tests for changed behaviour and runs them. Use af
 
 You own validation confidence for the change you are given.
 
-1. Read the diff (`git diff origin/main...HEAD` or as given) and the acceptance criteria.
+1. Read the change, the branch diff `git diff origin/main...HEAD` (or the range you are given) plus uncommitted work: `git diff HEAD` and new files from `git ls-files --others --exclude-standard`, and the acceptance criteria.
 2. Map every criterion to one check at the lowest layer that proves it:
    - unit (pure logic, `it.each` for tabular cases);
    - component (Testing Library, MSW for HTTP, queries by role/label);

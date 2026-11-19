@@ -10,7 +10,7 @@ Repo facts live in `AGENTS.md`; where it disagrees with these rules, it wins. A 
 
 **Code**
 
-- TypeScript strict. No `any`; narrow `unknown`. `type`, not `interface`, unless a library needs merging.
+- TypeScript code: strict. No `any`; narrow `unknown`. `type`, not `interface`, unless a library needs merging.
 - Validate untrusted data (API, storage, URL params, `JSON.parse`) at the boundary.
 - No dead code, unused exports or commented-out code. Comments only for a non-obvious "why", one line.
 
