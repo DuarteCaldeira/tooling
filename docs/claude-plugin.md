@@ -63,7 +63,8 @@ Check before merging:
 claude plugin validate --strict claude
 claude plugin validate --strict .
 node --test tests/claude-plugin.test.mjs
-claude plugin eval claude --runs 1 --allow-tools Bash   # fixture projects, with and without the plugin; uses your Claude credits
+claude plugin eval claude --runs 1   # fixture projects, with and without the plugin; uses your Claude credits
+# The validate case runs Bash: add --allow-tools Bash Edit Write, on Linux/macOS only (shell tools need the OS sandbox)
 ```
 
 ## Turn it off
