@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { execute, executable, invoke } from '../packages/tooling/runner/execute.mjs';
 import { plan, builtins } from '../packages/tooling/runner/graph.mjs';
@@ -191,6 +192,14 @@ test('bundle budgets include transitive initial imports once, respect base URLs 
     analyseBundle(root, { dist: 'dist', initialKB: 0.01, chunkKB: 100 }).errors.length,
     1,
   );
+  // A file without a source map (a pre-built worker) gets its own allowance by path.
+  put(root, 'dist/assets/map-worker-abc.js', randomBytes(4096).toString('base64'));
+  const tight = { dist: 'dist', initialKB: 100, chunkKB: 1 };
+  assert.match(analyseBundle(root, tight).errors.join('\n'), /map-worker-abc\.js \(route chunk\)/);
+  assert.deepEqual(
+    analyseBundle(root, { ...tight, files: [['map-worker-', 'map worker', 100]] }).errors,
+    [],
+  );
   put(root, 'dist/index.html', '<script src="/app/assets/missing.js"></script>');
   assert.throws(
     () => analyseBundle(root, { dist: 'dist', initialKB: 100, chunkKB: 100 }),
@@ -212,7 +221,7 @@ test('init creates small safe projects, preserves user settings and doctor repor
   initialize(root, { toolingSha: 'a'.repeat(40) });
   const pkg = JSON.parse(readFileSync(join(root, 'package.json')));
   assert.equal(pkg.scripts.lint, original.scripts.lint);
-  assert.equal(pkg.devDependencies['@dcaldeira/tooling'], '0.2.0');
+  assert.equal(pkg.devDependencies['@dcaldeira/tooling'], '0.2.1');
   assert.equal(
     readFileSync(join(root, 'prettier.config.mjs'), 'utf8'),
     'export default { semi: false };',

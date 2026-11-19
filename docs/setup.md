@@ -3,7 +3,7 @@
 For a new React/Vite consumer, install the published package and scaffold the adapters:
 
 ```sh
-npm install --save-dev --save-exact @dcaldeira/tooling@0.2.0
+npm install --save-dev --save-exact @dcaldeira/tooling@0.2.1
 npx tooling init --preset=react-vite --tooling-sha=FULL_40_CHARACTER_COMMIT_SHA
 npm install
 npx tooling doctor
@@ -13,8 +13,8 @@ Use `--preset=workspace --app=frontend` (or `--app=apps/web`) when the app is ne
 
 Install the peer tools used by those checks: Prettier, ESLint and its preset plugins, TypeScript, Vitest and the matching `@vitest/coverage-v8` version. Extend the shared configs or keep your existing application configs. `tooling doctor` validates configuration, the check graph, executables, npm script adapters, hook setup and workflow pins without running checks. It reports Linux-only checks as notices on Windows. Enable the generated hook with `git config core.hooksPath .githooks`.
 
-1. Publish the public repository as `DuarteCaldeira/tooling` and release `@dcaldeira/tooling@0.2.0` publicly. For the first publication, configure npm trusted publishing or an npm automation token. Releases run through the **Release tooling package** workflow (`package-release.yml`): it runs tests, checks the version against the lockfile, tags the commit, creates the GitHub release and publishes with provenance.
-2. Install `npm install --save-dev --save-exact @dcaldeira/tooling@0.2.0`. Commit `package-lock.json`. While publication is pending, install the checked-in pilot tarball from `tools/` instead. It contains the same versioned package.
+1. Publish the public repository as `DuarteCaldeira/tooling` and release `@dcaldeira/tooling@0.2.1` publicly. For the first publication, configure npm trusted publishing or an npm automation token. Releases run through the **Release tooling package** workflow (`package-release.yml`): it runs tests, checks the version against the lockfile, tags the commit, creates the GitHub release and publishes with provenance.
+2. Install `npm install --save-dev --save-exact @dcaldeira/tooling@0.2.1`. Commit `package-lock.json`. While publication is pending, install the checked-in pilot tarball from `tools/` instead. It contains the same versioned package.
 3. Copy and adapt `examples/rookie/tooling.config.json`. Commit it in the consumer root. Add `.tooling/` to Git and formatting ignores.
 4. Keep command names, with `check:dev`, `check:push` and `ci:local` invoking the shared binary. Keep application commands in config as adapters; never make a check call its own runner alias.
 5. Copy `packages/tooling/templates/pre-push` to `.githooks/pre-push`, make it executable on Linux and set `git config core.hooksPath .githooks`. The hook automatically validates; it accepts no release-branch shortcut and validates the actual pushed HEAD. Deletions do not need validation. It fails closed for a different ref.

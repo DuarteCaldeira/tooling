@@ -11,7 +11,7 @@
 | `styles`         | Source directory, `standard`/`rookie` preset, rule switches, token paths, nesting depth and specificity tuple         |
 | `execution`      | `concurrency` from 1 to 16; defaults to 2, or 1 with `--bail` unless explicitly configured                            |
 | `translations`   | Locale directory and authoritative language (without `.json`)                                                         |
-| `budgets.bundle` | Distribution directory, initial/chunk gzip KB and optional `[package, label, KB]` vendor tuples                       |
+| `budgets.bundle` | Distribution directory, initial/chunk gzip KB, `[package, label, KB]` vendor and `files` tuples                       |
 | `release`        | Preparation argument array and exact list of version/changelog files to commit                                        |
 
 Patterns support `*`, `**`, `?` and slash-separated paths, not brace expansion or negation. Paths override the patterns of the named group. Multiple specialized backend matches combine. Docs, styles and locale files take precedence over a general application-source match. Unknown paths broaden validation. Keep shared configurations out of narrowly classified source patterns.
