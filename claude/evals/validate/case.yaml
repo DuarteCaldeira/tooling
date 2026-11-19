@@ -1,0 +1,17 @@
+schema_version: '1'
+name: validate
+description: 'A bug fix gets a regression test and a test run before the agent says it is done.'
+context:
+  add_dirs: [fixture]
+execution:
+  max_turns: 20
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Bash, Skill]
+  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). `slugify("Hello  World")` returns `hello--world`; it should return `hello-world`. Fix it.'
+graders:
+  - type: tool_used
+    name: tests-run
+    tool: Bash
+    input_match: 'test'
+  - type: llm
+    name: verified-fix
+    criteria: 'The agent fixed `slugify` so runs of whitespace become one hyphen, added a regression test for the double-space case to `src/slugify.test.mjs`, ran the tests, and reported that they pass (quoting the result, not assuming it).'

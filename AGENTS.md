@@ -26,14 +26,27 @@ Shared check runner (`@dcaldeira/tooling`, public on npm), reusable GitHub Actio
 
 ## Commands
 
-| Purpose       | Command                                                                       |
-| ------------- | ----------------------------------------------------------------------------- |
-| unit tests    | `npm test`                                                                    |
-| formatting    | `npm run format:check`                                                        |
-| browser tests | `npm run test:browser` (needs Playwright browsers)                            |
-| package       | `npm run pack:tooling`                                                        |
-| plugin        | `claude plugin validate --strict claude && claude plugin validate --strict .` |
-| plugin evals  | `claude plugin eval claude --runs 1` (uses Claude credits)                    |
+| Purpose       | Command                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| unit tests    | `npm test`                                                                                                                |
+| formatting    | `npm run format:check`                                                                                                    |
+| browser tests | `npm run test:browser` (needs Playwright browsers)                                                                        |
+| package       | `npm run pack:tooling`                                                                                                    |
+| plugin        | `claude plugin validate --strict claude && claude plugin validate --strict .`                                             |
+| plugin evals  | `claude plugin eval claude --runs 1 --allow-tools Bash` (uses Claude credits; runs each case with and without the plugin) |
+
+## Tests per area
+
+Run the file for the area you change (`node --test tests/<file>`), then `npm test`.
+
+| Area                                                       | Test files                                                                                                                                                                              |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runner/` CLI, config, plan, execution                     | `cli`, `graph`, `execute`, `incremental`, `git`, `optimizations`                                                                                                                        |
+| `checks/`                                                  | `checks-regression`, `sass`, `translations`, `shared-scripts`, `features`; `a11y.integration` (browser)                                                                                 |
+| `release/`                                                 | `release`, `github-release`                                                                                                                                                             |
+| `claude/` hooks, `repo-standard`, `doctor --repo-standard` | `claude-plugin`                                                                                                                                                                         |
+| `.github/workflows`, `templates/`                          | `workflows`                                                                                                                                                                             |
+| `dashboard/`                                               | `dashboard`, `dashboard-runtime`, `dashboard-vercel`, `dashboard-overlay`, `discussions`, `release-notes`; `dashboard.browser`, `dashboard-runtime.browser`, `dashboard-mobile.browser` |
 
 ## Conventions
 
