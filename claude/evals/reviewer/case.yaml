@@ -2,11 +2,11 @@ schema_version: '1'
 name: reviewer
 description: 'A risky change goes to the core:reviewer agent, which finds the planted pricing bug.'
 context:
-  add_dirs: [fixture]
+  scaffold_script: scaffold.sh
 execution:
   max_turns: 15
   allowed_tools: [Read, Glob, Grep, Agent]
-  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). I changed how checkout discounts are calculated in `src/discount.ts` (new file, not committed yet). It touches money, so review it against `docs/spec.md` before I open a PR. Do not edit anything.'
+  prompt: 'The project is in your working directory. I changed how checkout discounts are calculated in `src/discount.ts` (new file, not committed yet). It touches money, so review it against `docs/spec.md` before I open a PR. Do not edit anything.'
 graders:
   - type: tool_used
     name: reviewer-used

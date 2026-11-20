@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { detectStack, scopeLabel, SKILLS } from './lib/detect.mjs';
 import { emit, findUp, readInput } from './lib/shared.mjs';
 
@@ -11,7 +12,13 @@ const input = await readInput();
 const subagent = process.argv.includes('--subagent');
 if (subagent && NO_RULES_AGENTS.test(input.agent_type ?? '')) process.exit(0);
 const cwd = input.cwd ?? process.cwd();
-const root = findUp(cwd, '.git') ?? findUp(cwd, 'package.json') ?? cwd;
+// The git root when it is the JS project; otherwise the nearest package.json (a JS app in a
+// subfolder of a non-JS repo, or a project under a home directory that is itself a git repo).
+const gitRoot = findUp(cwd, '.git');
+const root =
+  gitRoot && existsSync(join(gitRoot, 'package.json'))
+    ? gitRoot
+    : (findUp(cwd, 'package.json') ?? gitRoot ?? cwd);
 const detected = detectStack(root);
 if (!detected.js) process.exit(0);
 
