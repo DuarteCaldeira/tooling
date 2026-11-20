@@ -6,17 +6,44 @@ import { itemId, changelogSections, technicalNotes } from './release-items.mjs';
 const repositoryPattern = /^[\w.-]+\/[\w.-]+$/;
 const exactVersion = /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/;
 const packageNames = ['@dcaldeira/tooling', '@dcaldeira/repo-tooling'];
+const idPattern = /^[\w.-]+(?:\/[\w.-]+)*$/;
+const tagPrefixPattern = /^[\w.-]+$/;
+
+// The app's key in snapshots, URLs and review storage: its repository unless `id` is set.
+const appKey = (app) => app.id ?? app.repository;
+
+// With a tagPrefix, only tags `<prefix><digit>…` belong to the app; versions show as `v<rest>`.
+function appVersion(app, tag) {
+  if (app.tagPrefix === undefined) return tag;
+  const rest = tag.startsWith(app.tagPrefix) ? tag.slice(app.tagPrefix.length) : '';
+  return /^\d/.test(rest) ? `v${rest}` : null;
+}
 
 export function validateConfig(config) {
   if (!repositoryPattern.test(config.toolingRepository) || !Array.isArray(config.apps))
     throw new Error('Expected toolingRepository and apps');
-  const repositories = new Set();
+  const ids = new Set();
+  const prefixes = new Map();
   for (const app of config.apps) {
     if (!repositoryPattern.test(app.repository) || !app.name?.trim())
       throw new Error('Each app needs a name and owner/repository');
-    const key = app.repository.toLowerCase();
-    if (repositories.has(key)) throw new Error(`Duplicate repository: ${app.repository}`);
-    repositories.add(key);
+    if (app.id !== undefined && !(typeof app.id === 'string' && idPattern.test(app.id)))
+      throw new Error('Invalid id');
+    if (
+      app.tagPrefix !== undefined &&
+      !(typeof app.tagPrefix === 'string' && tagPrefixPattern.test(app.tagPrefix))
+    )
+      throw new Error('Invalid tagPrefix');
+    const id = appKey(app).toLowerCase();
+    if (ids.has(id)) throw new Error(`Duplicate app: ${appKey(app)}`);
+    ids.add(id);
+    // Apps sharing a repository must each claim their own tags.
+    const repository = app.repository.toLowerCase();
+    const shared = prefixes.get(repository) ?? [];
+    shared.push(app.tagPrefix);
+    prefixes.set(repository, shared);
+    if (shared.length > 1 && (shared.includes(undefined) || new Set(shared).size < shared.length))
+      throw new Error(`Apps sharing ${app.repository} need distinct tagPrefix values`);
     for (const key of ['packagePath', 'lockPath', 'workflowPath', 'changelogPath']) {
       const path = app[key];
       if (
@@ -180,7 +207,7 @@ export async function collect(config, api, now = new Date()) {
     const row = {
       name: app.name,
       emoji: app.emoji ?? '📦',
-      repository: app.repository,
+      repository: appKey(app),
       repositoryUrl: `https://github.com/${app.repository}`,
       version: null,
       releasedAt: null,
@@ -201,9 +228,11 @@ export async function collect(config, api, now = new Date()) {
       } catch {
         // Keep release information available when tooling metadata cannot be read.
       }
-      const history = await releaseHistory(api, app.repository);
-      row.releases = history.map((item) => {
-        const override = app.releaseNotes?.[item.tag_name.replace(/^v/, '')];
+      const history = (await releaseHistory(api, app.repository))
+        .map((item) => ({ item, version: appVersion(app, item.tag_name) }))
+        .filter(({ version }) => version);
+      row.releases = history.map(({ item, version }) => {
+        const override = app.releaseNotes?.[version.replace(/^v/, '')];
         const edited = override ?? productNotes(item.body);
         if (
           edited &&
@@ -212,7 +241,7 @@ export async function collect(config, api, now = new Date()) {
         )
           throw new Error('Invalid product release notes');
         return {
-          version: item.tag_name,
+          version,
           releasedAt: item.published_at,
           url: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(item.tag_name)}`,
           prerelease: Boolean(item.prerelease),
@@ -223,7 +252,7 @@ export async function collect(config, api, now = new Date()) {
           originalNotes: typeof item.body === 'string' ? item.body : '',
         };
       });
-      const release = history[0];
+      const release = history[0]?.item;
       if (!release) {
         apps.push({ ...row, status: 'unreleased' });
         continue;
@@ -253,7 +282,7 @@ export async function collect(config, api, now = new Date()) {
         }));
       }
       Object.assign(row, {
-        version: release.tag_name,
+        version: history[0].version,
         releasedAt: release.published_at,
         releaseUrl: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(release.tag_name)}`,
         prerelease: release.prerelease,
@@ -293,7 +322,7 @@ export async function loadConfig(configPath = new URL('./apps.json', import.meta
       )
         throw new Error('Invalid edited release notes or item IDs');
     }
-  for (const app of config.apps) app.releaseNotes = notes[app.repository] ?? {};
+  for (const app of config.apps) app.releaseNotes = notes[appKey(app)] ?? {};
   return validateConfig(config);
 }
 
