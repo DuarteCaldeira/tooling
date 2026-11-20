@@ -2,11 +2,11 @@ schema_version: '1'
 name: scoped-stack
 description: 'React rules stay in the frontend folder: plain-JS work elsewhere follows the repo, not the React conventions.'
 context:
-  add_dirs: [fixture]
+  scaffold_script: scaffold.sh
 execution:
   max_turns: 10
   allowed_tools: [Read, Glob, Grep, Skill]
-  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). Plan a `chunk(list, size)` helper for the CLI in `cli/`, next to `cli/sum.mjs`. List the files you would create and how you would test it. Do not write files.'
+  prompt: 'The project is in your working directory. Plan a `chunk(list, size)` helper for the CLI in `cli/`, next to `cli/sum.mjs`. List the files you would create and how you would test it. Do not write files.'
 graders:
   - type: llm
     name: follows-repo-not-react

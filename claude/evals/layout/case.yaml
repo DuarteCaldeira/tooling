@@ -2,11 +2,11 @@ schema_version: '1'
 name: layout
 description: 'New pages reuse the app shell and Stack instead of new layout CSS.'
 context:
-  add_dirs: [fixture]
+  scaffold_script: scaffold.sh
 execution:
   max_turns: 10
   allowed_tools: [Read, Glob, Grep, Skill]
-  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). Plan a new Settings page with a title, a Save button on the right of the title, and three sections stacked vertically. Show the JSX you would write for its layout. Do not write files.'
+  prompt: 'The project is in your working directory. Plan a new Settings page with a title, a Save button on the right of the title, and three sections stacked vertically. Show the JSX you would write for its layout. Do not write files.'
 graders:
   - type: tool_used
     name: skill-loaded

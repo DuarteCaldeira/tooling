@@ -63,7 +63,9 @@ Check before merging:
 claude plugin validate --strict claude
 claude plugin validate --strict .
 node --test tests/claude-plugin.test.mjs
-claude plugin eval claude --runs 1   # fixture projects, with and without the plugin; uses your Claude credits
+claude plugin eval claude --runs 1 --scaffold   # fixture projects, with and without the plugin; uses your Claude credits
+# --scaffold runs each case's scaffold.sh, which copies its fixture into the run. On Windows, put Git's bin
+# before WSL's bash.exe on PATH, or the scaffold fails with "No such file".
 # The validate case runs Bash: add --allow-tools Bash Edit Write, on Linux/macOS only (shell tools need the OS sandbox)
 ```
 
