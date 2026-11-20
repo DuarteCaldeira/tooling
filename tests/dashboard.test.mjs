@@ -8,7 +8,7 @@ import {
   collect,
   createClient,
   latestRelease,
-  toolingAtRelease,
+  toolingAtRef,
   validateConfig,
 } from '../dashboard/collect.mjs';
 
@@ -37,27 +37,31 @@ const release = {
   prerelease: false,
 };
 const baseRoutes = {
-  '/repos/owner/app': { id: 1 },
+  '/repos/owner/app': { id: 1, default_branch: 'trunk' },
   '/repos/owner/app/releases?per_page=100&page=1': [release],
   '/repos/owner/app/commits/v1.2.0': { sha },
 };
 
-test('dashboard records the release tag and locked tooling at its immutable commit', async () => {
+test('dashboard records the published release and tooling locked on the default branch', async () => {
   const snapshot = await collect(
     config,
     mockApi({
       ...baseRoutes,
       [`/repos/owner/app/contents/package.json?ref=${sha}`]: file({
+        devDependencies: { '@dcaldeira/tooling': '0.1.0' },
+      }),
+      '/repos/owner/app/contents/package.json?ref=trunk': file({
         version: '99.0.0',
         devDependencies: { '@dcaldeira/tooling': '^0.2.0' },
       }),
-      [`/repos/owner/app/contents/package-lock.json?ref=${sha}`]: file({
+      '/repos/owner/app/contents/package-lock.json?ref=trunk': file({
         packages: { 'node_modules/@dcaldeira/tooling': { version: '0.2.4' } },
       }),
     }),
     new Date('2026-11-15T00:00:00Z'),
   );
   assert.equal(snapshot.apps[0].version, 'v1.2.0');
+  assert.equal(snapshot.apps[0].commit, sha);
   assert.equal(snapshot.apps[0].tooling.version, '0.2.4');
   assert.equal(snapshot.apps[0].releasedAt, release.published_at);
   assert.equal(snapshot.generatedAt, '2026-11-15T00:00:00.000Z');
@@ -94,12 +98,16 @@ test('dashboard distinguishes no release, inaccessible repository and absent too
     },
     mockApi({
       ...baseRoutes,
-      '/repos/owner/new': { id: 2 },
+      '/repos/owner/new': { id: 2, default_branch: 'main' },
+      '/repos/owner/new/contents/package.json?ref=main': file({
+        devDependencies: { '@dcaldeira/tooling': '0.2.0' },
+      }),
       '/repos/owner/new/releases?per_page=100&page=1': [],
     }),
   );
   assert.equal(snapshot.apps[0].tooling.status, 'not-adopted');
   assert.equal(snapshot.apps[1].status, 'unreleased');
+  assert.equal(snapshot.apps[1].tooling.version, '0.2.0');
   assert.equal(snapshot.apps[2].status, 'unavailable');
 });
 
@@ -108,7 +116,7 @@ test('dashboard preserves release information if only tooling collection fails',
     config,
     mockApi({
       ...baseRoutes,
-      [`/repos/owner/app/contents/package.json?ref=${sha}`]: file('{broken'),
+      '/repos/owner/app/contents/package.json?ref=trunk': file('{broken'),
     }),
   );
   assert.equal(snapshot.apps[0].status, 'partial');
@@ -121,7 +129,7 @@ test('dashboard fails instead of replacing every app with unavailable data', asy
 });
 
 test('dashboard does not present dependency ranges as resolved versions', async () => {
-  const result = await toolingAtRelease(
+  const result = await toolingAtRef(
     mockApi({
       [`/repos/owner/app/contents/package.json?ref=${sha}`]: file({
         devDependencies: { '@dcaldeira/tooling': '^1.0.0' },
@@ -150,7 +158,7 @@ test('dashboard resolves the nearest workspace installation and legacy lockfiles
   };
   assert.equal(
     (
-      await toolingAtRelease(
+      await toolingAtRef(
         mockApi(routes),
         { ...app, packagePath: 'frontend/package.json' },
         sha,
@@ -164,7 +172,7 @@ test('dashboard resolves the nearest workspace installation and legacy lockfiles
   });
   assert.equal(
     (
-      await toolingAtRelease(
+      await toolingAtRef(
         mockApi(routes),
         { ...app, packagePath: 'frontend/package.json' },
         sha,
@@ -185,14 +193,14 @@ test('dashboard resolves SHA-pinned workflows and declines moving refs', async (
       version: '1.0.0',
     }),
   };
-  const pinned = await toolingAtRelease(mockApi(routes), app, sha, config.toolingRepository);
+  const pinned = await toolingAtRef(mockApi(routes), app, sha, config.toolingRepository);
   assert.equal(pinned.version, '1.0.0');
   assert.equal(pinned.revision, toolingSha);
   routes[workflowPath] = file(
     'jobs:\n  ci:\n    uses: owner/tooling/.github/workflows/ci.yml@main\n',
   );
   assert.equal(
-    (await toolingAtRelease(mockApi(routes), app, sha, config.toolingRepository)).status,
+    (await toolingAtRef(mockApi(routes), app, sha, config.toolingRepository)).status,
     'unresolved',
   );
 });
@@ -206,6 +214,46 @@ test('dashboard validates app allowlist and file paths before API access', () =>
   assert.throws(
     () => validateConfig({ ...config, apps: [{ ...app, packagePath: '../secrets' }] }),
     /Invalid/,
+  );
+});
+
+test('dashboard splits apps sharing a repository by tag prefix', async () => {
+  const health = { ...app, tagPrefix: 'v' };
+  const meals = { ...app, name: 'Meals', id: 'owner/app/meals', tagPrefix: 'meals-v' };
+  const mealsRelease = { ...release, id: 2, tag_name: 'meals-v0.1.0' };
+  const snapshot = await collect(
+    { ...config, apps: [health, meals] },
+    mockApi({
+      ...baseRoutes,
+      '/repos/owner/app/releases?per_page=100&page=1': [
+        release,
+        mealsRelease,
+        { ...release, id: 3, tag_name: 'meals-latest' },
+      ],
+      '/repos/owner/app/commits/meals-v0.1.0': { sha },
+    }),
+  );
+  const [first, second] = snapshot.apps;
+  assert.equal(first.repository, 'owner/app');
+  assert.deepEqual(
+    first.releases.map((entry) => entry.version),
+    ['v1.2.0'],
+  );
+  assert.equal(second.repository, 'owner/app/meals');
+  assert.equal(second.repositoryUrl, 'https://github.com/owner/app');
+  assert.equal(second.version, 'v0.1.0');
+  assert.deepEqual(
+    second.releases.map((entry) => [entry.version, entry.url]),
+    [['v0.1.0', 'https://github.com/owner/app/releases/tag/meals-v0.1.0']],
+  );
+  assert.throws(() => validateConfig({ ...config, apps: [app, meals] }), /distinct tagPrefix/);
+  assert.throws(
+    () => validateConfig({ ...config, apps: [health, { ...meals, tagPrefix: 'v' }] }),
+    /distinct tagPrefix/,
+  );
+  assert.throws(
+    () => validateConfig({ ...config, apps: [{ ...meals, id: 'bad id' }] }),
+    /Invalid id/,
   );
 });
 

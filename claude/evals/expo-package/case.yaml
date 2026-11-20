@@ -2,11 +2,11 @@ schema_version: '1'
 name: expo-package
 description: 'The core:expo-conventions skill triggers and its rules show up in the answer.'
 context:
-  add_dirs: [fixture]
+  scaffold_script: scaffold.sh
 execution:
   max_turns: 10
   allowed_tools: [Read, Glob, Grep, Skill]
-  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). I want to add a camera feature to this app. Which command should I use to add the camera library, and what do I need to check first?'
+  prompt: 'The project is in your working directory. I want to add a camera feature to this app. Which command should I use to add the camera library, and what do I need to check first?'
 graders:
   - type: tool_used
     name: skill-loaded

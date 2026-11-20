@@ -79,7 +79,7 @@ export async function releaseSnapshot(options) {
   if (!source) {
     if (!process.env.APPS_READ_TOKEN) throw new Error('Release data unavailable');
     const config = await loadConfig();
-    const key = `release-cache/v1/${createHash('sha256').update(JSON.stringify(config)).digest('hex')}.json`;
+    const key = `release-cache/v2/${createHash('sha256').update(JSON.stringify(config)).digest('hex')}.json`;
     const { get, put } = await import('@vercel/blob');
     source ??= createReleaseSource({
       key,

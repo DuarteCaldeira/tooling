@@ -1,12 +1,12 @@
 schema_version: '1'
 name: motion
-description: 'The core:design-motion-principles skill triggers for animation work.'
+description: 'The core:design-motion-principles skill triggers for animation work and its frequency rule decides what moves.'
 context:
-  add_dirs: [fixture]
+  scaffold_script: scaffold.sh
 execution:
   max_turns: 10
   allowed_tools: [Read, Glob, Grep, Skill]
-  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). The Drawer component in src/components/Drawer opens instantly. Describe how you would animate it opening and closing. Do not write files.'
+  prompt: 'The project is in your working directory. The Drawer component in src/components/Drawer opens instantly. Describe how you would animate it opening and closing. Do not write files.'
 graders:
   - type: tool_used
     name: skill-loaded
@@ -14,4 +14,4 @@ graders:
     input_match: 'design-motion-principles'
   - type: llm
     name: purposeful-motion
-    criteria: 'The answer animates transform/opacity (not layout properties), uses a short duration and an ease-out style curve for entering, handles exit, and respects prefers-reduced-motion.'
+    criteria: 'The answer judges motion by how often it is triggered: opening from the `]` keyboard shortcut is instant (not animated), because it happens dozens of times a day. Any animation it keeps for pointer opening is short (under 300 ms), uses transform/opacity rather than layout properties, handles exit, and respects prefers-reduced-motion. An answer that animates every opening the same way fails.'

@@ -17,8 +17,7 @@ From this directory, once authenticated and online:
 
 ```sh
 gh repo create DuarteCaldeira/tooling --public --source=. --remote=origin --push
-git tag v0.1.0
-git push origin v0.1.0
+gh workflow run package-release.yml --ref main
 ```
 
-The package publishing workflow requires npm trusted publishing or an npm automation token configured for this package. Review `npm pack --dry-run -w packages/tooling` before publication. Neither GitHub repository creation nor npm publication is completed by a local Git commit.
+Pushing a `v*` tag no longer publishes: the **Release tooling package** workflow creates the tag, the GitHub release and the npm publication together. It requires npm trusted publishing or an npm automation token configured for this package. Review `npm pack --dry-run -w packages/tooling` before publication. Neither GitHub repository creation nor npm publication is completed by a local Git commit.

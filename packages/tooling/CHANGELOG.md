@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.2.1
+
+- `budgets.bundle.files`: `[path part, label, KB]` allowances for files with no source map, such as a pre-built map worker, which otherwise count against `chunkKB`.
+
+## 0.2.0
 
 - `repoStandard` option and `tooling doctor --repo-standard`: AGENTS.md sections, CLAUDE.md, `.claude/settings.json` plugins (UI plugins only for frontend repos), no `.ai` kit or `ai-memory`. The reusable `ci.yml` runs it when enabled.
 - Opt-in `duplication` check (jscpd): in every profile only clones touching changed files fail; `--all` runs report existing clones without failing; `duplication.scope: "all"` makes every clone fail. It fails when none of `duplication.paths` exist (for example the default `src` in a monorepo) instead of passing without scanning.

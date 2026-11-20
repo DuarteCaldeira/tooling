@@ -16,7 +16,7 @@ The report uses Portuguese UI and full dates such as `15 de novembro, 2026 23:47
 
 Validation and conversation status are shared through immutable private Blob events, scoped to the app, release and stable item ID. Their boolean values are encoded in event metadata filenames so summary reads do not download each event body. No personal browser state is used as the shared validation source. Comments use only their selected display name. Message cards separate the author and timestamp from the body and action footer. Question badges use a blue question mark, while issue badges use a red exclamation mark; their labels remain explicit. QAren messages appear on the right and other messages on the left. No browser participant ID or display-name preference is stored in localStorage, and comments have no Tu badge.
 
-Choose an app from the emoji picker (or the selector on mobile) to browse its releases, search changes or versions, and filter to product notes. Saudinha opens by default; the app selector updates the shareable URL (`?app=DuarteCaldeira%2Fsaudinha-pnn#release-notes`). A compact summary shows the selected app's latest version, last release and tooling version. All six apps remain available in the overview, and SwipeIt is excluded from collection and publication. Releases keep the 🚀 emoji heading style.
+Choose an app from the emoji picker (or the selector on mobile) to browse its releases, search changes or versions, and filter to product notes. Saudinha opens by default; the app selector updates the shareable URL (`?app=DuarteCaldeira%2Fsaudinha-pnn#release-notes`). A compact summary shows the selected app's latest version, last release and tooling version. All seven apps remain available in the overview, and SwipeIt is excluded from collection and publication. Releases keep the 🚀 emoji heading style.
 
 `dashboard/release-notes.json` contains reviewed Portuguese summaries for all 32 published Saudinha versions and 28 published Rookie versions, including 1.27.2. Saudinha's source is its versioned `CHANGELOG.md`; Rookie's versioned in-app changelog and Portuguese translations were checked as well as GitHub release notes, because some GitHub releases contain cumulative older changes. Design system 1.0.0 has no published changelog detail and is labelled accordingly. Summaries are shown only when a matching published release exists. Dates come from GitHub and historical behaviours remain tied to their own version.
 
@@ -39,7 +39,9 @@ Collection reads those bullets at each refresh. An explicit summary in `release-
 
 ## Apps
 
-Edit `dashboard/apps.json` to add or remove apps. The list includes Rookie, Billy, Dra. Gabriela Videira, Saudinha, Despesas and Design system (`DuarteCaldeira/design-system`). Each app can have an `emoji`. Only explicitly listed repositories are published; include each private repository in the read token's access list. Optional `packagePath`, `lockPath` and `workflowPath` support monorepos and custom CI locations; paths are relative to the repository root.
+Edit `dashboard/apps.json` to add or remove apps. The list includes Rookie, Billy, Dra. Gabriela Videira, Saudinha, Comidinha, Despesas and Design system (`DuarteCaldeira/design-system`). Each app can have an `emoji`. Only explicitly listed repositories are published; include each private repository in the read token's access list. Optional `packagePath`, `lockPath`, `workflowPath` and `changelogPath` support monorepos and custom CI locations; paths are relative to the repository root.
+
+Several apps can share one repository (Saudinha and Comidinha both live in `saudinha-pnn`). Each of them then needs a distinct `tagPrefix`, and all but one need an `id`. An app only shows releases whose tag is its prefix followed by a version, such as `meals-v0.1.0` for `"tagPrefix": "meals-v"`, and shows the version as `v0.1.0`. The `id` replaces the repository in the `?app=` URL, in shared validation and conversation storage, and as the key in `release-notes.json`. Apps without an `id` keep their repository as the key, so their existing reviews stay.
 
 ## Shared discussions
 
@@ -51,9 +53,9 @@ Product notes have persisted `itemIds`. When changing wording, keep the matching
 
 The private store is already provisioned and connected to this project. For a different project, create/connect a private Vercel Blob store first. The server SDK is pinned with a dashboard-specific lockfile; a same-major Zod override fixes the SDK's transitive audit finding. The runtime also stores a shared release snapshot in this private store, separately from immutable discussion events. Neither storage credentials nor the server manifest are included in the static site.
 
-Collection resolves each release tag to its commit, then reads the manifest and npm lockfile at that commit. Tooling comes from `@dcaldeira/tooling` (or its previous package name), preferring the nearest workspace installation in `package-lock.json`. Exact manifest versions work without a lockfile. Unresolved ranges, non-npm lockfiles and moving workflow refs are labelled unresolved. Alternatively, a SHA-pinned reusable workflow in `.github/workflows/ci.yml` resolves to `packages/tooling/package.json` at that exact tooling revision. The revision appears below the version, since multiple commits can share a package version. Configure `workflowPath` if the app uses another workflow file.
+Collection resolves each release tag to its commit for release notes. The tooling column reads the manifest and npm lockfile from each repository's default branch, including for apps without a published release. Tooling comes from `@dcaldeira/tooling` (or its previous package name), preferring the nearest workspace installation in `package-lock.json`. Exact manifest versions work without a lockfile. Unresolved ranges, non-npm lockfiles and moving workflow refs are labelled unresolved. Alternatively, a SHA-pinned reusable workflow in `.github/workflows/ci.yml` resolves to `packages/tooling/package.json` at that exact tooling revision. The revision appears below the version, since multiple commits can share a package version. Configure `workflowPath` if the app uses another workflow file.
 
-Apps without releases show "No releases yet". Released apps without the package or a shared workflow show "Not adopted". Access errors show "Unavailable"; tooling-only errors preserve the release and show a warning. If every repository is inaccessible, the runtime retains its last successful snapshot and retries after a minute. During partial outages, previously collected releases for inaccessible apps remain available. A last-checked timestamp and overdue indicator make stale data visible. No repository code is executed during collection. Only selected app metadata, published release notes and their edited summaries are returned by the API; credentials and source manifests are excluded.
+Apps without releases show "No releases yet". Apps without the package or a shared workflow show "Not adopted". Access errors show "Unavailable"; tooling-only errors preserve the release and show tooling as unavailable. If every repository is inaccessible, the runtime retains its last successful snapshot and retries after a minute. During partial outages, previously collected releases for inaccessible apps remain available. A last-checked timestamp and overdue indicator make stale data visible. No repository code is executed during collection. Only selected app metadata, published release notes and their edited summaries are returned by the API; credentials and source manifests are excluded.
 
 ## Runtime updates
 
@@ -61,7 +63,7 @@ The browser reads `/api/releases` on opening the dashboard, every 30 seconds whi
 
 Discussion validation uses the same runtime source, so newly discovered releases accept comments and validation without rebuilding. Each refresh uses a fresh GitHub client, preventing its request cache from hiding new releases. No repository code is executed.
 
-New releases, edited release bodies, deletions and released tooling versions need no deployment. Changing the app allowlist, reviewed summaries in `release-notes.json`, dashboard code or the design-system dependency still requires a deployment. Versions continue to represent published releases and the tooling dependency at each release commit, not unpublished changes on main.
+New releases, edited release bodies, deletions and tooling dependency updates on an app's default branch need no deployment. Changing the app allowlist, reviewed summaries in `release-notes.json`, dashboard code or the design-system dependency still requires a deployment.
 
 ## API latency
 
@@ -94,4 +96,3 @@ npm run test:dashboard:runtime
 ```
 
 Use Vercel's development environment with the runtime secrets for a full local preview. A static-only server or plain Vite preview does not provide the release/discussion APIs. For a standalone data export, the legacy `node dashboard/collect.mjs` command still writes `.tooling/dashboard-site/data.json` with `APPS_READ_TOKEN` set; `node dashboard/build.mjs` remains an optional export/storage diagnostic, outside the deployment build path.
-
