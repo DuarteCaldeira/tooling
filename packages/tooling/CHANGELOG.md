@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- No changes to the package's code, configs or templates since 0.2.1. This release tags the current `main`, which adds release dashboard and plugin updates outside the package.
+
 ## 0.2.1
 
 - `budgets.bundle.files`: `[path part, label, KB]` allowances for files with no source map, such as a pre-built map worker, which otherwise count against `chunkKB`.
