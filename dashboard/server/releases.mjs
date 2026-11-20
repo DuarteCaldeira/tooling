@@ -116,7 +116,7 @@ export function createReleaseHandler(getSnapshot = releaseSnapshot) {
       return Response.json(await getSnapshot(), { headers });
     } catch {
       return Response.json(
-        { error: 'As vers�es est�o temporariamente indispon�veis' },
+        { error: 'As versões estão temporariamente indisponíveis' },
         {
           status: 503,
           headers,

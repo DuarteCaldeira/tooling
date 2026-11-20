@@ -179,7 +179,7 @@ export async function collect(config, api, now = new Date()) {
   for (const app of config.apps) {
     const row = {
       name: app.name,
-      emoji: app.emoji ?? '??',
+      emoji: app.emoji ?? '📦',
       repository: app.repository,
       repositoryUrl: `https://github.com/${app.repository}`,
       version: null,

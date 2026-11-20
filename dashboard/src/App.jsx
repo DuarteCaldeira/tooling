@@ -48,13 +48,13 @@ function useCountUp(value) {
 
 function ToolingValue({ tooling }) {
   const labels = {
-    'not-adopted': 'N�o utilizado',
+    'not-adopted': 'Não utilizado',
     unresolved: 'Por resolver',
-    unknown: 'Indispon�vel',
+    unknown: 'Indisponível',
   };
   return (
     <div>
-      <span className="value">{tooling.version ?? labels[tooling.status] ?? 'Indispon�vel'}</span>
+      <span className="value">{tooling.version ?? labels[tooling.status] ?? 'Indisponível'}</span>
       {tooling.revision ? (
         <small className="detail mono">{tooling.revision.slice(0, 7)}</small>
       ) : null}
@@ -63,7 +63,7 @@ function ToolingValue({ tooling }) {
 }
 
 const versionLabel = (app) =>
-  app?.version ?? (app?.status === 'unavailable' ? 'Indispon�vel' : 'Sem publica��es');
+  app?.version ?? (app?.status === 'unavailable' ? 'Indisponível' : 'Sem publicações');
 
 function Ticker({ apps }) {
   const recent = apps
@@ -74,7 +74,7 @@ function Ticker({ apps }) {
     <ul className="ticker-row" aria-hidden={hidden || undefined}>
       {recent.map((app) => (
         <li key={app.repository}>
-          <span className="ticker-emoji">{app.emoji ?? '??'}</span>
+          <span className="ticker-emoji">{app.emoji ?? '📦'}</span>
           <strong>{app.name}</strong>
           <span className="mono">{app.version}</span>
           <ReleaseDate value={app.releasedAt} />
@@ -83,7 +83,7 @@ function Ticker({ apps }) {
     </ul>
   );
   return (
-    <div className="ticker" role="group" aria-label="Publica��es recentes">
+    <div className="ticker" role="group" aria-label="Publicações recentes">
       <div className="ticker-track">
         {row(false)}
         {row(true)}
@@ -105,7 +105,7 @@ function AppTabs({ apps, selected, onSelect }) {
     });
   }, [selected]);
   return (
-    <nav ref={nav} id="app-nav" className="app-tabs" aria-label="Escolher uma aplica��o">
+    <nav ref={nav} id="app-nav" className="app-tabs" aria-label="Escolher uma aplicação">
       {apps.map((app, index) => (
         <button
           key={app.repository}
@@ -116,10 +116,10 @@ function AppTabs({ apps, selected, onSelect }) {
           onClick={() => onSelect(app.repository)}
         >
           <span className="choice-emoji" aria-hidden="true">
-            {app.emoji ?? '??'}
+            {app.emoji ?? '📦'}
           </span>
           <span className="choice-name">{app.name}</span>
-          <span className="choice-version mono">{app.version ?? '-'}</span>
+          <span className="choice-version mono">{app.version ?? '—'}</span>
         </button>
       ))}
     </nav>
@@ -155,24 +155,24 @@ function Bento({ app, review }) {
   const caption = loaded
     ? `${validated} de ${total} novidades validadas`
     : review.hasError(repository)
-      ? 'Revis�o indispon�vel de momento'
-      : 'A carregar a revis�o.';
+      ? 'Revisão indisponível de momento'
+      : 'A carregar a revisão…';
   const percent = loaded && total ? Math.round((validated / total) * 100) : null;
   const pShown = useCountUp(percent);
   const tShown = useCountUp(total);
   const pendingShown = useCountUp(loaded ? total - validated : null);
   const openShown = useCountUp(loaded ? open : null);
   return (
-    <section className="bento" aria-label="Aplica��o selecionada">
+    <section className="bento" aria-label="Aplicação selecionada">
       <div className="tile tile-name">
         <div className="selected-app-heading">
           <span className="selected-emoji" aria-hidden="true">
-            {app?.emoji ?? '??'}
+            {app?.emoji ?? '📦'}
           </span>
           <span className="selected-label">A acontecer em</span>
         </div>
         <div className="selected-name">
-          <h2>{app?.name ?? 'Escolha uma aplica��o'}</h2>
+          <h2>{app?.name ?? 'Escolha uma aplicação'}</h2>
         </div>
         {githubUrl(app?.repositoryUrl) ? (
           <a className="tile-link" href={app.repositoryUrl}>
@@ -182,11 +182,11 @@ function Bento({ app, review }) {
       </div>
       <dl className="selected-metrics">
         <div className="tile tile-version">
-          <dt>�ltima vers�o</dt>
+          <dt>Última versão</dt>
           <dd className="metric-version">{versionLabel(app)}</dd>
         </div>
         <div className="tile tile-date">
-          <dt>�ltima publica��o</dt>
+          <dt>Última publicação</dt>
           <dd>
             <ReleaseDate value={app?.releasedAt} />
           </dd>
@@ -198,9 +198,9 @@ function Bento({ app, review }) {
           </dd>
         </div>
       </dl>
-      <div className="tile tile-score review-overview" aria-label="Estado de revis�o">
+      <div className="tile tile-score review-overview" aria-label="Estado de revisão">
         <span className="review-percent" aria-hidden="true">
-          {pShown ?? '-'}
+          {pShown ?? '—'}
           {percent === null ? null : <small>%</small>}
         </span>
         <span className="review-score-label">validado</span>
@@ -213,11 +213,11 @@ function Bento({ app, review }) {
           </div>
           <div className="stat">
             <span className="stat-label">Por validar</span>
-            <strong className="stat-value">{pendingShown ?? '-'}</strong>
+            <strong className="stat-value">{pendingShown ?? '—'}</strong>
           </div>
           <div className="stat">
             <span className="stat-label">Conversas em aberto</span>
-            <strong className="stat-value">{openShown ?? '-'}</strong>
+            <strong className="stat-value">{openShown ?? '—'}</strong>
           </div>
         </div>
         <div className="review-completion">
@@ -278,16 +278,16 @@ function Portfolio({ apps, snapshot, onSelect }) {
             id: 'apps',
             header: (
               <span className="portfolio-heading">
-                <span>Vis�o geral das aplica��es</span>
-                <span className="portfolio-hint">Vers�es e tooling</span>
+                <span>Visão geral das aplicações</span>
+                <span className="portfolio-hint">Versões e tooling</span>
               </span>
             ),
             content: (
               <div className="portfolio-body">
-                <div className="stats" aria-label="Vis�o geral das aplica��es">
+                <div className="stats" aria-label="Visão geral das aplicações">
                   {[
-                    [apps.length, 'Aplica��es'],
-                    [released, 'Com vers�es publicadas'],
+                    [apps.length, 'Aplicações'],
+                    [released, 'Com versões publicadas'],
                     [adopted, 'Com tooling partilhado'],
                   ].map(([value, label]) => (
                     <div key={label} className="stat-block">
@@ -298,18 +298,18 @@ function Portfolio({ apps, snapshot, onSelect }) {
                 </div>
                 <div className="section-heading">
                   <h2>
-                    Todas as aplica��es <span className="count">{apps.length}</span>
+                    Todas as aplicações <span className="count">{apps.length}</span>
                   </h2>
                   <SearchFilter
                     id="search"
-                    label="Pesquisar aplica��es"
-                    placeholder="Pesquisar aplica��es."
+                    label="Pesquisar aplicações"
+                    placeholder="Pesquisar aplicações…"
                     value={query}
                     onChange={setQuery}
                   />
                 </div>
                 <div className="collection-controls">
-                  <div className="filters" role="group" aria-label="Filtrar aplica��es">
+                  <div className="filters" role="group" aria-label="Filtrar aplicações">
                     {filters.map(([id, label, count]) => (
                       <Button
                         key={id}
@@ -325,35 +325,35 @@ function Portfolio({ apps, snapshot, onSelect }) {
                   <div className="sort">
                     <Select
                       id="sort"
-                      label="Ordenar aplica��es"
+                      label="Ordenar aplicações"
                       value={sort}
                       onChange={setSort}
                       options={[
-                        { value: 'latest', label: 'Publica��o mais recente' },
-                        { value: 'name', label: 'Nome A-Z' },
+                        { value: 'latest', label: 'Publicação mais recente' },
+                        { value: 'name', label: 'Nome A–Z' },
                       ]}
                     />
                   </div>
                 </div>
                 <p role="status" aria-live="polite" className="portfolio-message">
                   {!visible.length
-                    ? 'Nenhuma aplica��o corresponde aos filtros.'
+                    ? 'Nenhuma aplicação corresponde aos filtros.'
                     : apps.some((app) => app.status === 'unavailable')
-                      ? 'Algumas aplica��es est�o indispon�veis. Verifique o acesso aos reposit�rios.'
+                      ? 'Algumas aplicações estão indisponíveis. Verifique o acesso aos repositórios.'
                       : ''}
                 </p>
                 <div className="ledger">
                   <div className="ledger-head" aria-hidden="true">
-                    <span>Aplica��o</span>
-                    <span>Vers�o</span>
+                    <span>Aplicação</span>
+                    <span>Versão</span>
                     <span>Tooling atual</span>
-                    <span>Publica��o</span>
+                    <span>Publicação</span>
                     <span />
                   </div>
                   {visible.map((app) => (
                     <article key={app.repository} className="app-card">
                       <div className="identity">
-                        <span className="app-icon">{app.emoji ?? '??'}</span>
+                        <span className="app-icon">{app.emoji ?? '📦'}</span>
                         <h3>
                           <button
                             type="button"
@@ -365,7 +365,7 @@ function Portfolio({ apps, snapshot, onSelect }) {
                         </h3>
                       </div>
                       <p className={`app-version${app.version ? ' mono' : ' is-empty'}`}>
-                        {app.version ?? 'Sem vers�o publicada'}
+                        {app.version ?? 'Sem versão publicada'}
                       </p>
                       <dl className="card-metrics">
                         <div>
@@ -375,7 +375,7 @@ function Portfolio({ apps, snapshot, onSelect }) {
                           </dd>
                         </div>
                         <div>
-                          <dt>Publica��o</dt>
+                          <dt>Publicação</dt>
                           <dd>
                             <ReleaseDate value={app.releasedAt} />
                           </dd>
@@ -397,7 +397,7 @@ function Portfolio({ apps, snapshot, onSelect }) {
                 </div>
                 <div className="workspace-details">
                   <section>
-                    <h2>Publica��es recentes</h2>
+                    <h2>Publicações recentes</h2>
                     {recent.length ? (
                       <ol className="release-list">
                         {recent.map((app) => (
@@ -415,22 +415,22 @@ function Portfolio({ apps, snapshot, onSelect }) {
                         ))}
                       </ol>
                     ) : (
-                      <p>Ainda n�o h� vers�es publicadas.</p>
+                      <p>Ainda não há versões publicadas.</p>
                     )}
                   </section>
                   <section>
                     <h2>Tooling partilhado</h2>
                     <p className="adoption">
-                      <strong>{percent}%</strong> das aplica��es t�m a vers�o de tooling
+                      <strong>{percent}%</strong> das aplicações têm a versão de tooling
                       identificada.
                     </p>
                     <Progress
                       variant="primary"
                       value={percent}
                       max={100}
-                      label="Aplica��es com tooling partilhado"
+                      label="Aplicações com tooling partilhado"
                     />
-                    <p>{`${adopted} de ${apps.length} aplica��es t�m uma vers�o de tooling identificada no ramo predefinido.`}</p>
+                    <p>{`${adopted} de ${apps.length} aplicações têm uma versão de tooling identificada no ramo predefinido.`}</p>
                   </section>
                 </div>
               </div>
@@ -504,7 +504,7 @@ export function App() {
             version: release.version,
             item,
             appName: app.name,
-            text: entry?.text ?? 'Conversa sobre esta vers�o e novas descobertas',
+            text: entry?.text ?? 'Conversa sobre esta versão e novas descobertas',
             technical: Boolean(entry?.id?.startsWith('technical-')),
             reported: Boolean(entry?.reported),
           });
@@ -548,11 +548,11 @@ export function App() {
   };
   const app = apps.find((entry) => entry.repository === selected);
   const updated = failed
-    ? 'Informa��o indispon�vel'
+    ? 'Informação indisponível'
     : snapshot
       ? portugueseDate(snapshot.generatedAt) +
-        (Date.now() - Date.parse(snapshot.generatedAt) > 120000 ? ' � Atualiza��o em atraso' : '')
-      : 'A carregar as vers�es.';
+        (Date.now() - Date.parse(snapshot.generatedAt) > 120000 ? ' · Atualização em atraso' : '')
+      : 'A carregar as versões…';
 
   const stale = Boolean(snapshot) && Date.now() - Date.parse(snapshot.generatedAt) > 120000;
   const accentIndex = Math.max(
@@ -576,10 +576,10 @@ export function App() {
           <div className="header-end">
             <span className={`header-status${stale || failed ? ' is-stale' : ''}`}>
               <i className="live-dot" aria-hidden="true" />
-              {failed ? 'Sem liga��o' : stale ? 'Em atraso' : snapshot ? 'Em direto' : 'A ligar.'}
+              {failed ? 'Sem ligação' : stale ? 'Em atraso' : snapshot ? 'Em direto' : 'A ligar…'}
             </span>
             <a className="header-link" href="#apps">
-              Vis�o geral
+              Visão geral
             </a>
             <a className="header-link" href="https://github.com/DuarteCaldeira/tooling">
               GitHub <ArrowUpRight />
@@ -593,12 +593,12 @@ export function App() {
           <h1 className="visually-hidden">Novidades</h1>
           {failed ? (
             <p role="status" id="release-refresh-error">
-              N�o foi poss�vel carregar as vers�es. Tente novamente dentro de instantes.
+              Não foi possível carregar as versões. Tente novamente dentro de instantes.
             </p>
           ) : null}
           {!snapshot && !failed ? (
             <p className="loading" role="status">
-              A carregar as vers�es.
+              A carregar as versões…
             </p>
           ) : snapshot ? (
             <>
@@ -611,8 +611,8 @@ export function App() {
           <footer>
             <span>Atualizado: {updated}</span>
             <span>
-              Hora de Portugal continental <span aria-hidden="true">�</span>{' '}
-              <a href="/api/releases">Dados das vers�es</a>
+              Hora de Portugal continental <span aria-hidden="true">·</span>{' '}
+              <a href="/api/releases">Dados das versões</a>
             </span>
           </footer>
         </div>
