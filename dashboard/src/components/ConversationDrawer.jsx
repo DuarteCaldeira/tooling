@@ -72,6 +72,24 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
   const [deleting, setDeleting] = useState(null);
   const [deleteError, setDeleteError] = useState('');
   const deletingComment = comments.find((comment) => comment.id === deleting);
+
+  async function closeDrawer() {
+    if (deletingComment) return;
+    const drawer = contentRef.current?.closest('[role="dialog"]');
+    if (!drawer) {
+      onClose();
+      return;
+    }
+    if (drawer.hasAttribute('data-closing')) return;
+    drawer.style.setProperty('--conversation-exit-start', getComputedStyle(drawer).transform);
+    drawer.setAttribute('data-closing', '');
+    const exit = drawer
+      .getAnimations()
+      .find((animation) => animation.animationName === 'conversation-exit');
+    if (exit) await exit.finished.catch(() => {});
+    if (drawer.isConnected) onClose();
+  }
+
   useLayoutEffect(() => {
     if (!deletingComment) return undefined;
     const drawer = contentRef.current?.closest('[role="dialog"]');
@@ -313,9 +331,7 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
     <>
       <Drawer
         isOpen={open}
-        onClose={() => {
-          if (!deletingComment) onClose();
-        }}
+        onClose={closeDrawer}
         title={isReport ? '🐛 Reportar bug' : '💬 Conversa'}
         subtitle={context ? `${context.appName} · ${context.version}` : undefined}
         closeLabel="Fechar"
@@ -347,6 +363,7 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
                     {canValidate ? (
                       <ToggleSwitch
                         id="conversation-validated"
+                        className="conversation-toggle"
                         label="Validada"
                         helperText="Confirma que esta novidade está correta."
                         checked={state.validated}
@@ -362,6 +379,7 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
                     ) : null}
                     <ToggleSwitch
                       id="conversation-resolved"
+                      className="conversation-toggle"
                       label="Conversa resolvida"
                       helperText="Marca esta conversa como tratada. Pode reabri-la quando quiser."
                       checked={state.closed}
@@ -503,20 +521,22 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
             ) : null}
             <Section title={isReport ? 'Novo problema' : 'Novo comentário'} className="drawer-form">
               <form className="comment-form" onSubmit={submit} aria-busy={busy}>
-                <Select
-                  id="comment-author"
-                  label="Nome"
-                  options={authors}
-                  value={author}
-                  onChange={setAuthor}
-                />
-                <Select
-                  id="comment-kind"
-                  label="Tipo"
-                  options={kinds}
-                  value={kind}
-                  onChange={setKind}
-                />
+                <div className="comment-form-fields">
+                  <Select
+                    id="comment-author"
+                    label="Nome"
+                    options={authors}
+                    value={author}
+                    onChange={setAuthor}
+                  />
+                  <Select
+                    id="comment-kind"
+                    label="Tipo"
+                    options={kinds}
+                    value={kind}
+                    onChange={setKind}
+                  />
+                </div>
                 <Textarea
                   id="comment-body"
                   label="Mensagem"
@@ -531,7 +551,11 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
                 <Button type="submit" variant="primary" isLoading={busy}>
                   {isReport ? 'Adicionar à versão' : 'Enviar comentário'}
                 </Button>
-                {isReport && status ? <p role="status">{status}</p> : null}
+                {isReport && status ? (
+                  <p className="drawer-status" role="status">
+                    {status}
+                  </p>
+                ) : null}
               </form>
             </Section>
           </div>
