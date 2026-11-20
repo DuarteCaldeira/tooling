@@ -2,11 +2,11 @@ schema_version: '1'
 name: validate
 description: 'A bug fix gets a regression test and a test run before the agent says it is done.'
 context:
-  add_dirs: [fixture]
+  scaffold_script: scaffold.sh
 execution:
   max_turns: 20
   allowed_tools: [Read, Glob, Grep, Edit, Write, Bash, Skill]
-  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). `slugify("Hello  World")` returns `hello--world`; it should return `hello-world`. Fix it.'
+  prompt: 'The project is in your working directory. `slugify("Hello  World")` returns `hello--world`; it should return `hello-world`. Fix it.'
 graders:
   - type: tool_used
     name: tests-run

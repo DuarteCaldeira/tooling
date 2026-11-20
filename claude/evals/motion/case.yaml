@@ -2,11 +2,11 @@ schema_version: '1'
 name: motion
 description: 'The core:design-motion-principles skill triggers for animation work.'
 context:
-  add_dirs: [fixture]
+  scaffold_script: scaffold.sh
 execution:
   max_turns: 10
   allowed_tools: [Read, Glob, Grep, Skill]
-  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). The Drawer component in src/components/Drawer opens instantly. Describe how you would animate it opening and closing. Do not write files.'
+  prompt: 'The project is in your working directory. The Drawer component in src/components/Drawer opens instantly. Describe how you would animate it opening and closing. Do not write files.'
 graders:
   - type: tool_used
     name: skill-loaded

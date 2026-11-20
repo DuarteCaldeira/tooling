@@ -145,6 +145,17 @@ test('session start injects rules and stack in JS repos and nothing elsewhere', 
   assert.equal(hook('session-start.mjs', { cwd: temp() }).stdout, '');
 });
 
+test('session start finds a JS project below a git root without package.json', () => {
+  const root = temp();
+  mkdirSync(join(root, '.git'));
+  put(root, 'app/package.json', { devDependencies: { vite: '8' } });
+  const result = hook('session-start.mjs', { cwd: join(root, 'app') });
+  assert.match(
+    JSON.parse(result.stdout).hookSpecificOutput.additionalContext,
+    /Detected stack: vite\./,
+  );
+});
+
 test('session start leaves frontend rules out of non-frontend repos', () => {
   const root = temp();
   put(root, 'package.json', { devDependencies: { typescript: '6' } });

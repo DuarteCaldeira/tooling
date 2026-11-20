@@ -2,6 +2,11 @@
 
 Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
 
+## 0.2.1
+
+- Evals: each case copies its `fixture/` into the run's working directory with a `scaffold.sh` (run with `--scaffold`). With `add_dirs` the agent got read access but was never told the fixture's path, so no case could read its project.
+- Session start: when the git root has no `package.json`, the rules come from the nearest `package.json` instead of being skipped (a JS app in a subfolder of a non-JS repo, and eval runs, whose home is a git repo).
+
 ## 0.2.0
 
 - Session context names the folders each stack lives in (`vite (dashboard/)`). The stack skill and the frontend rules apply only to files there, so other code in a monorepo no longer gets React conventions. The TypeScript rule applies to TypeScript code only.
