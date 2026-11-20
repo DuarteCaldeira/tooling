@@ -108,9 +108,9 @@ export function productNotes(body = '') {
     : null;
 }
 
-export async function toolingAtRelease(api, app, sha, toolingRepository) {
+export async function toolingAtRef(api, app, ref, toolingRepository) {
   const packagePath = app.packagePath ?? 'package.json';
-  const text = await contents(api, app.repository, packagePath, sha);
+  const text = await contents(api, app.repository, packagePath, ref);
   const manifest = text ? JSON.parse(text) : {};
   const dependencies = {
     ...manifest.dependencies,
@@ -120,7 +120,7 @@ export async function toolingAtRelease(api, app, sha, toolingRepository) {
   const dependency = packageNames.find((name) => dependencies[name]);
   if (dependency) {
     const declared = dependencies[dependency];
-    const lockText = await contents(api, app.repository, app.lockPath ?? 'package-lock.json', sha);
+    const lockText = await contents(api, app.repository, app.lockPath ?? 'package-lock.json', ref);
     const lock = lockText ? JSON.parse(lockText) : {};
     // A workspace can have its own installed version rather than the hoisted one.
     let directory = posix.dirname(packagePath);
@@ -142,7 +142,7 @@ export async function toolingAtRelease(api, app, sha, toolingRepository) {
     api,
     app.repository,
     app.workflowPath ?? '.github/workflows/ci.yml',
-    sha,
+    ref,
   );
   const escaped = toolingRepository.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const matches = [
@@ -158,7 +158,7 @@ export async function toolingAtRelease(api, app, sha, toolingRepository) {
     return { version: null, status: 'unresolved', source: 'workflow', declared: refs.join(', ') };
   if (refs.length === 1) {
     const ref = refs[0];
-    // A moving branch cannot identify the tooling used by an earlier release.
+    // A moving workflow ref cannot identify the version pinned by the app.
     if (!/^[a-f\d]{40}$/i.test(ref))
       return { version: null, status: 'unresolved', source: 'workflow', declared: ref };
     const tooling = await contents(api, toolingRepository, 'packages/tooling/package.json', ref);
@@ -189,7 +189,18 @@ export async function collect(config, api, now = new Date()) {
     };
     try {
       // A missing release and a missing/private repository are different states.
-      await api(`/repos/${app.repository}`);
+      const repository = await api(`/repos/${app.repository}`);
+      try {
+        if (repository.default_branch)
+          row.tooling = await toolingAtRef(
+            api,
+            app,
+            repository.default_branch,
+            config.toolingRepository,
+          );
+      } catch {
+        // Keep release information available when tooling metadata cannot be read.
+      }
       const history = await releaseHistory(api, app.repository);
       row.releases = history.map((item) => {
         const override = app.releaseNotes?.[item.tag_name.replace(/^v/, '')];
@@ -248,12 +259,7 @@ export async function collect(config, api, now = new Date()) {
         prerelease: release.prerelease,
         commit: commit.sha,
       });
-      try {
-        row.tooling = await toolingAtRelease(api, app, commit.sha, config.toolingRepository);
-        row.status = 'released';
-      } catch {
-        row.status = 'partial';
-      }
+      row.status = row.tooling.status === 'unknown' ? 'partial' : 'released';
       apps.push(row);
     } catch {
       apps.push({ ...row, status: 'unavailable' });
