@@ -63,9 +63,9 @@ Check before merging:
 claude plugin validate --strict claude
 claude plugin validate --strict .
 node --test tests/claude-plugin.test.mjs
-claude plugin eval claude --runs 1 --scaffold --judge-model sonnet   # fixture projects, with and without the plugin; uses your Claude credits
-# --scaffold runs each case's scaffold.sh, which copies its fixture into the run. On Windows, put Git's bin
-# before WSL's bash.exe on PATH, or the scaffold fails with "No such file".
+npm run eval:plugin -- --runs 1   # fixture projects, with and without the plugin; uses your Claude credits
+# eval:plugin adds --scaffold (each case's scaffold.sh copies its fixture into the run) and --judge-model sonnet.
+# On Windows it puts Git's bash first on PATH: WSL's bash.exe cannot open the scaffold's Windows path.
 # The validate case runs Bash: add --allow-tools Bash Edit Write, on Linux/macOS only (shell tools need the OS sandbox)
 ```
 
