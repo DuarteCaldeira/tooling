@@ -2,6 +2,10 @@
 
 Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
 
+## 0.2.4
+
+- Evals: the `supabase-migration` fixture uses vite 8.1.6 (was 8.0.0).
+
 ## 0.2.3
 
 - Evals: the `scoped-stack` fixture uses vite 8.1.6 (was 8.0.0).
