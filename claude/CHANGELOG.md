@@ -2,6 +2,10 @@
 
 Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
 
+## 0.2.3
+
+- Evals: the `scoped-stack` fixture uses vite 8.1.6 (was 8.0.0).
+
 ## 0.2.2
 
 - Core rules: a review of a change to auth, money, personal data, API contracts or migrations goes to the `core:reviewer` agent. Before, the rule lived only in `core:workflow`, which a review request does not load.
