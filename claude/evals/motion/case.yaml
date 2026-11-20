@@ -1,6 +1,6 @@
 schema_version: '1'
 name: motion
-description: 'The core:design-motion-principles skill triggers for animation work.'
+description: 'The core:design-motion-principles skill triggers for animation work and its frequency rule decides what moves.'
 context:
   scaffold_script: scaffold.sh
 execution:
@@ -14,4 +14,4 @@ graders:
     input_match: 'design-motion-principles'
   - type: llm
     name: purposeful-motion
-    criteria: 'The answer animates transform/opacity (not layout properties), uses a short duration and an ease-out style curve for entering, handles exit, and respects prefers-reduced-motion.'
+    criteria: 'The answer judges motion by how often it is triggered: opening from the `]` keyboard shortcut is instant (not animated), because it happens dozens of times a day. Any animation it keeps for pointer opening is short (under 300 ms), uses transform/opacity rather than layout properties, handles exit, and respects prefers-reduced-motion. An answer that animates every opening the same way fails.'

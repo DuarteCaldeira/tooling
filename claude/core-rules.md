@@ -40,4 +40,5 @@ Repo facts live in `AGENTS.md`; where it disagrees with these rules, it wins. A 
 **Done means**
 
 - Formatted; lint, types and related tests green (the Stop hook runs `tooling --profile=dev --changed`). Report what you could not run as "not verified".
+- A review of a change to auth, money, personal data, API contracts or migrations (yours or the user's) goes to the `core:reviewer` agent, not an inline read.
 - Workflow, commits and PRs: `core:workflow`. New or drifting repo: `core:repo-standard`.

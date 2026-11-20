@@ -2,6 +2,12 @@
 
 Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
 
+## 0.2.2
+
+- Core rules: a review of a change to auth, money, personal data, API contracts or migrations goes to the `core:reviewer` agent. Before, the rule lived only in `core:workflow`, which a review request does not load.
+- Evals `layout` and `motion` now grade what only the plugin teaches: i18n keys in every locale (a separate `layout` grader); the motion skill's frequency rule (no animation for a keyboard shortcut used dozens of times a day). Both passed without the plugin before. `scoped-stack` is labelled a no-harm guard (Δ 0 expected).
+- Eval command uses `--judge-model sonnet`: the default haiku judge split its votes on correct answers (supabase-migration scored −0.50 with haiku, +0.50 with Sonnet).
+
 ## 0.2.1
 
 - Evals: each case copies its `fixture/` into the run's working directory with a `scaffold.sh` (run with `--scaffold`). With `add_dirs` the agent got read access but was never told the fixture's path, so no case could read its project.
