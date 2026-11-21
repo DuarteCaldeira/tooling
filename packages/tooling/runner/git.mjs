@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, readlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { executable } from './execute.mjs';
+import { detectPackageManager, installedLockfile } from './package-manager.mjs';
 
 export const git = (root, ...args) =>
   execFileSync('git', args, {
@@ -70,7 +71,7 @@ export function captureSnapshot(
   add(process.version);
   add(process.platform);
   add(config);
-  for (const file of ['node_modules/.package-lock.json', ...inputs]) {
+  for (const file of [installedLockfile(detectPackageManager(root)), ...inputs]) {
     add(file);
     try {
       const bytes = readFileSync(resolve(root, file));

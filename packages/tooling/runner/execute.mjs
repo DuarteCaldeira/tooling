@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { inside } from './config.mjs';
 import { matches } from './graph.mjs';
+import { adaptCommand, detectPackageManager } from './package-manager.mjs';
 
 const bins = {
   prettier: 'prettier',
@@ -67,6 +68,13 @@ export function invoke(command, root, { cwd = root, extra = [], quiet = false, e
       });
     [file, ...args] = [...binary, ...command.slice(1), ...extra];
     shell = false;
+    // Node refuses to spawn .cmd/.bat shims (pnpm.cmd) without a shell on Windows.
+    if (process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(file)) {
+      const quote = (value) =>
+        /[\s&|<>^()"]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+      [file, ...args] = [quote(file), ...args.map(quote)];
+      shell = true;
+    }
   } else {
     if (extra.length) throw new Error('Changed-file commands must use an argument array');
     file = command;
@@ -128,6 +136,7 @@ export async function execute(
       { id, status: 'excluded', reason: 'Required check intentionally excluded' },
     ]),
   );
+  const packageManager = detectPackageManager(root);
   const pending = selection.checks.filter((c) => !c.excluded);
   const running = new Map();
   const resources = new Set();
@@ -174,6 +183,7 @@ export async function execute(
       : selection.profile === 'dev'
         ? (check.devAllCommand ?? check.command)
         : check.command;
+    command = adaptCommand(command, packageManager);
     if (!toolCache && Array.isArray(command) && command[0] === 'eslint') {
       command = command.filter(
         (value, index, args) =>

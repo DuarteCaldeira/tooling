@@ -11,6 +11,16 @@ The package, CLI and repository are now `@dcaldeira/tooling`, `tooling` and `Dua
 
 Rookie budgets, locale names, coverage floors, exercise seed generation, Supabase setup and environment variables belong to Rookie. Do not extract its workout/domain logic. Internal tooling work has no What's New entry.
 
+## Migrating a consumer from npm to pnpm
+
+Requires `@dcaldeira/tooling` 0.3.0 or later and a reusable-workflow SHA from that release.
+
+1. Add `"packageManager": "pnpm@<exact version>"` to the root `package.json` (the workflows install exactly that pnpm version), run `pnpm import` or `pnpm install`, commit `pnpm-lock.yaml` and delete `package-lock.json`.
+2. Replace `npm run …` in `.githooks/pre-push` and the `check:*` scripts with `pnpm run …`. Adapters in `tooling.config.json` may stay as `["npm", "run", "x"]`: they run through pnpm in a pnpm repository.
+3. Bump the `tooling-sha` and the `uses:` SHA in `.github/workflows/ci.yml` and `release.yml` together. Keep `package-ecosystem: npm` in `dependabot.yml`: Dependabot uses it for pnpm.
+4. Install the peer tools as direct devDependencies: pnpm does not hoist them, and the runner resolves binaries from `node_modules`.
+5. `audit-allowlist.json` keeps its format. Remove `lightweight-docs: true` from the workflow call if you want to avoid a second install path; it falls back to the full install under pnpm anyway.
+
 ## First publication
 
 From this directory, once authenticated and online:
