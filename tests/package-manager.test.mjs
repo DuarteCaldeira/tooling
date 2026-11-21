@@ -178,10 +178,10 @@ test('execute runs npm adapters and the security check through pnpm only in pnpm
       commands.push(typeof command === 'string' ? command : command.join(' '));
       return { status: 'passed' };
     };
-    await execute(root, plan({}, { profile: 'ci', only: ['build', 'size', 'security'] }), {
-      run,
-      cache: undefined,
-    });
+    const selection = plan({}, { profile: 'ci', only: ['build', 'size', 'security'] });
+    // Host tools (gitleaks) must not decide whether a check reaches `run`.
+    selection.checks = selection.checks.map(({ tools, ...check }) => check);
+    await execute(root, selection, { run, cache: undefined });
     return commands;
   };
   const npm = await seen(project({ 'package.json': '{}' }));
