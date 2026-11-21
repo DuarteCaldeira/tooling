@@ -1,6 +1,6 @@
 {
   "name": "core",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Conventions, workflow, repo standard and validation hooks for React/Vite and Expo projects.",
   "author": { "name": "DuarteCaldeira", "url": "https://github.com/DuarteCaldeira" },
   "repository": "https://github.com/DuarteCaldeira/tooling",
