@@ -1,6 +1,6 @@
 {
   "name": "@dcaldeira/tooling",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Shared checks and change detection for local development and GitHub Actions",
   "type": "module",
   "license": "MIT",

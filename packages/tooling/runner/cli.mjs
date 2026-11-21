@@ -7,6 +7,12 @@ import { changedFiles, clean, git, captureSnapshot } from './git.mjs';
 import { checkCache } from './cache.mjs';
 import { plan } from './graph.mjs';
 import { execute, invoke } from './execute.mjs';
+import {
+  adaptCommand,
+  detectPackageManager,
+  installCommand,
+  installedLockfile,
+} from './package-manager.mjs';
 import { writeReport } from './report.mjs';
 import { setupCommand } from './setup.mjs';
 import { generateCommand } from './generate.mjs';
@@ -110,7 +116,7 @@ async function run() {
     return true;
   }
   if (options.install) {
-    const result = await invoke(['npm', 'ci', '--ignore-scripts'], root);
+    const result = await invoke(installCommand(detectPackageManager(root)), root);
     if (result.status !== 'passed') throw new Error('Dependency installation failed');
   }
   const context = {
@@ -124,15 +130,18 @@ async function run() {
         ...(config.a11y?.storageState ? [config.a11y.storageState] : []),
         ...selection.checks
           .filter((c) => c.cwd)
-          .map((c) => join(c.cwd, 'node_modules/.package-lock.json')),
+          .map((c) => join(c.cwd, installedLockfile(detectPackageManager(root)))),
       ]),
     ],
     tools: [
       ...new Map(
         selection.checks.flatMap((check) =>
-          [...(check.tools ?? []), ...(Array.isArray(check.command) ? [check.command[0]] : [])].map(
-            (name) => [`${check.cwd ?? '.'}\0${name}`, { name, cwd: check.cwd ?? '.' }],
-          ),
+          [
+            ...(check.tools ?? []),
+            ...(Array.isArray(check.command)
+              ? [adaptCommand(check.command, detectPackageManager(root))[0]]
+              : []),
+          ].map((name) => [`${check.cwd ?? '.'}\0${name}`, { name, cwd: check.cwd ?? '.' }]),
         ),
       ).values(),
     ],

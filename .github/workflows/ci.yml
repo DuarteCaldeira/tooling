@@ -72,10 +72,13 @@ jobs:
           ref: ${{ inputs.tooling-sha }}
           path: .tooling/source
           persist-credentials: false
+      # pnpm repositories are detected by their lockfile; the version comes from the packageManager field.
+      - uses: pnpm/action-setup@v4
+        if: hashFiles('pnpm-lock.yaml') != ''
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: ${{ hashFiles('pnpm-lock.yaml') != '' && 'pnpm' || 'npm' }}
       - name: Check repo standard
         env:
           CONFIG: ${{ inputs.config-path }}
@@ -105,15 +108,20 @@ jobs:
         run: node .tooling/source/packages/tooling/runner/docs-install.mjs .tooling/plan.json
       - name: Install application dependencies
         if: steps.plan-info.outputs.active == 'true' && steps.install-plan.outputs.lightweight != 'true'
-        run: npm ci --ignore-scripts
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile --ignore-scripts
+          else
+            npm ci --ignore-scripts
+          fi
       - name: Restore tool caches
         if: steps.plan-info.outputs.active == 'true' && steps.install-plan.outputs.lightweight != 'true'
         uses: actions/cache@v4
         with:
           path: ${{ steps.plan-info.outputs.tool-cache-paths }}
-          key: tooling-tools-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}-${{ github.sha }}
+          key: tooling-tools-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json', 'pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            tooling-tools-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}-
+            tooling-tools-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json', 'pnpm-lock.yaml') }}-
       - name: Provision selected prerequisites
         if: steps.plan-info.outputs.active == 'true'
         run: node .tooling/source/packages/tooling/runner/provision.mjs .tooling/plan.json

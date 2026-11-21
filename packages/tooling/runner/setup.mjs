@@ -4,13 +4,24 @@ import { inside, loadConfig, validateConfig } from './config.mjs';
 import { builtins, plan } from './graph.mjs';
 import { executable, packageManifest } from './execute.mjs';
 import { git } from './git.mjs';
+import {
+  adaptCommand,
+  detectPackageManager,
+  lockfileName,
+  scriptCommand,
+} from './package-manager.mjs';
 import { repoStandardFindings } from './repo-standard.mjs';
 
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const readJSON = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const json = (value) => JSON.stringify(value, null, 2) + '\n';
 
-export function starterConfig({ preset = 'react-vite', app = 'frontend', scripts = {} } = {}) {
+export function starterConfig({
+  preset = 'react-vite',
+  app = 'frontend',
+  scripts = {},
+  packageManager = 'npm',
+} = {}) {
   if (!['react-vite', 'workspace'].includes(preset))
     throw new Error('Preset must be react-vite or workspace');
   if (!/^[\w-]+(?:\/[\w-]+)*$/.test(app))
@@ -25,7 +36,7 @@ export function starterConfig({ preset = 'react-vite', app = 'frontend', scripts
   for (const id of ['lint', 'types', 'unit', 'build']) {
     checks[id].cwd = cwd;
     if (workspace) checks[id].workspaces = ['app'];
-    if (scripts[adapters[id]]) checks[id].command = ['npm', 'run', adapters[id]];
+    if (scripts[adapters[id]]) checks[id].command = scriptCommand(packageManager, adapters[id]);
   }
   const config = {
     $schema: './node_modules/@dcaldeira/tooling/config.schema.json',
@@ -53,7 +64,8 @@ export function initialize(root, { preset = 'react-vite', app = 'frontend', tool
   const pkg = readJSON(packagePath);
   const appPackage =
     preset === 'workspace' ? readJSON(join(inside(root, app), 'package.json')) : pkg;
-  const config = starterConfig({ preset, app, scripts: appPackage.scripts });
+  const packageManager = detectPackageManager(root);
+  const config = starterConfig({ preset, app, scripts: appPackage.scripts, packageManager });
   const aliases = {
     'check:dev': 'tooling --profile=dev --changed',
     'check:push': 'tooling --profile=push --changed --bail',
@@ -72,7 +84,10 @@ export function initialize(root, { preset = 'react-vite', app = 'frontend', tool
   files.set('.github/workflows/ci.yml', template('ci.yml'));
   files.set('.github/workflows/dependabot-merge.yml', template('dependabot-merge.yml'));
   files.set('.github/dependabot.yml', template('dependabot.yml'));
-  files.set('.githooks/pre-push', template('pre-push'));
+  files.set(
+    '.githooks/pre-push',
+    template('pre-push').replace('npm run check:push', `${packageManager} run check:push`),
+  );
   files.set(
     'prettier.config.mjs',
     "export { default } from '@dcaldeira/tooling/configs/prettier.mjs';\n",
@@ -154,8 +169,9 @@ export function diagnose(root, configPath) {
     add('failed', error.message);
     return findings;
   }
-  if (!existsSync(join(root, 'package-lock.json')))
-    add('failed', 'Run npm install and commit package-lock.json');
+  const packageManager = detectPackageManager(root);
+  if (!existsSync(join(root, lockfileName(packageManager))))
+    add('failed', `Run ${packageManager} install and commit ${lockfileName(packageManager)}`);
   if (!existsSync(join(root, '.nvmrc'))) add('failed', 'Add .nvmrc for the shared workflow');
   try {
     git(root, 'rev-parse', '--verify', 'HEAD');
@@ -170,7 +186,9 @@ export function diagnose(root, configPath) {
       add('failed', `${check.id}: missing directory ${check.cwd}`);
       continue;
     }
-    const commands = [check.command, check.devCommand, check.devAllCommand].filter(Array.isArray);
+    const commands = [check.command, check.devCommand, check.devAllCommand]
+      .filter(Array.isArray)
+      .map((command) => adaptCommand(command, packageManager));
     const tools = new Set([...commands.map((command) => command[0]), ...(check.tools ?? [])]);
     for (const tool of tools)
       if (!executable(cwd, tool))
@@ -183,10 +201,10 @@ export function diagnose(root, configPath) {
         !existsSync(command[1])
       )
         add('failed', `${check.id}: missing script ${command[1]}`);
-      if (command[0] === 'npm' && command[1] === 'run') {
+      if (command[0] === packageManager && command[1] === 'run') {
         const pkgPath = join(cwd, 'package.json');
         if (!existsSync(pkgPath) || !readJSON(pkgPath).scripts?.[command[2]])
-          add('failed', `${check.id}: missing npm script ${command[2]}`);
+          add('failed', `${check.id}: missing ${packageManager} script ${command[2]}`);
       }
     }
     if (check.platforms && !check.platforms.includes(process.platform))
@@ -229,7 +247,7 @@ export async function setupCommand(command, root, options) {
       toolingSha: options['tooling-sha'],
     });
     console.log(
-      `Created/adapted: ${paths.join(', ')}\nRun npm install, install the peer tools for your enabled checks, then tooling doctor.\nEnable the hook: git config core.hooksPath .githooks\nPin the workflow SHA if you did not pass --tooling-sha.`,
+      `Created/adapted: ${paths.join(', ')}\nRun ${detectPackageManager(root)} install, install the peer tools for your enabled checks, then tooling doctor.\nEnable the hook: git config core.hooksPath .githooks\nPin the workflow SHA if you did not pass --tooling-sha.`,
     );
     return 0;
   }

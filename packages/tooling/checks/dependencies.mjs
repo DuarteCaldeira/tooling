@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import semver from 'semver';
 import { loadConfig, inside } from '../runner/config.mjs';
 import { matches } from '../runner/graph.mjs';
+import { readLockfile } from '../runner/package-manager.mjs';
 import {
   compilerOptions,
   importsIn,
@@ -159,13 +160,7 @@ export function analyseDependencies(root, settings = {}, manifests, lock, files,
       }
     }
   }
-  if (lock === undefined) {
-    try {
-      lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
-  }
+  if (lock === undefined) lock = readLockfile(root);
   const versions = new Map();
   for (const [path, entry] of Object.entries(lock?.packages ?? {})) {
     const match = path.match(/(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)$/);

@@ -39,7 +39,7 @@ Only an unmodified built-in formatting command, a docs-only plan and a locked st
 
 Canonical browser screenshots and Lighthouse timings run on Ubuntu 24.04. Use WSL or a matching Linux container locally. Missing Linux/browser/backend tooling is an **unavailable** result, never a success. `--all` broadens selection; it does not waive platform requirements.
 
-Hosted provisioning uses the selected plan: PostgreSQL 16/pgTAP only for database checks, pinned Deno/Lighthouse versions and pinned actionlint/gitleaks containers only when needed. Browser versions come from the consumer's Playwright lockfile. `--install` performs `npm ci --ignore-scripts`; install external prerequisites explicitly before running local CI.
+Hosted provisioning uses the selected plan: PostgreSQL 16/pgTAP only for database checks, pinned Deno/Lighthouse versions and pinned actionlint/gitleaks containers only when needed. Browser versions come from the consumer's Playwright lockfile. `--install` performs `npm ci --ignore-scripts` (`pnpm install --frozen-lockfile --ignore-scripts` in a pnpm repository, see [migration](migration.md)); install external prerequisites explicitly before running local CI.
 
 Workspace scaffolding now declares the app and shared-source relationship explicitly. For multiple applications, adapt `examples/multi-workspace/tooling.config.json`; use scoped aliases of built-in checks instead of copying their command definitions. Browser installation and ESLint tool-cache restoration are shared by PR and release validation. See the incremental-validation section of [configuration](configuration.md) for result-cache controls and opt-in TypeScript metadata persistence.
 
