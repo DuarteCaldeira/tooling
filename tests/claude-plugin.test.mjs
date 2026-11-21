@@ -473,7 +473,15 @@ test('a plugin change bumps the plugin version', (t) => {
   const ref = base.stdout.trim();
   const diff = spawnSync(
     'git',
-    ['diff', '--name-only', ref, '--', 'claude', ':!claude/evals/results'],
+    [
+      'diff',
+      '--name-only',
+      ref,
+      '--',
+      'claude',
+      ':!claude/evals/results',
+      ':!claude/evals/*/fixture/*',
+    ],
     {
       cwd: repo,
       encoding: 'utf8',
