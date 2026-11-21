@@ -2,6 +2,10 @@
 
 Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
 
+## 0.2.6
+
+- Evals: the `react-component` fixture uses vite 8.1.6 (was 8.0.0).
+
 ## 0.2.5
 
 - Evals: the `reviewer` fixture uses vite 8.1.6 (was 8.0.0).
