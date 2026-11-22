@@ -107,9 +107,7 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
         <div className="item-meta">
           {tags.length || reported ? (
             <div className="item-topics">
-              {reported ? (
-                <span className="comment-kind comment-kind--issue">Problema</span>
-              ) : null}
+              {reported ? <span className="comment-kind comment-kind--issue">Problema</span> : null}
               {tags.map((topic) => (
                 <button
                   key={topic.id}
@@ -613,17 +611,19 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
       </p>
       {accordionItems.length ? (
         <div className="release-feed">
-        <Accordion
-          type="multiple"
-          items={accordionItems}
-          value={states.filter((state) => state.open).map(({ entry }) => releaseId(entry.release))}
-          onChange={(value) =>
-            setOpen(
-              states.map(({ entry }) => releaseId(entry.release)),
-              [value].flat(),
-            )
-          }
-        />
+          <Accordion
+            type="multiple"
+            items={accordionItems}
+            value={states
+              .filter((state) => state.open)
+              .map(({ entry }) => releaseId(entry.release))}
+            onChange={(value) =>
+              setOpen(
+                states.map(({ entry }) => releaseId(entry.release)),
+                [value].flat(),
+              )
+            }
+          />
         </div>
       ) : null}
       {matches.length > limit ? (
@@ -636,4 +636,3 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     </section>
   );
 }
-

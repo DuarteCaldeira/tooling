@@ -72,7 +72,7 @@ test(
       snapshot.apps[1].version = 'v2.0.0';
       await page.clock.fastForward(30_000);
       await page.waitForFunction(() =>
-        document.querySelector('.selected-metrics')?.textContent.includes('v2.0.0'),
+        document.querySelector('.app-choice[aria-pressed="true"]')?.textContent.includes('v2.0.0'),
       );
       assert.ok(requests >= 2);
       assert.equal(await search.inputValue(), 'lembretes');
@@ -81,13 +81,16 @@ test(
       fail = true;
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
       await page.locator('#release-refresh-error').waitFor();
-      assert.match(await page.locator('.selected-metrics').textContent(), /v2\.0\.0/);
+      assert.match(
+        await page.locator('.app-choice[aria-pressed="true"]').textContent(),
+        /v2\.0\.0/,
+      );
       assert.equal(await draft.inputValue(), 'Rascunho mantido durante a atualização');
       fail = false;
       snapshot.apps[1].version = 'v3.0.0';
       await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
       await page.waitForFunction(() =>
-        document.querySelector('.selected-metrics')?.textContent.includes('v3.0.0'),
+        document.querySelector('.app-choice[aria-pressed="true"]')?.textContent.includes('v3.0.0'),
       );
       await page.locator('#release-refresh-error').waitFor({ state: 'detached' });
       assert.equal(await draft.inputValue(), 'Rascunho mantido durante a atualização');

@@ -38,6 +38,8 @@ function fixture() {
   const saved = new Map();
   const options = {
     key: 'snapshot',
+    // Most tests expect an expired snapshot to wait for a refresh.
+    stale: 0,
     now: () => time,
     store: { get: async (key) => saved.get(key), set: async (key, value) => saved.set(key, value) },
     load: async () => {
@@ -96,6 +98,18 @@ test('GitHub failures preserve the last snapshot and back off refresh attempts',
   assert.equal(f.calls(), 2);
 });
 
+test('an expired snapshot is served at once while a refresh runs in the background', async () => {
+  const f = fixture();
+  const read = createReleaseSource({ ...f.options, stale: 300_000 });
+  assert.equal((await read()).apps[0].version, 'v1.0.0');
+  f.advance();
+  assert.equal((await read()).apps[0].version, 'v1.0.0');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(f.calls(), 2);
+  assert.equal((await read()).apps[0].version, 'v2.0.0');
+  assert.equal(f.calls(), 2);
+});
+
 test('cache outages still allow live collection', async () => {
   const f = fixture();
   const read = createReleaseSource({
@@ -141,7 +155,7 @@ test('release endpoint avoids browser caching and returns sanitized errors witho
   const handler = createReleaseHandler(read);
   const response = await handler();
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  assert.equal(response.headers.get('cache-control'), 'private, no-cache');
   const failed = fixture();
   failed.fail();
   const unavailable = await createReleaseHandler(createReleaseSource(failed.options))();
@@ -231,4 +245,16 @@ test('discussion context refreshes new releases while rejecting unknown applicat
   const discovered = { ...known, version: 'v2.0.0' };
   assert.equal((await (await serviceFor(discovered)).list(discovered)).total, 0);
   assert.equal(f.calls(), 2);
+});
+
+test('an unchanged release snapshot answers a revalidation with 304', async () => {
+  const snapshot = { schemaVersion: 1, generatedAt: '2026-11-17T12:00:00Z', apps: [] };
+  const handler = createReleaseHandler(async () => snapshot);
+  const first = await handler(new Request('https://x.test/api/releases'));
+  const etag = first.headers.get('etag');
+  assert.equal(first.status, 200);
+  const again = await handler(
+    new Request('https://x.test/api/releases', { headers: { 'If-None-Match': etag } }),
+  );
+  assert.equal(again.status, 304);
 });

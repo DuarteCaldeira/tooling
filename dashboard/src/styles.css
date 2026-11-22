@@ -163,7 +163,6 @@ button {
 
 .stat-label,
 .selected-label,
-.selected-metrics dt,
 .review-score-label,
 .ledger-head,
 .release-area-heading > span,
@@ -417,7 +416,7 @@ button {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
 }
 .tile-name {
-  grid-column: 1 / 9;
+  grid-column: 1 / -1;
   grid-row: 1;
   display: flex;
   flex-direction: column;
@@ -425,7 +424,11 @@ button {
   gap: 28px;
   min-height: 300px;
   background:
-    linear-gradient(115deg, color-mix(in srgb, var(--accent) 11%, var(--surface)), var(--surface) 60%),
+    linear-gradient(
+      115deg,
+      color-mix(in srgb, var(--accent) 11%, var(--surface)),
+      var(--surface) 60%
+    ),
     var(--surface);
 }
 .selected-app-heading {
@@ -471,58 +474,9 @@ button {
 .tile-link:hover {
   color: var(--accent);
 }
-.selected-metrics {
-  display: contents;
-  margin: 0;
-}
-.selected-metrics dt {
-  margin-bottom: 8px;
-}
-.selected-metrics dd {
-  margin: 0;
-}
-.tile-version {
-  grid-column: 9 / 13;
-  grid-row: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-.metric-version {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: clamp(40px, 5.6vw, 84px);
-  line-height: 0.95;
-  letter-spacing: -0.05em;
-  color: var(--accent);
-  overflow-wrap: anywhere;
-}
-.tile-date {
-  grid-column: 1 / 5;
-  grid-row: 2;
-}
-.tile-tooling {
-  grid-column: 5 / 9;
-  grid-row: 2;
-}
-.selected-metrics .value {
-  font-family: var(--font-display);
-  font-size: clamp(19px, 1.9vw, 26px);
-  font-weight: 700;
-  letter-spacing: -0.025em;
-}
-.detail {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--text-3);
-}
-.muted {
-  color: var(--text-3);
-}
 .tile-score {
   grid-column: 9 / 13;
-  grid-row: 2 / 4;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -567,7 +521,7 @@ button {
 }
 .tile-stats {
   grid-column: 1 / 9;
-  grid-row: 3;
+  grid-row: 2;
   display: grid;
   gap: 22px;
 }
@@ -789,7 +743,7 @@ button {
 .release-body {
   display: grid;
   gap: var(--ds-spacing-6);
-  padding: var(--ds-spacing-2) clamp(1rem, 2vw, 1.5rem) var(--ds-spacing-6);
+  padding: var(--ds-spacing-5) clamp(1rem, 2vw, 1.5rem) var(--ds-spacing-6);
 }
 .release-footer {
   display: flex;
@@ -1123,7 +1077,9 @@ button {
 .ledger-head,
 .app-card {
   display: grid;
-  grid-template-columns: minmax(160px, 1.5fr) minmax(90px, 0.8fr) minmax(150px, 1.2fr) minmax(0, 1.3fr) 92px;
+  grid-template-columns:
+    minmax(160px, 1.5fr) minmax(90px, 0.8fr) minmax(150px, 1.2fr) minmax(0, 1.3fr)
+    92px;
   gap: 16px;
   align-items: center;
 }
@@ -1318,25 +1274,13 @@ footer {
     grid-column: 1 / -1;
     min-height: 240px;
   }
-  .tile-version {
-    grid-column: 1 / 7;
-    grid-row: 2;
-  }
-  .tile-date {
-    grid-column: 7 / 13;
-    grid-row: 2;
-  }
-  .tile-tooling {
-    grid-column: 1 / 7;
-    grid-row: 3;
-  }
   .tile-score {
-    grid-column: 7 / 13;
-    grid-row: 3 / 5;
+    grid-column: 1 / -1;
+    grid-row: auto;
   }
   .tile-stats {
-    grid-column: 1 / 7;
-    grid-row: 4;
+    grid-column: 1 / -1;
+    grid-row: auto;
   }
   .review-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1433,7 +1377,6 @@ footer {
   }
 }
 
-
 /* ───────── Mobile-first overrides (this dashboard is mostly used on phones) ───────── */
 @media (max-width: 760px) {
   :root,
@@ -1492,24 +1435,11 @@ footer {
   .selected-name h2 {
     font-size: clamp(44px, 15vw, 68px);
   }
-  .tile-version,
-  .tile-date,
-  .tile-tooling,
   .tile-score {
-    grid-column: auto;
+    grid-column: 1 / -1;
   }
   .tile-stats {
     grid-column: 1 / -1;
-  }
-  .metric-version {
-    font-size: clamp(30px, 9vw, 40px);
-  }
-  .tile-version {
-    min-height: 0;
-    justify-content: flex-start;
-  }
-  .selected-metrics .value {
-    font-size: 17px;
   }
   .tile-score {
     gap: 6px;
@@ -1597,7 +1527,7 @@ footer {
   }
   .release-body {
     gap: var(--ds-spacing-5);
-    padding: var(--ds-spacing-1) var(--ds-spacing-3) var(--ds-spacing-4);
+    padding: var(--ds-spacing-4) var(--ds-spacing-3) var(--ds-spacing-4);
   }
   .release-heading {
     flex-direction: column;
@@ -1691,13 +1621,8 @@ footer {
   .bento .tile {
     animation: rise-in 700ms var(--ease-out) backwards;
   }
-  .bento .tile-version,
   .bento .tile-score {
     animation-delay: 80ms;
-  }
-  .bento .tile-date,
-  .bento .tile-tooling {
-    animation-delay: 140ms;
   }
   .bento .tile-stats {
     animation-delay: 200ms;

@@ -138,8 +138,15 @@ test(
       page.setDefaultTimeout(10000);
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
+      // The home page holds the overview; an app's own screen does not repeat it.
       await page.goto('https://tooling.test/');
+      await page.locator('.app-card').first().waitFor();
+      assert.equal(await page.locator('.app-card').count(), 2);
+      assert.equal(await page.locator('.bento .tile-version, .release-area').count(), 0);
+      await page.locator('.app-card-button', { hasText: 'Saudinha' }).click();
       await page.locator('.release-area').first().waitFor();
+      assert.equal(await page.locator('.app-card').count(), 0);
+      assert.equal(await page.locator('.selected-metrics').count(), 0);
       const select = async (id, name) => {
         await page.locator('#' + id).click();
         await page.getByRole('option', { name, exact: true }).click();
@@ -207,7 +214,10 @@ test(
       await page.getByRole('button', { name: 'Abrir conversa: ' + texts[0], exact: true }).click();
       const dialog = page.getByRole('dialog');
       await dialog.waitFor();
-      assert.equal(await dialog.getByRole('heading', { name: 'Comentários', exact: true }).count(), 1);
+      assert.equal(
+        await dialog.getByRole('heading', { name: 'Comentários', exact: true }).count(),
+        1,
+      );
       assert.equal(
         await dialog.getByRole('heading', { name: /^(Alteração|Ações|Novo comentário)$/ }).count(),
         0,
@@ -272,9 +282,7 @@ test(
       await confirmation.waitFor({ state: 'detached' });
       await dialog.getByText('Comentário eliminado', { exact: true }).waitFor();
       await other.getByRole('button', { name: 'Atualizar comentários', exact: true }).click();
-      await other
-        .getByText('Ainda não há comentários.', { exact: true })
-        .waitFor();
+      await other.getByText('Ainda não há comentários.', { exact: true }).waitFor();
       await secondContext.close();
       await dialog.getByRole('button', { name: 'Fechar', exact: true }).click();
       await dialog.waitFor({ state: 'detached' });
