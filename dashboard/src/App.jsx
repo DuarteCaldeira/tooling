@@ -192,7 +192,7 @@ function Bento({ app, review }) {
           </dd>
         </div>
         <div className="tile tile-tooling">
-          <dt>Tooling</dt>
+          <dt>Tooling atual</dt>
           <dd>
             <ToolingValue tooling={app?.tooling ?? { status: 'unknown' }} />
           </dd>
@@ -346,7 +346,7 @@ function Portfolio({ apps, snapshot, onSelect }) {
                   <div className="ledger-head" aria-hidden="true">
                     <span>Aplicação</span>
                     <span>Versão</span>
-                    <span>Tooling</span>
+                    <span>Tooling atual</span>
                     <span>Publicação</span>
                     <span />
                   </div>
@@ -369,7 +369,7 @@ function Portfolio({ apps, snapshot, onSelect }) {
                       </p>
                       <dl className="card-metrics">
                         <div>
-                          <dt>Tooling</dt>
+                          <dt>Tooling atual</dt>
                           <dd>
                             <ToolingValue tooling={app.tooling} />
                           </dd>
@@ -430,7 +430,7 @@ function Portfolio({ apps, snapshot, onSelect }) {
                       max={100}
                       label="Aplicações com tooling partilhado"
                     />
-                    <p>{`${adopted} de ${apps.length} aplicações têm uma versão de tooling identificada na última publicação.`}</p>
+                    <p>{`${adopted} de ${apps.length} aplicações têm uma versão de tooling identificada no ramo predefinido.`}</p>
                   </section>
                 </div>
               </div>
@@ -636,4 +636,3 @@ export function App() {
     </>
   );
 }
-

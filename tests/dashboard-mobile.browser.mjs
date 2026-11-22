@@ -137,6 +137,24 @@ test(
               const lockedTop = await page.locator('body').evaluate((body) => body.style.top);
               const validated = dialog.getByRole('switch', { name: 'Validada', exact: true });
               await validated.waitFor({ state: 'attached' });
+              const tracks = await dialog.locator('.conversation-toggle').evaluateAll((rows) =>
+                rows.map((row) => {
+                  const label = row.querySelector('label');
+                  const track = label.querySelector('[class*="toggle-switch__track"]');
+                  const bounds = row.getBoundingClientRect();
+                  const toggle = track.getBoundingClientRect();
+                  return {
+                    right: toggle.right,
+                    afterLabel: toggle.left >= label.getBoundingClientRect().right,
+                    centered:
+                      Math.abs(toggle.top + toggle.height / 2 - (bounds.top + bounds.height / 2)) <=
+                      1,
+                  };
+                }),
+              );
+              assert.equal(tracks.length, 2);
+              assert.equal(tracks[0].right, tracks[1].right);
+              assert.ok(tracks.every(({ afterLabel, centered }) => afterLabel && centered));
               await page.waitForFunction(
                 () => !document.getElementById('conversation-validated')?.disabled,
               );
@@ -194,7 +212,7 @@ test(
                 .getByRole('button', { name: 'Atualizar comentários', exact: true })
                 .tap();
               await dialog
-                .getByText('Ainda não há comentários. Comece a conversa abaixo.', { exact: true })
+                .getByText('Ainda não há comentários.', { exact: true })
                 .waitFor();
               assert.equal(
                 await page.locator('body').evaluate((body) => body.style.top),
@@ -202,7 +220,20 @@ test(
               );
               // Resizing (e.g. the mobile keyboard) must not release the lock.
               await page.setViewportSize({ width: 390, height: 600 });
-              await dialog.getByRole('button', { name: 'Fechar', exact: true }).tap();
+              const exit = await dialog
+                .getByRole('button', { name: 'Fechar', exact: true })
+                .evaluate((button) => {
+                  const drawer = button.closest('[role="dialog"]');
+                  button.click();
+                  return {
+                    animated: drawer.getAnimations().some(
+                      (animation) => animation.animationName === 'conversation-exit',
+                    ),
+                    scrollLocked: document.body.style.position === 'fixed',
+                  };
+                });
+              assert.equal(exit.animated, reducedMotion === 'no-preference');
+              if (exit.animated) assert.equal(exit.scrollLocked, true);
               await dialog.waitFor({ state: 'detached' });
               assert.equal(await page.locator('body').evaluate((body) => body.style.position), '');
               assert.ok(

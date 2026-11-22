@@ -440,7 +440,19 @@ export function createHandler(serviceFactory) {
       return new Response(JSON.stringify(result), { status: 200, headers });
     } catch (error) {
       const status = error instanceof DiscussionError ? error.status : 503;
-      if (status === 503) console.error('release-discussions: shared storage unavailable');
+      if (status === 503) {
+        const upstreamStatus = /^Vercel Blob: Failed to fetch blob: (\d{3})\b/.exec(
+          error?.message ?? '',
+        )?.[1];
+        console.error('release-discussions: shared storage unavailable', {
+          upstreamStatus,
+          invalidJson: error instanceof SyntaxError,
+          invalidResponse: error instanceof TypeError,
+          networkCode: /^[A-Z][A-Z_\d]{2,40}$/.test(error?.cause?.code ?? '')
+            ? error.cause.code
+            : undefined,
+        });
+      }
       return new Response(
         JSON.stringify({
           error:
