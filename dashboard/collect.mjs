@@ -202,98 +202,8 @@ export async function toolingAtRef(api, app, ref, toolingRepository) {
 
 export async function collect(config, api, now = new Date()) {
   validateConfig(config);
-  const apps = [];
-  for (const app of config.apps) {
-    const row = {
-      name: app.name,
-      emoji: app.emoji ?? '📦',
-      repository: appKey(app),
-      repositoryUrl: `https://github.com/${app.repository}`,
-      version: null,
-      releasedAt: null,
-      tooling: { version: null, status: 'unknown' },
-      releases: [],
-    };
-    try {
-      // A missing release and a missing/private repository are different states.
-      const repository = await api(`/repos/${app.repository}`);
-      try {
-        if (repository.default_branch)
-          row.tooling = await toolingAtRef(
-            api,
-            app,
-            repository.default_branch,
-            config.toolingRepository,
-          );
-      } catch {
-        // Keep release information available when tooling metadata cannot be read.
-      }
-      const history = (await releaseHistory(api, app.repository))
-        .map((item) => ({ item, version: appVersion(app, item.tag_name) }))
-        .filter(({ version }) => version);
-      row.releases = history.map(({ item, version }) => {
-        const override = app.releaseNotes?.[version.replace(/^v/, '')];
-        const edited = override ?? productNotes(item.body);
-        if (
-          edited &&
-          (!Array.isArray(edited.changes) ||
-            edited.changes.some((change) => typeof change !== 'string'))
-        )
-          throw new Error('Invalid product release notes');
-        return {
-          version,
-          releasedAt: item.published_at,
-          url: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(item.tag_name)}`,
-          prerelease: Boolean(item.prerelease),
-          notes: edited?.changes ?? [],
-          summaryContext: edited?.context ?? null,
-          language: edited?.language ?? null,
-          source: override ? 'edited' : edited ? 'published' : 'github',
-          originalNotes: typeof item.body === 'string' ? item.body : '',
-        };
-      });
-      const release = history[0]?.item;
-      if (!release) {
-        apps.push({ ...row, status: 'unreleased' });
-        continue;
-      }
-      const commit = await api(
-        `/repos/${app.repository}/commits/${encodeURIComponent(release.tag_name)}`,
-      );
-      if (!/^[a-f\d]{40}$/i.test(commit.sha)) throw new Error('Invalid release commit');
-      const changelog = await contents(
-        api,
-        app.repository,
-        app.changelogPath ?? 'CHANGELOG.md',
-        commit.sha,
-      );
-      const sections = changelogSections(changelog ?? '');
-      for (const entry of row.releases) {
-        const source = sections[entry.version.replace(/^v/, '')] ?? entry.originalNotes;
-        entry.originalNotes = source;
-        entry.technicalNotes = technicalNotes(source);
-        entry.items = entry.notes.map((text, index) => ({
-          id: app.releaseNotes?.[entry.version.replace(/^v/, '')]?.itemIds?.[index] ?? itemId(text),
-          text,
-        }));
-        entry.technicalItems = entry.technicalNotes.map((text) => ({
-          id: itemId(text, 'technical'),
-          text,
-        }));
-      }
-      Object.assign(row, {
-        version: history[0].version,
-        releasedAt: release.published_at,
-        releaseUrl: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(release.tag_name)}`,
-        prerelease: release.prerelease,
-        commit: commit.sha,
-      });
-      row.status = row.tooling.status === 'unknown' ? 'partial' : 'released';
-      apps.push(row);
-    } catch {
-      apps.push({ ...row, status: 'unavailable' });
-    }
-  }
+  // Apps are independent: collect them together (the client's request cache is shared).
+  const apps = await Promise.all(config.apps.map((app) => collectApp(config, api, app)));
   if (apps.length && apps.every((app) => app.status === 'unavailable'))
     throw new Error('All repositories are unavailable; previous deployment preserved');
   return {
@@ -303,6 +213,97 @@ export async function collect(config, api, now = new Date()) {
     generatedAt: now.toISOString(),
     apps,
   };
+}
+
+async function collectApp(config, api, app) {
+  const row = {
+    name: app.name,
+    emoji: app.emoji ?? '📦',
+    repository: appKey(app),
+    repositoryUrl: `https://github.com/${app.repository}`,
+    version: null,
+    releasedAt: null,
+    tooling: { version: null, status: 'unknown' },
+    releases: [],
+  };
+  try {
+    // A missing release and a missing/private repository are different states.
+    const repository = await api(`/repos/${app.repository}`);
+    // Tooling and release history are independent reads: run them together.
+    const [tooling, releases] = await Promise.all([
+      repository.default_branch
+        ? toolingAtRef(api, app, repository.default_branch, config.toolingRepository).catch(
+            // Keep release information available when tooling metadata cannot be read.
+            () => row.tooling,
+          )
+        : row.tooling,
+      releaseHistory(api, app.repository),
+    ]);
+    row.tooling = tooling;
+    const history = releases
+      .map((item) => ({ item, version: appVersion(app, item.tag_name) }))
+      .filter(({ version }) => version);
+    row.releases = history.map(({ item, version }) => {
+      const override = app.releaseNotes?.[version.replace(/^v/, '')];
+      const edited = override ?? productNotes(item.body);
+      if (
+        edited &&
+        (!Array.isArray(edited.changes) ||
+          edited.changes.some((change) => typeof change !== 'string'))
+      )
+        throw new Error('Invalid product release notes');
+      return {
+        version,
+        releasedAt: item.published_at,
+        url: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(item.tag_name)}`,
+        prerelease: Boolean(item.prerelease),
+        notes: edited?.changes ?? [],
+        summaryContext: edited?.context ?? null,
+        language: edited?.language ?? null,
+        source: override ? 'edited' : edited ? 'published' : 'github',
+        originalNotes: typeof item.body === 'string' ? item.body : '',
+      };
+    });
+    const release = history[0]?.item;
+    if (!release) {
+      return { ...row, status: 'unreleased' };
+    }
+    const commit = await api(
+      `/repos/${app.repository}/commits/${encodeURIComponent(release.tag_name)}`,
+    );
+    if (!/^[a-f\d]{40}$/i.test(commit.sha)) throw new Error('Invalid release commit');
+    const changelog = await contents(
+      api,
+      app.repository,
+      app.changelogPath ?? 'CHANGELOG.md',
+      commit.sha,
+    );
+    const sections = changelogSections(changelog ?? '');
+    for (const entry of row.releases) {
+      const source = sections[entry.version.replace(/^v/, '')] ?? entry.originalNotes;
+      entry.originalNotes = source;
+      entry.technicalNotes = technicalNotes(source);
+      entry.items = entry.notes.map((text, index) => ({
+        id: app.releaseNotes?.[entry.version.replace(/^v/, '')]?.itemIds?.[index] ?? itemId(text),
+        text,
+      }));
+      entry.technicalItems = entry.technicalNotes.map((text) => ({
+        id: itemId(text, 'technical'),
+        text,
+      }));
+    }
+    Object.assign(row, {
+      version: history[0].version,
+      releasedAt: release.published_at,
+      releaseUrl: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(release.tag_name)}`,
+      prerelease: release.prerelease,
+      commit: commit.sha,
+    });
+    row.status = row.tooling.status === 'unknown' ? 'partial' : 'released';
+    return row;
+  } catch {
+    return { ...row, status: 'unavailable' };
+  }
 }
 
 export async function loadConfig(configPath = new URL('./apps.json', import.meta.url)) {

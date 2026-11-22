@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Accordion,
-  Button,
-  Progress,
-  SearchFilter,
-  Select,
-  SelectFilter,
-} from '@dcaldeira/design-system';
+import { Button, Progress, SearchFilter, Select } from '@dcaldeira/design-system';
 import { ConversationDrawer } from './components/ConversationDrawer.jsx';
 import { ArrowUpRight, Mark } from './components/Icons.jsx';
 import { ReleaseDate, ReleaseHub } from './components/ReleaseHub.jsx';
@@ -17,6 +10,23 @@ import { usePolling, useReview } from './hooks.js';
 // Every app gets its own colour; the whole page re-tints when you switch.
 const ACCENTS = ['#c8ff3d', '#ff7a59', '#4cc9ff', '#ff5fa2', '#ffc233', '#3dffb0', '#b794ff'];
 
+const CACHE_KEY = 'release-hub-snapshot';
+const readCached = () => {
+  try {
+    const data = JSON.parse(sessionStorage.getItem(CACHE_KEY));
+    return data?.schemaVersion === 1 && Array.isArray(data.apps) ? data : null;
+  } catch {
+    return null;
+  }
+};
+const writeCached = (data) => {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  } catch {
+    // Storage can be full or blocked; the cache is only a speed-up.
+  }
+};
+
 const githubUrl = (url) =>
   typeof url === 'string' && url.startsWith('https://github.com/') ? url : undefined;
 
@@ -25,7 +35,10 @@ function useCountUp(value) {
   const [shown, setShown] = useState(value);
   const from = useRef(value);
   useEffect(() => {
-    if (typeof value !== 'number' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (
+      typeof value !== 'number' ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
       setShown(value);
       from.current = value;
       return undefined;
@@ -61,9 +74,6 @@ function ToolingValue({ tooling }) {
     </div>
   );
 }
-
-const versionLabel = (app) =>
-  app?.version ?? (app?.status === 'unavailable' ? 'Indisponível' : 'Sem publicações');
 
 function Ticker({ apps }) {
   const recent = apps
@@ -106,6 +116,18 @@ function AppTabs({ apps, selected, onSelect }) {
   }, [selected]);
   return (
     <nav ref={nav} id="app-nav" className="app-tabs" aria-label="Escolher uma aplicação">
+      <button
+        type="button"
+        className="app-choice"
+        style={{ '--tab': ACCENTS[0] }}
+        aria-pressed={selected === ''}
+        onClick={() => onSelect('')}
+      >
+        <span className="choice-emoji" aria-hidden="true">
+          🏠
+        </span>
+        <span className="choice-name">Início</span>
+      </button>
       {apps.map((app, index) => (
         <button
           key={app.repository}
@@ -172,7 +194,7 @@ function Bento({ app, review }) {
           <span className="selected-label">A acontecer em</span>
         </div>
         <div className="selected-name">
-          <h2>{app?.name ?? 'Escolha uma aplicação'}</h2>
+          <h2>{app?.name}</h2>
         </div>
         {githubUrl(app?.repositoryUrl) ? (
           <a className="tile-link" href={app.repositoryUrl}>
@@ -180,24 +202,6 @@ function Bento({ app, review }) {
           </a>
         ) : null}
       </div>
-      <dl className="selected-metrics">
-        <div className="tile tile-version">
-          <dt>Última versão</dt>
-          <dd className="metric-version">{versionLabel(app)}</dd>
-        </div>
-        <div className="tile tile-date">
-          <dt>Última publicação</dt>
-          <dd>
-            <ReleaseDate value={app?.releasedAt} />
-          </dd>
-        </div>
-        <div className="tile tile-tooling">
-          <dt>Tooling atual</dt>
-          <dd>
-            <ToolingValue tooling={app?.tooling ?? { status: 'unknown' }} />
-          </dd>
-        </div>
-      </dl>
       <div className="tile tile-score review-overview" aria-label="Estado de revisão">
         <span className="review-percent" aria-hidden="true">
           {pShown ?? '—'}
@@ -222,30 +226,27 @@ function Bento({ app, review }) {
         </div>
         <div className="review-completion">
           <span className="progress-caption">{caption}</span>
-          <Progress variant="primary" size="md" value={validated} max={total || 1} label={caption} />
+          <Progress
+            variant="primary"
+            size="md"
+            value={validated}
+            max={total || 1}
+            label={caption}
+          />
         </div>
       </div>
     </section>
   );
 }
 
-function Portfolio({ apps, snapshot, onSelect }) {
+function Home({ apps, onSelect }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('latest');
-  const [open, setOpen] = useState(false);
   const released = apps.filter((app) => app.version).length;
   const unreleased = apps.filter((app) => app.status === 'unreleased').length;
   const adopted = apps.filter((app) => app.tooling.version).length;
   const percent = apps.length ? Math.round((adopted / apps.length) * 100) : 0;
-  useEffect(() => {
-    const show = () => {
-      if (location.hash === '#apps') setOpen(true);
-    };
-    show();
-    window.addEventListener('hashchange', show);
-    return () => window.removeEventListener('hashchange', show);
-  }, []);
   const visible = useMemo(() => {
     const term = query.toLocaleLowerCase('pt-PT').trim();
     return apps
@@ -271,184 +272,169 @@ function Portfolio({ apps, snapshot, onSelect }) {
   ];
   return (
     <div id="apps" className="portfolio">
-      <Accordion
-        type="multiple"
-        items={[
-          {
-            id: 'apps',
-            header: (
-              <span className="portfolio-heading">
-                <span>Visão geral das aplicações</span>
-                <span className="portfolio-hint">Versões e tooling</span>
-              </span>
-            ),
-            content: (
-              <div className="portfolio-body">
-                <div className="stats" aria-label="Visão geral das aplicações">
-                  {[
-                    [apps.length, 'Aplicações'],
-                    [released, 'Com versões publicadas'],
-                    [adopted, 'Com tooling partilhado'],
-                  ].map(([value, label]) => (
-                    <div key={label} className="stat-block">
-                      <strong>{value}</strong>
-                      <span>{label}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="section-heading">
-                  <h2>
-                    Todas as aplicações <span className="count">{apps.length}</span>
-                  </h2>
-                  <SearchFilter
-                    id="search"
-                    label="Pesquisar aplicações"
-                    placeholder="Pesquisar aplicações…"
-                    value={query}
-                    onChange={setQuery}
-                  />
-                </div>
-                <div className="collection-controls">
-                  <div className="filters" role="group" aria-label="Filtrar aplicações">
-                    {filters.map(([id, label, count]) => (
-                      <Button
-                        key={id}
-                        variant={filter === id ? 'secondary' : 'ghost'}
-                        size="sm"
-                        aria-pressed={filter === id}
-                        onClick={() => setFilter(id)}
-                      >
-                        {`${label} ${count}`}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className="sort">
-                    <Select
-                      id="sort"
-                      label="Ordenar aplicações"
-                      value={sort}
-                      onChange={setSort}
-                      options={[
-                        { value: 'latest', label: 'Publicação mais recente' },
-                        { value: 'name', label: 'Nome A–Z' },
-                      ]}
-                    />
-                  </div>
-                </div>
-                <p role="status" aria-live="polite" className="portfolio-message">
-                  {!visible.length
-                    ? 'Nenhuma aplicação corresponde aos filtros.'
-                    : apps.some((app) => app.status === 'unavailable')
-                      ? 'Algumas aplicações estão indisponíveis. Verifique o acesso aos repositórios.'
-                      : ''}
-                </p>
-                <div className="ledger">
-                  <div className="ledger-head" aria-hidden="true">
-                    <span>Aplicação</span>
-                    <span>Versão</span>
-                    <span>Tooling atual</span>
-                    <span>Publicação</span>
-                    <span />
-                  </div>
-                  {visible.map((app) => (
-                    <article key={app.repository} className="app-card">
-                      <div className="identity">
-                        <span className="app-icon">{app.emoji ?? '📦'}</span>
-                        <h3>
-                          <button
-                            type="button"
-                            className="app-card-button"
-                            onClick={() => onSelect(app.repository)}
-                          >
-                            {app.name}
-                          </button>
-                        </h3>
-                      </div>
-                      <p className={`app-version${app.version ? ' mono' : ' is-empty'}`}>
-                        {app.version ?? 'Sem versão publicada'}
-                      </p>
-                      <dl className="card-metrics">
-                        <div>
-                          <dt>Tooling atual</dt>
-                          <dd>
-                            <ToolingValue tooling={app.tooling} />
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Publicação</dt>
-                          <dd>
-                            <ReleaseDate value={app.releasedAt} />
-                          </dd>
-                        </div>
-                      </dl>
-                      {githubUrl(app.repositoryUrl) ? (
-                        <a
-                          className="app-card-github"
-                          href={app.repositoryUrl}
-                          aria-label={`${app.name} no GitHub`}
-                        >
-                          GitHub <ArrowUpRight />
-                        </a>
-                      ) : (
-                        <span />
-                      )}
-                    </article>
-                  ))}
-                </div>
-                <div className="workspace-details">
-                  <section>
-                    <h2>Publicações recentes</h2>
-                    {recent.length ? (
-                      <ol className="release-list">
-                        {recent.map((app) => (
-                          <li key={app.repository}>
-                            <strong>{app.name}</strong>
-                            {githubUrl(app.releaseUrl) ? (
-                              <a className="activity-version mono" href={app.releaseUrl}>
-                                {app.version}
-                              </a>
-                            ) : (
-                              <span className="activity-version mono">{app.version}</span>
-                            )}
-                            <ReleaseDate value={app.releasedAt} />
-                          </li>
-                        ))}
-                      </ol>
-                    ) : (
-                      <p>Ainda não há versões publicadas.</p>
-                    )}
-                  </section>
-                  <section>
-                    <h2>Tooling partilhado</h2>
-                    <p className="adoption">
-                      <strong>{percent}%</strong> das aplicações têm a versão de tooling
-                      identificada.
-                    </p>
-                    <Progress
-                      variant="primary"
-                      value={percent}
-                      max={100}
-                      label="Aplicações com tooling partilhado"
-                    />
-                    <p>{`${adopted} de ${apps.length} aplicações têm uma versão de tooling identificada no ramo predefinido.`}</p>
-                  </section>
-                </div>
+      <h2 className="visually-hidden">Visão geral das aplicações</h2>
+      <div className="portfolio-body">
+        <div className="stats" aria-label="Visão geral das aplicações">
+          {[
+            [apps.length, 'Aplicações'],
+            [released, 'Com versões publicadas'],
+            [adopted, 'Com tooling partilhado'],
+          ].map(([value, label]) => (
+            <div key={label} className="stat-block">
+              <strong>{value}</strong>
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="section-heading">
+          <h2>
+            Todas as aplicações <span className="count">{apps.length}</span>
+          </h2>
+          <SearchFilter
+            id="search"
+            label="Pesquisar aplicações"
+            placeholder="Pesquisar aplicações…"
+            value={query}
+            onChange={setQuery}
+          />
+        </div>
+        <div className="collection-controls">
+          <div className="filters" role="group" aria-label="Filtrar aplicações">
+            {filters.map(([id, label, count]) => (
+              <Button
+                key={id}
+                variant={filter === id ? 'secondary' : 'ghost'}
+                size="sm"
+                aria-pressed={filter === id}
+                onClick={() => setFilter(id)}
+              >
+                {`${label} ${count}`}
+              </Button>
+            ))}
+          </div>
+          <div className="sort">
+            <Select
+              id="sort"
+              label="Ordenar aplicações"
+              value={sort}
+              onChange={setSort}
+              options={[
+                { value: 'latest', label: 'Publicação mais recente' },
+                { value: 'name', label: 'Nome A–Z' },
+              ]}
+            />
+          </div>
+        </div>
+        <p role="status" aria-live="polite" className="portfolio-message">
+          {!visible.length
+            ? 'Nenhuma aplicação corresponde aos filtros.'
+            : apps.some((app) => app.status === 'unavailable')
+              ? 'Algumas aplicações estão indisponíveis. Verifique o acesso aos repositórios.'
+              : ''}
+        </p>
+        <div className="ledger">
+          <div className="ledger-head" aria-hidden="true">
+            <span>Aplicação</span>
+            <span>Versão</span>
+            <span>Tooling atual</span>
+            <span>Publicação</span>
+            <span />
+          </div>
+          {visible.map((app) => (
+            <article key={app.repository} className="app-card">
+              <div className="identity">
+                <span className="app-icon">{app.emoji ?? '📦'}</span>
+                <h3>
+                  <button
+                    type="button"
+                    className="app-card-button"
+                    onClick={() => onSelect(app.repository)}
+                  >
+                    {app.name}
+                  </button>
+                </h3>
               </div>
-            ),
-          },
-        ]}
-        value={open ? ['apps'] : []}
-        onChange={(value) => setOpen([value].flat().includes('apps'))}
-      />
-      <span hidden>{snapshot.generatedAt}</span>
+              <p className={`app-version${app.version ? ' mono' : ' is-empty'}`}>
+                {app.version ?? 'Sem versão publicada'}
+              </p>
+              <dl className="card-metrics">
+                <div>
+                  <dt>Tooling atual</dt>
+                  <dd>
+                    <ToolingValue tooling={app.tooling} />
+                  </dd>
+                </div>
+                <div>
+                  <dt>Publicação</dt>
+                  <dd>
+                    <ReleaseDate value={app.releasedAt} />
+                  </dd>
+                </div>
+              </dl>
+              {githubUrl(app.repositoryUrl) ? (
+                <a
+                  className="app-card-github"
+                  href={app.repositoryUrl}
+                  aria-label={`${app.name} no GitHub`}
+                >
+                  GitHub <ArrowUpRight />
+                </a>
+              ) : (
+                <span />
+              )}
+            </article>
+          ))}
+        </div>
+        <div className="workspace-details">
+          <section>
+            <h2>Publicações recentes</h2>
+            {recent.length ? (
+              <ol className="release-list">
+                {recent.map((app) => (
+                  <li key={app.repository}>
+                    <strong>{app.name}</strong>
+                    {githubUrl(app.releaseUrl) ? (
+                      <a className="activity-version mono" href={app.releaseUrl}>
+                        {app.version}
+                      </a>
+                    ) : (
+                      <span className="activity-version mono">{app.version}</span>
+                    )}
+                    <ReleaseDate value={app.releasedAt} />
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p>Ainda não há versões publicadas.</p>
+            )}
+          </section>
+          <section>
+            <h2>Tooling partilhado</h2>
+            <p className="adoption">
+              <strong>{percent}%</strong> das aplicações têm a versão de tooling identificada.
+            </p>
+            <Progress
+              variant="primary"
+              value={percent}
+              max={100}
+              label="Aplicações com tooling partilhado"
+            />
+            <p>{`${adopted} de ${apps.length} aplicações têm uma versão de tooling identificada no ramo predefinido.`}</p>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
 
 export function App() {
-  const [snapshot, setSnapshot] = useState(null);
+  const [snapshot, setSnapshot] = useState(readCached);
   const [failed, setFailed] = useState(false);
-  const [selected, setSelected] = useState('');
+  // '' is the home page; an app's own screen is chosen by `?app=`.
+  const [selected, setSelected] = useState(() => {
+    const wanted = new URLSearchParams(location.search).get('app');
+    return readCached()?.apps.some((entry) => entry.repository === wanted) ? wanted : '';
+  });
   const [conversation, setConversation] = useState(null);
   const review = useReview();
   const drafts = useRef(new Map());
@@ -463,7 +449,7 @@ export function App() {
       loading = true;
       try {
         const response = await fetch('/api/releases', {
-          cache: 'no-store',
+          cache: 'no-cache',
           signal: controller.signal,
         });
         if (!response.ok) throw new Error();
@@ -473,14 +459,12 @@ export function App() {
         const params = new URLSearchParams(location.search);
         const apps = data.apps;
         setSnapshot(data);
+        writeCached(data);
         setFailed(false);
         setSelected((current) =>
           apps.some((app) => app.repository === current)
             ? current
-            : (apps.find((app) => app.repository === params.get('app'))?.repository ??
-              apps.find((app) => app.repository === data.defaultApp)?.repository ??
-              apps[0]?.repository ??
-              ''),
+            : (apps.find((app) => app.repository === params.get('app'))?.repository ?? ''),
         );
         if (initialized) return;
         initialized = true;
@@ -531,9 +515,17 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const loaded = snapshot !== null;
   useEffect(() => {
-    if (selected) review.refresh(selected);
-  }, [selected, review.refresh]);
+    // Switching back to an app reuses its review summary while it is fresh.
+    if (selected) review.refresh(selected, { maxAge: 15_000 });
+    else if (loaded) {
+      const url = new URL(location.href);
+      for (const key of [...url.searchParams.keys()]) url.searchParams.delete(key);
+      url.hash = '';
+      history.replaceState(null, '', url);
+    }
+  }, [selected, loaded, review.refresh]);
 
   usePolling(() => review.refresh(selected), 30_000, Boolean(selected));
 
@@ -559,13 +551,14 @@ export function App() {
     0,
     apps.findIndex((entry) => entry.repository === selected),
   );
+  const home = !app;
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', ACCENTS[accentIndex % ACCENTS.length]);
   }, [accentIndex]);
   return (
     <>
-      <a className="skip" href="#release-notes">
-        Saltar para as novidades
+      <a className="skip" href={home ? '#apps' : '#release-notes'}>
+        {home ? 'Saltar para as aplicações' : 'Saltar para as novidades'}
       </a>
       <header className="site-header">
         <div className="header-content">
@@ -578,7 +571,15 @@ export function App() {
               <i className="live-dot" aria-hidden="true" />
               {failed ? 'Sem ligação' : stale ? 'Em atraso' : snapshot ? 'Em direto' : 'A ligar…'}
             </span>
-            <a className="header-link" href="#apps">
+            <a
+              className="header-link"
+              href="./"
+              onClick={(event) => {
+                event.preventDefault();
+                setSelected('');
+                window.scrollTo({ top: 0 });
+              }}
+            >
               Visão geral
             </a>
             <a className="header-link" href="https://github.com/DuarteCaldeira/tooling">
@@ -590,7 +591,7 @@ export function App() {
       {snapshot ? <AppTabs apps={apps} selected={selected} onSelect={setSelected} /> : null}
       <main className="workspace">
         <div className="main-area">
-          <h1 className="visually-hidden">Novidades</h1>
+          <h1 className="visually-hidden">{home ? 'Visão geral' : 'Novidades'}</h1>
           {failed ? (
             <p role="status" id="release-refresh-error">
               Não foi possível carregar as versões. Tente novamente dentro de instantes.
@@ -602,10 +603,17 @@ export function App() {
             </p>
           ) : snapshot ? (
             <>
-              <Ticker apps={apps} />
-              <Bento app={app} review={review} />
-              <ReleaseHub apps={apps} app={app} review={review} onOpen={setConversation} />
-              <Portfolio apps={apps} snapshot={snapshot} onSelect={chooseApp} />
+              {home ? (
+                <>
+                  <Ticker apps={apps} />
+                  <Home apps={apps} onSelect={chooseApp} />
+                </>
+              ) : (
+                <>
+                  <Bento app={app} review={review} />
+                  <ReleaseHub apps={apps} app={app} review={review} onOpen={setConversation} />
+                </>
+              )}
             </>
           ) : null}
           <footer>
@@ -636,4 +644,3 @@ export function App() {
     </>
   );
 }
-

@@ -2,8 +2,17 @@ import { createHash } from 'node:crypto';
 import { collect, createClient, loadConfig } from '../collect.mjs';
 
 export const RELEASE_TTL = 60_000;
+// Past the TTL a snapshot is still served at once while a refresh runs behind it.
+export const RELEASE_STALE = 300_000;
 
-export function createReleaseSource({ load, store, key, now = Date.now, ttl = RELEASE_TTL }) {
+export function createReleaseSource({
+  load,
+  store,
+  key,
+  now = Date.now,
+  ttl = RELEASE_TTL,
+  stale = RELEASE_STALE,
+}) {
   let cached;
   let pending;
   let reading;
@@ -40,9 +49,11 @@ export function createReleaseSource({ load, store, key, now = Date.now, ttl = RE
       await readShared();
       if (cached) return cached;
     }
-    if (cached && (now() - Date.parse(cached.generatedAt) < ttl || now() < retryAt)) return cached;
+    const age = cached ? now() - Date.parse(cached.generatedAt) : Infinity;
+    if (cached && (age < ttl || now() < retryAt)) return cached;
     if (!cached && now() < retryAt) throw new Error('Release data unavailable');
-    if (!pending) {
+    const refresh = () => {
+      if (pending) return pending;
       pending = (async () => {
         await readShared();
         if (cached && now() - Date.parse(cached.generatedAt) < ttl) return cached;
@@ -69,8 +80,13 @@ export function createReleaseSource({ load, store, key, now = Date.now, ttl = RE
       })().finally(() => {
         pending = undefined;
       });
+      return pending;
+    };
+    if (cached && age < ttl + stale) {
+      refresh().catch(() => {});
+      return cached;
     }
-    return pending;
+    return refresh();
   };
 }
 
@@ -110,10 +126,16 @@ export async function releaseSnapshot(options) {
 }
 
 export function createReleaseHandler(getSnapshot = releaseSnapshot) {
-  return async () => {
-    const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
+  return async (request) => {
+    const headers = { 'Cache-Control': 'private, no-cache', 'X-Content-Type-Options': 'nosniff' };
     try {
-      return Response.json(await getSnapshot(), { headers });
+      const snapshot = await getSnapshot();
+      // Polling revalidates: an unchanged snapshot costs a 304 instead of the whole body.
+      const etag = `"${snapshot.generatedAt}"`;
+      headers.ETag = etag;
+      if (request?.headers?.get('if-none-match') === etag)
+        return new Response(null, { status: 304, headers });
+      return Response.json(snapshot, { headers });
     } catch {
       return Response.json(
         { error: 'As versões estão temporariamente indisponíveis' },
@@ -125,4 +147,3 @@ export function createReleaseHandler(getSnapshot = releaseSnapshot) {
     }
   };
 }
-

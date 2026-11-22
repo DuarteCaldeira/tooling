@@ -122,7 +122,7 @@ test(
                   body: await result.text(),
                 });
               });
-              await page.goto(origin);
+              await page.goto(`${origin}/?app=DuarteCaldeira%2Fsaudinha-pnn`);
               const trigger = page.getByRole('button', {
                 name: `Abrir conversa: ${text}`,
                 exact: true,

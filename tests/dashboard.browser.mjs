@@ -138,8 +138,15 @@ test(
       page.setDefaultTimeout(10000);
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
+      // The home page holds the overview; an app's own screen does not repeat it.
       await page.goto('https://tooling.test/');
+      await page.locator('.app-card').first().waitFor();
+      assert.equal(await page.locator('.app-card').count(), 2);
+      assert.equal(await page.locator('.release-area').count(), 0);
+      await page.locator('.app-card-button', { hasText: 'Saudinha' }).click();
       await page.locator('.release-area').first().waitFor();
+      assert.equal(await page.locator('.app-card').count(), 0);
+      assert.equal(await page.locator('.selected-metrics').count(), 0);
       const select = async (id, name) => {
         await page.locator('#' + id).click();
         await page.getByRole('option', { name, exact: true }).click();

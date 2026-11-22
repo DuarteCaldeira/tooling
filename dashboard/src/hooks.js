@@ -11,9 +11,12 @@ export function useReview() {
   const [reportedItems, setReportedItems] = useState({});
 
   const requests = useRef(new Map());
-  const refresh = useCallback((repository, { force = false } = {}) => {
+  const fetchedAt = useRef(new Map());
+  const refresh = useCallback((repository, { force = false, maxAge = 0 } = {}) => {
     const active = requests.current.get(repository);
     if (active && !force) return active;
+    if (!force && Date.now() - (fetchedAt.current.get(repository) ?? 0) < maxAge)
+      return Promise.resolve(true);
     const request = api({ repository, view: 'summary' })
       .then((result) => {
         if (requests.current.get(repository) !== request) return true;
@@ -24,6 +27,7 @@ export function useReview() {
           [repository]: result.reportedItems ?? EMPTY,
         }));
         setErrors((current) => ({ ...current, [repository]: false }));
+        fetchedAt.current.set(repository, Date.now());
         return true;
       })
       .catch(() => {
