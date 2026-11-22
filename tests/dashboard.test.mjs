@@ -217,6 +217,46 @@ test('dashboard validates app allowlist and file paths before API access', () =>
   );
 });
 
+test('dashboard splits apps sharing a repository by tag prefix', async () => {
+  const health = { ...app, tagPrefix: 'v' };
+  const meals = { ...app, name: 'Meals', id: 'owner/app/meals', tagPrefix: 'meals-v' };
+  const mealsRelease = { ...release, id: 2, tag_name: 'meals-v0.1.0' };
+  const snapshot = await collect(
+    { ...config, apps: [health, meals] },
+    mockApi({
+      ...baseRoutes,
+      '/repos/owner/app/releases?per_page=100&page=1': [
+        release,
+        mealsRelease,
+        { ...release, id: 3, tag_name: 'meals-latest' },
+      ],
+      '/repos/owner/app/commits/meals-v0.1.0': { sha },
+    }),
+  );
+  const [first, second] = snapshot.apps;
+  assert.equal(first.repository, 'owner/app');
+  assert.deepEqual(
+    first.releases.map((entry) => entry.version),
+    ['v1.2.0'],
+  );
+  assert.equal(second.repository, 'owner/app/meals');
+  assert.equal(second.repositoryUrl, 'https://github.com/owner/app');
+  assert.equal(second.version, 'v0.1.0');
+  assert.deepEqual(
+    second.releases.map((entry) => [entry.version, entry.url]),
+    [['v0.1.0', 'https://github.com/owner/app/releases/tag/meals-v0.1.0']],
+  );
+  assert.throws(() => validateConfig({ ...config, apps: [app, meals] }), /distinct tagPrefix/);
+  assert.throws(
+    () => validateConfig({ ...config, apps: [health, { ...meals, tagPrefix: 'v' }] }),
+    /distinct tagPrefix/,
+  );
+  assert.throws(
+    () => validateConfig({ ...config, apps: [{ ...meals, id: 'bad id' }] }),
+    /Invalid id/,
+  );
+});
+
 test('dashboard API client keeps credentials in headers, handles 404 and retries server errors', async () => {
   let calls = 0;
   const api = createClient('secret-token', async (url, options) => {

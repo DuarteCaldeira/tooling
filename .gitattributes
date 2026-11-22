@@ -1,0 +1,2 @@
+# Shell scripts run under bash, which fails on CRLF ($'\r': command not found).
+*.sh text eol=lf

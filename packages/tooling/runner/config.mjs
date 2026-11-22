@@ -11,7 +11,13 @@ export const defaults = {
   functions: [],
   workflows: ['.github/workflows/**'],
   tooling: ['tooling.config.json', '*config*', 'scripts/**', '.githooks/**'],
-  dependencies: ['**/package.json', '**/package-lock.json', '**/npm-shrinkwrap.json'],
+  dependencies: [
+    '**/package.json',
+    '**/package-lock.json',
+    '**/npm-shrinkwrap.json',
+    '**/pnpm-lock.yaml',
+    '**/pnpm-workspace.yaml',
+  ],
 };
 export const inside = (root, path) => {
   const target = resolve(root, path);

@@ -3,7 +3,7 @@
 The checks can be invoked by the tooling runner or directly with Node. Direct invocations
 use `TOOLING_ROOT` when set, otherwise the current directory.
 
-- `checks/audit.mjs` runs production and full npm audits. Production high/critical
+- `checks/audit.mjs` runs production and full audits with the repository package manager (`npm audit`, or `pnpm audit` when the repository uses pnpm). Production high/critical
   advisories always fail. Development advisories require an unexpired exception in
   `audit-allowlist.json`, or the file selected by `TOOLING_AUDIT_ALLOWLIST`.
   The default file is optional when there are no exceptions; an explicitly selected

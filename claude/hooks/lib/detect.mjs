@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { listDirs, readJSON } from './shared.mjs';
 
 // Keep in sync with `hasFrontend` in packages/tooling/runner/repo-standard.mjs (a test compares them).
@@ -31,34 +31,49 @@ function dependencies(manifest) {
   );
 }
 
+const STACK_DEPS = { expo: 'expo', vite: 'vite', next: 'next', supabase: '@supabase/supabase-js' };
+// Folder a Supabase project marks as backend → where its `supabase/` lives.
+const SUPABASE_DIRS = { supabase: 'supabase', backend: 'backend/supabase' };
+
 /**
  * Detect the stacks a repository uses, looking through workspace packages too.
+ * `where` maps each stack (and `frontend`) to the repo-relative folders that use it; `.` is the root.
  * Returns `{ js: false }` for repositories without a root package.json.
  */
 export function detectStack(root) {
   const manifest = readJSON(join(root, 'package.json'));
   if (!manifest) return { js: false, stacks: [] };
-  const manifests = [
-    manifest,
-    ...workspaceDirs(root, manifest).map((dir) => readJSON(join(dir, 'package.json'))),
+  const packages = [
+    { dir: '.', deps: dependencies(manifest) },
+    ...workspaceDirs(root, manifest).map((dir) => ({
+      dir: relative(root, dir).split(sep).join('/'),
+      deps: dependencies(readJSON(join(dir, 'package.json'))),
+    })),
   ];
-  const deps = new Set(manifests.flatMap((m) => [...dependencies(m)]));
-  const stacks = [];
-  if (deps.has('expo')) stacks.push('expo');
-  if (deps.has('vite')) stacks.push('vite');
-  if (deps.has('next')) stacks.push('next');
-  if (
-    deps.has('@supabase/supabase-js') ||
-    existsSync(join(root, 'supabase')) ||
-    existsSync(join(root, 'backend', 'supabase'))
-  )
-    stacks.push('supabase');
+  const using = (names) =>
+    packages.filter((p) => names.some((n) => p.deps.has(n))).map((p) => p.dir);
+  const where = {};
+  for (const [stack, dep] of Object.entries(STACK_DEPS)) {
+    const dirs = using([dep]);
+    if (stack === 'supabase')
+      for (const [dir, path] of Object.entries(SUPABASE_DIRS))
+        if (existsSync(join(root, path))) dirs.push(dir);
+    if (dirs.length) where[stack] = [...new Set(dirs)];
+  }
+  const frontend = using(FRONTEND_DEPS);
+  if (frontend.length) where.frontend = frontend;
   return {
     js: true,
-    stacks,
-    frontend: FRONTEND_DEPS.some((name) => deps.has(name)),
+    stacks: Object.keys(STACK_DEPS).filter((stack) => where[stack]),
+    where,
+    frontend: frontend.length > 0,
     tooling: existsSync(join(root, 'tooling.config.json')),
   };
+}
+
+/** `dashboard/, web/` for the folders a stack lives in, or '' when it covers the repo root. */
+export function scopeLabel(dirs = []) {
+  return dirs.includes('.') ? '' : dirs.map((dir) => `${dir}/`).join(', ');
 }
 
 export const SKILLS = {

@@ -10,7 +10,20 @@
       "emoji": "🩺",
       "repository": "DuarteCaldeira/dr-gabriela-videira"
     },
-    { "name": "Saudinha", "emoji": "💚", "repository": "DuarteCaldeira/saudinha-pnn" },
+    {
+      "name": "Saudinha",
+      "emoji": "💚",
+      "repository": "DuarteCaldeira/saudinha-pnn",
+      "tagPrefix": "v"
+    },
+    {
+      "name": "Comidinha",
+      "emoji": "🍲",
+      "id": "DuarteCaldeira/saudinha-pnn/meals",
+      "repository": "DuarteCaldeira/saudinha-pnn",
+      "tagPrefix": "meals-v",
+      "changelogPath": "apps/meals/CHANGELOG.md"
+    },
     { "name": "Despesas", "emoji": "💸", "repository": "DuarteCaldeira/despesas" },
     { "name": "Design system", "emoji": "🎨", "repository": "DuarteCaldeira/design-system" }
   ]

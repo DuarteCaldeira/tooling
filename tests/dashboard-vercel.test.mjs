@@ -83,7 +83,7 @@ test('Vercel data build writes only data.json; the web bundle comes from the pre
       { cwd: root, env: environment, stdio: 'pipe' },
     );
     const data = await readFile(join(root, 'dist/data.json'), 'utf8');
-    assert.equal(JSON.parse(data).apps.length, 6);
+    assert.equal(JSON.parse(data).apps.length, 7);
     assert.ok(!data.includes('fixture-only-token'));
     const { readdir } = await import('node:fs/promises');
     assert.deepEqual((await readdir(join(root, 'dist'))).sort(), ['data.json']);

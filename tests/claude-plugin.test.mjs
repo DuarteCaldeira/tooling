@@ -9,6 +9,7 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,7 +17,13 @@ import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { detectStack } from '../claude/hooks/lib/detect.mjs';
 import { bashBlockReason, blockReason } from '../claude/hooks/lib/guard-rules.mjs';
-import { recordEdit, stopCheck, takeEdits } from '../claude/hooks/lib/stop.mjs';
+import {
+  markCommand,
+  recordEdit,
+  stopCheck,
+  takeEdits,
+  validationCommand,
+} from '../claude/hooks/lib/stop.mjs';
 import { hasFrontend, repoStandardFindings } from '../packages/tooling/runner/repo-standard.mjs';
 import { diagnose } from '../packages/tooling/runner/setup.mjs';
 import { plan } from '../packages/tooling/runner/graph.mjs';
@@ -54,6 +61,11 @@ function gitRepo() {
   git(root, 'add', '.');
   git(root, 'commit', '-qm', 'init');
   return root;
+}
+/** Write `path` in `root` and record it as Claude's edit for `session`. */
+function edit(root, path, session, stateDir) {
+  put(root, path, `edit ${Math.random()}`);
+  recordEdit({ session_id: session, cwd: root, tool_input: { file_path: path } }, { stateDir });
 }
 const hook = (script, input) =>
   spawnSync(process.execPath, [join(plugin, 'hooks', script)], {
@@ -104,6 +116,7 @@ test('stack detection reads workspace packages', () => {
   assert.deepEqual(detectStack(expo), {
     js: true,
     stacks: ['expo'],
+    where: { expo: ['apps/health'], frontend: ['apps/health'] },
     frontend: true,
     tooling: true,
   });
@@ -114,6 +127,7 @@ test('stack detection reads workspace packages', () => {
   put(full, 'backend/package.json', {});
   mkdirSync(join(full, 'backend/supabase'), { recursive: true });
   assert.deepEqual(detectStack(full).stacks, ['vite', 'supabase']);
+  assert.deepEqual(detectStack(full).where.supabase, ['backend']);
 
   assert.deepEqual(detectStack(temp()), { js: false, stacks: [] });
 });
@@ -131,6 +145,17 @@ test('session start injects rules and stack in JS repos and nothing elsewhere', 
   assert.equal(hook('session-start.mjs', { cwd: temp() }).stdout, '');
 });
 
+test('session start finds a JS project below a git root without package.json', () => {
+  const root = temp();
+  mkdirSync(join(root, '.git'));
+  put(root, 'app/package.json', { devDependencies: { vite: '8' } });
+  const result = hook('session-start.mjs', { cwd: join(root, 'app') });
+  assert.match(
+    JSON.parse(result.stdout).hookSpecificOutput.additionalContext,
+    /Detected stack: vite\./,
+  );
+});
+
 test('session start leaves frontend rules out of non-frontend repos', () => {
   const root = temp();
   put(root, 'package.json', { devDependencies: { typescript: '6' } });
@@ -142,13 +167,15 @@ test('session start leaves frontend rules out of non-frontend repos', () => {
   assert.doesNotMatch(context, /\n{3,}/);
 });
 
-test('stop check skips re-entry, clean trees and unchanged trees', async () => {
+test('stop check skips clean trees, turns without Claude edits and unchanged trees', async () => {
   const stateDir = temp();
   const root = gitRepo();
-  assert.equal(await stopCheck({ cwd: root, stop_hook_active: true }, { stateDir }), undefined);
   assert.equal(await stopCheck({ cwd: root }, { stateDir }), undefined);
   assert.equal(await stopCheck({ cwd: temp() }, { stateDir }), undefined);
   put(root, 'b.txt', 'b');
+  assert.equal(await stopCheck({ cwd: root, session_id: 's' }, { stateDir }), undefined);
+  assert.equal(readdirSync(stateDir).length, 0, "the user's own changes are not checked");
+  edit(root, 'b.txt', 's', stateDir);
   assert.equal(await stopCheck({ cwd: root, session_id: 's' }, { stateDir }), undefined);
   assert.equal(readdirSync(stateDir).length, 1, 'records the checked tree');
 });
@@ -161,7 +188,9 @@ test('stop check blocks on tooling failure and reports a timeout as unfinished',
   put(root, '.gitignore', 'node_modules\n');
 
   put(root, `${bin}/cli.mjs`, 'console.log(process.argv.slice(2).join(" ")); process.exit(1);');
-  const failed = await stopCheck({ cwd: root, session_id: 'fail' }, { stateDir: temp() });
+  const failState = temp();
+  edit(root, 'a.txt', 'fail', failState);
+  const failed = await stopCheck({ cwd: root, session_id: 'fail' }, { stateDir: failState });
   assert.equal(failed.decision, 'block');
   assert.match(failed.reason, /--profile=dev --changed --skip=format/);
 
@@ -174,9 +203,11 @@ test('stop check blocks on tooling failure and reports a timeout as unfinished',
 spawn(process.execPath, ['-e', ${JSON.stringify(`setTimeout(() => require('fs').writeFileSync(${JSON.stringify(marker)}, 'x'), 2000)`)}], { stdio: 'inherit' });
 setTimeout(() => {}, 10_000);`,
   );
+  const slowState = temp();
+  edit(root, 'a.txt', 'slow', slowState);
   const slow = await stopCheck(
     { cwd: root, session_id: 'slow' },
-    { stateDir: temp(), timeoutMs: 800 },
+    { stateDir: slowState, timeoutMs: 800 },
   );
   assert.match(slow.reason, /did not finish/);
   assert.match(slow.reason, /NOT validated/);
@@ -216,6 +247,72 @@ test('stop check formats only files Claude edited and logs tooling timings', asy
   const timing = JSON.parse(readFileSync(join(root, '.tooling/claude-stop.jsonl'), 'utf8'));
   assert.equal(timing.passed, true);
   assert.ok(Number.isInteger(timing.ms));
+});
+
+test('session start scopes stack skills and frontend rules to their folders', () => {
+  const root = temp();
+  put(root, 'package.json', { type: 'module' });
+  put(root, 'dashboard/package.json', { devDependencies: { vite: '8', react: '19' } });
+  const context = JSON.parse(hook('session-start.mjs', { cwd: root }).stdout).hookSpecificOutput
+    .additionalContext;
+  assert.match(context, /Detected stack: vite \(dashboard\/\)\./);
+  assert.match(context, /core:react-conventions \(dashboard\/\)/);
+  assert.match(context, /\*\*Frontend\*\* \(dashboard\/\)/);
+  assert.match(context, /npm run check/);
+
+  put(root, 'package.json', { devDependencies: { vite: '8' } });
+  const whole = JSON.parse(hook('session-start.mjs', { cwd: root }).stdout).hookSpecificOutput
+    .additionalContext;
+  assert.match(whole, /Detected stack: vite\./, 'a root dependency covers the whole repo');
+  assert.match(whole, /\*\*Frontend\*\*\r?\n/);
+});
+
+test('stop check re-checks a fix once, then hands verification to Claude', async () => {
+  const root = gitRepo();
+  const stateDir = temp();
+  put(root, '.gitignore', 'node_modules\n');
+  put(root, 'tooling.config.json', { checks: {} });
+  const cli = 'node_modules/@dcaldeira/tooling/cli.mjs';
+  put(root, 'node_modules/@dcaldeira/tooling/package.json', { bin: { tooling: 'cli.mjs' } });
+  put(root, cli, 'process.exit(1);');
+  const stop = (stop_hook_active) => {
+    edit(root, 'src/x.ts', 'r', stateDir);
+    return stopCheck({ cwd: root, session_id: 'r', stop_hook_active }, { stateDir });
+  };
+
+  assert.match((await stop(false)).reason, /re-checks once/);
+  assert.match((await stop(true)).reason, /last automatic re-check/);
+  assert.equal(await stop(true), undefined, 'no endless loop');
+  assert.match((await stop(false)).reason, /re-checks once/, 'a new turn starts over');
+  put(root, cli, '');
+  assert.equal(await stop(true), undefined, 'a passing fix ends the turn');
+});
+
+test('stop check falls back to the check npm script without tooling.config.json', (t) => {
+  const root = temp();
+  assert.equal(validationCommand(root), undefined);
+  put(root, 'package.json', { scripts: { test: 'x' } });
+  assert.equal(validationCommand(root), undefined, 'only a script named check');
+  put(root, 'package.json', { scripts: { check: 'node --test' } });
+  const command = validationCommand(root);
+  if (!command) return t.skip('npm CLI not found next to node');
+  assert.equal(command.label, 'npm run check');
+  assert.deepEqual(command.args, ['run', 'check']);
+});
+
+test('files a shell command writes are recorded as Claude edits', () => {
+  const root = gitRepo();
+  const stateDir = temp();
+  const input = { tool_name: 'Bash', session_id: 'b', cwd: root };
+  put(root, 'old.txt', 'user work');
+  const past = new Date(Date.now() - 60_000);
+  utimesSync(join(root, 'old.txt'), past, past);
+  markCommand(input, { stateDir });
+  put(root, 'src/new.mjs', 'written by sed');
+  recordEdit(input, { stateDir });
+  assert.deepEqual(takeEdits('b', root, { stateDir }), ['src/new.mjs']);
+  recordEdit(input, { stateDir });
+  assert.deepEqual(takeEdits('b', root, { stateDir }), [], 'no command mark, nothing recorded');
 });
 
 test('guard blocks shell writes to protected files and allows reads and package installs', () => {
@@ -376,7 +473,15 @@ test('a plugin change bumps the plugin version', (t) => {
   const ref = base.stdout.trim();
   const diff = spawnSync(
     'git',
-    ['diff', '--name-only', ref, '--', 'claude', ':!claude/evals/results'],
+    [
+      'diff',
+      '--name-only',
+      ref,
+      '--',
+      'claude',
+      ':!claude/evals/results',
+      ':!claude/evals/*/fixture/*',
+    ],
     {
       cwd: repo,
       encoding: 'utf8',

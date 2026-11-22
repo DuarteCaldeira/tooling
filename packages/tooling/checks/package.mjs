@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inside } from '../runner/config.mjs';
 import { invoke } from '../runner/execute.mjs';
+import { detectPackageManager } from '../runner/package-manager.mjs';
 
 export async function checkPackage(root, requiredFiles, run = invoke) {
   if (!requiredFiles.length) throw new Error('Specify required package build files');
@@ -14,10 +15,15 @@ export async function checkPackage(root, requiredFiles, run = invoke) {
   if (missing.length) throw new Error(`Package build is missing: ${missing.join(', ')}`);
   const destination = mkdtempSync(join(tmpdir(), 'tooling-pack-'));
   try {
-    const result = await run(['npm', 'pack', '--ignore-scripts', '--pack-destination', destination], root, { quiet: true });
+    const result = await run(
+      [detectPackageManager(root), 'pack', '--ignore-scripts', '--pack-destination', destination],
+      root,
+      { quiet: true },
+    );
     if (result.status !== 'passed') throw new Error('Package packing failed');
     const archives = readdirSync(destination).filter((file) => file.endsWith('.tgz'));
-    if (archives.length !== 1) throw new Error('Package smoke check did not produce exactly one archive');
+    if (archives.length !== 1)
+      throw new Error('Package smoke check did not produce exactly one archive');
     return archives[0];
   } finally {
     rmSync(destination, { recursive: true, force: true });

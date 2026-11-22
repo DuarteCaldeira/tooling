@@ -1,9 +1,9 @@
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { join } from 'node:path';
 import { browserChecks } from './browsers.mjs';
 import { inside, loadConfig } from './config.mjs';
+import { readLockfile } from './package-manager.mjs';
 
 export function planMetadata(root, selection, config, lock = {}) {
   const active = Boolean(selection.checks.length || selection.excluded.length);
@@ -34,13 +34,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const root = process.cwd();
   const selection = JSON.parse(readFileSync(process.argv[2], 'utf8'));
   const { config } = loadConfig(root, process.env.CONFIG ?? 'tooling.config.json');
-  const lockPath = join(root, 'package-lock.json');
-  const metadata = planMetadata(
-    root,
-    selection,
-    config,
-    existsSync(lockPath) ? JSON.parse(readFileSync(lockPath, 'utf8')) : {},
-  );
+  const metadata = planMetadata(root, selection, config, readLockfile(root) ?? {});
   for (const [name, value] of Object.entries(metadata)) {
     const delimiter = `tooling_${randomUUID()}`;
     if (process.env.GITHUB_OUTPUT)

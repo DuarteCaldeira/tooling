@@ -8,7 +8,7 @@ import {
   Tag,
 } from '@dcaldeira/design-system';
 import { itemTopics, normalize, portugueseDate } from '../lib/topics.js';
-import { ArrowUpRight, Bug, Chat, Check, Filter, Refresh } from './Icons.jsx';
+import { ArrowUpRight, Bug, Chat, Check, Dot, Filter, Refresh } from './Icons.jsx';
 
 const FILTER_KEYS = [
   'notes-search',
@@ -43,7 +43,6 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
   const [feedback, setFeedback] = useState('');
   const [pending, setPending] = useState(false);
   const { text, technical, areaLabel, reported } = context;
-  const canValidate = !technical && !reported;
   const split = text.indexOf(': ');
   const repeated =
     split > 0 && areaLabel && normalize(text.slice(0, split)) === normalize(areaLabel);
@@ -70,8 +69,12 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
         : 'is-pending';
   return (
     <li className={`change-item ${status}${state.count && !state.closed ? ' has-open' : ''}`}>
-      {canValidate ? (
-        <span className="check-wrap">
+      <span className="check-wrap">
+        {technical || reported ? (
+          <span className="item-bullet" aria-hidden="true">
+            {reported ? <Bug /> : <Dot />}
+          </span>
+        ) : (
           <Button
             variant="secondary"
             size="sm"
@@ -82,8 +85,8 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
           >
             <Check />
           </Button>
-        </span>
-      ) : null}
+        )}
+      </span>
       <div className="item-main">
         <button
           type="button"
@@ -107,7 +110,9 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
         <div className="item-meta">
           {tags.length || reported ? (
             <div className="item-topics">
-              {reported ? <span className="comment-kind comment-kind--issue">Problema</span> : null}
+              {reported ? (
+                <span className="comment-kind comment-kind--issue">Problema</span>
+              ) : null}
               {tags.map((topic) => (
                 <button
                   key={topic.id}
@@ -431,7 +436,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             </p>
           ) : null}
           {reported.length ? (
-            <section className="release-area" aria-label="Problemas reportados">
+            <section className="area-groups release-area" aria-label="Problemas reportados">
               <header className="release-area-heading">
                 <h3>Problemas reportados</h3>
               </header>
@@ -611,19 +616,17 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
       </p>
       {accordionItems.length ? (
         <div className="release-feed">
-          <Accordion
-            type="multiple"
-            items={accordionItems}
-            value={states
-              .filter((state) => state.open)
-              .map(({ entry }) => releaseId(entry.release))}
-            onChange={(value) =>
-              setOpen(
-                states.map(({ entry }) => releaseId(entry.release)),
-                [value].flat(),
-              )
-            }
-          />
+        <Accordion
+          type="multiple"
+          items={accordionItems}
+          value={states.filter((state) => state.open).map(({ entry }) => releaseId(entry.release))}
+          onChange={(value) =>
+            setOpen(
+              states.map(({ entry }) => releaseId(entry.release)),
+              [value].flat(),
+            )
+          }
+        />
         </div>
       ) : null}
       {matches.length > limit ? (
@@ -636,3 +639,4 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     </section>
   );
 }
+

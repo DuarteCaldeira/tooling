@@ -1,0 +1,13 @@
+schema_version: '1'
+name: scoped-stack
+description: 'No-harm guard (expect Δ 0): React rules stay in the frontend folder, so plain-JS work elsewhere follows the repo, not the React conventions.'
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 10
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: 'The project is in your working directory. Plan a `chunk(list, size)` helper for the CLI in `cli/`, next to `cli/sum.mjs`. List the files you would create and how you would test it. Do not write files.'
+graders:
+  - type: llm
+    name: follows-repo-not-react
+    criteria: 'The answer puts the helper in `cli/` as plain ESM JavaScript (`chunk.mjs`, no TypeScript), tests it with `node:test` like the existing CLI code, and does not apply React conventions (no component folder, SCSS Module, Testing Library or Vitest) to it.'

@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { packageBin, readJSON } from './shared.mjs';
 
 const LINTABLE = /\.(c|m)?[jt]sx?$/;
@@ -59,13 +59,49 @@ export function fingerprint(root, files) {
   return hash.digest('hex');
 }
 
-/** PostToolUse body: remember a file Claude edited, so the Stop hook formats only Claude's files. */
+const SHELLS = new Set(['Bash', 'PowerShell']);
+const commandStartPath = (stateDir, sessionId) =>
+  join(stateDir, `${sha1(String(sessionId ?? ''))}.command`);
+
+/** PreToolUse body for shell tools: note when the command started, so its edits can be found after. */
+export function markCommand(input, { stateDir = DEFAULT_STATE_DIR, now = Date.now() } = {}) {
+  if (!SHELLS.has(input.tool_name)) return;
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(commandStartPath(stateDir, input.session_id), String(now));
+}
+
+/** Changed files a shell command wrote: modified on or after the command started. */
+function shellEdits(input, stateDir) {
+  const startPath = commandStartPath(stateDir, input.session_id);
+  if (!existsSync(startPath)) return [];
+  const started = Number(readFileSync(startPath, 'utf8'));
+  rmSync(startPath, { force: true });
+  let root;
+  try {
+    root = git(input.cwd ?? process.cwd(), 'rev-parse', '--show-toplevel').trim();
+  } catch {
+    return [];
+  }
+  // 1 s slack: some file systems store mtimes with coarse precision.
+  return changedFiles(root)
+    .map((file) => join(root, file))
+    .filter((file) => statSync(file).mtimeMs >= started - 1000);
+}
+
+/**
+ * PostToolUse body: remember files Claude edited (Edit/Write, or a shell command), so the Stop
+ * hook formats only Claude's files and validates only turns where Claude changed something.
+ */
 export function recordEdit(input, { stateDir = DEFAULT_STATE_DIR } = {}) {
   const path = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
-  if (!path) return;
+  const files = SHELLS.has(input.tool_name)
+    ? shellEdits(input, stateDir)
+    : path
+      ? [resolve(input.cwd ?? process.cwd(), path)]
+      : [];
+  if (!files.length) return;
   mkdirSync(stateDir, { recursive: true });
-  const absolute = resolve(input.cwd ?? process.cwd(), path);
-  appendFileSync(editsPath(stateDir, input.session_id), `${absolute}\n`);
+  appendFileSync(editsPath(stateDir, input.session_id), files.map((f) => `${f}\n`).join(''));
 }
 
 /** Files Claude edited since the last Stop that still exist inside `root`, repo-relative. Clears the record. */
@@ -157,19 +193,41 @@ function runTree(root, script, args, timeoutMs) {
   });
 }
 
-/** Run `tooling --profile=dev --changed` without its format check. Returns a failure reason, undefined on pass, or NOT_RUN. */
-export async function runTooling(root, timeoutMs) {
+/** npm's own CLI script next to the running Node, so npm runs without a shell or `.cmd` shim. */
+function npmCli() {
+  const dir = dirname(process.execPath);
+  return [
+    join(dir, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    join(dir, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+  ].find((path) => existsSync(path));
+}
+
+/**
+ * What the Stop hook validates with: `tooling --profile=dev --changed` (without its format check)
+ * when the repo has `tooling.config.json`, else the repo's own `check` npm script.
+ */
+export function validationCommand(root) {
   const config = readJSON(join(root, 'tooling.config.json'));
-  const bin = packageBin(root, '@dcaldeira/tooling', 'tooling');
-  if (!config || !bin) return NOT_RUN;
-  const args = ['--profile=dev', '--changed'];
-  if (config.checks?.format) args.push('--skip=format');
-  const result = await runTree(root, bin, args, timeoutMs);
-  const command = `tooling ${args.join(' ')}`;
+  if (config) {
+    const bin = packageBin(root, '@dcaldeira/tooling', 'tooling');
+    if (!bin) return undefined;
+    const args = ['--profile=dev', '--changed'];
+    if (config.checks?.format) args.push('--skip=format');
+    return { script: bin, args, label: `tooling ${args.join(' ')}` };
+  }
+  const cli = readJSON(join(root, 'package.json'))?.scripts?.check && npmCli();
+  return cli ? { script: cli, args: ['run', 'check'], label: 'npm run check' } : undefined;
+}
+
+/** Run the validation command. Returns a failure reason, undefined on pass, or NOT_RUN. */
+export async function runTooling(root, timeoutMs) {
+  const command = validationCommand(root);
+  if (!command) return NOT_RUN;
+  const result = await runTree(root, command.script, command.args, timeoutMs);
   if (result.timedOut)
-    return `\`${command}\` did not finish within ${Math.round(timeoutMs / 1000)} s, so the changes are NOT validated. Run it yourself (in the background) and fix what fails.`;
+    return `\`${command.label}\` did not finish within ${Math.round(timeoutMs / 1000)} s, so the changes are NOT validated. Run it yourself (in the background) and fix what fails.`;
   if (result.status !== 0)
-    return `\`${command}\` failed. Fix these before finishing:\n\n${tail(result.output)}`;
+    return `\`${command.label}\` failed. Fix these before finishing:\n\n${tail(result.output)}`;
   return undefined;
 }
 
@@ -181,10 +239,13 @@ function logTiming(root, entry) {
   appendFileSync(join(dir, 'claude-stop.jsonl'), `${line}\n`);
 }
 
+// The first failure plus one re-check of Claude's fix; then Claude must verify by hand.
+const MAX_BLOCKS = 2;
+
 /**
- * Stop-hook body. Formats the files Claude edited, then runs `tooling` when the working tree
- * changed since the last run. Returns `{ decision: 'block', reason }` when Claude must keep
- * working, otherwise undefined.
+ * Stop-hook body. In turns where Claude edited files: formats them, then validates when the
+ * working tree changed since the last run. A failure blocks the stop, and the fix is re-checked
+ * once. Returns `{ decision: 'block', reason }` when Claude must keep working, otherwise undefined.
  */
 export async function stopCheck(
   input,
@@ -193,7 +254,6 @@ export async function stopCheck(
     timeoutMs = Number(process.env.CORE_STOP_TIMEOUT_MS) || 240_000,
   } = {},
 ) {
-  if (input.stop_hook_active) return undefined;
   let root;
   try {
     root = git(input.cwd ?? process.cwd(), 'rev-parse', '--show-toplevel').trim();
@@ -201,11 +261,18 @@ export async function stopCheck(
     return undefined;
   }
   const edited = takeEdits(input.session_id, root, { stateDir });
-  if (edited.length) formatFiles(root, edited);
+  // A turn without Claude edits (a question, a review) is not validated: a dirty tree is the user's.
+  if (!edited.length) return undefined;
+  formatFiles(root, edited);
+
+  const statePath = join(stateDir, sha1(`${root}\0${input.session_id ?? ''}`));
+  const blocksPath = `${statePath}.blocks`;
+  const blocks =
+    input.stop_hook_active && existsSync(blocksPath) ? Number(readFileSync(blocksPath, 'utf8')) : 0;
+  if (blocks >= MAX_BLOCKS) return undefined;
 
   const files = changedFiles(root);
   if (!files.length) return undefined;
-  const statePath = join(stateDir, sha1(`${root}\0${input.session_id ?? ''}`));
   const previous = existsSync(statePath) ? readFileSync(statePath, 'utf8') : '';
   const current = fingerprint(root, files);
   if (previous === current) return undefined;
@@ -216,5 +283,14 @@ export async function stopCheck(
   writeFileSync(statePath, current);
   if (result === NOT_RUN) return undefined;
   logTiming(root, { ms: Date.now() - started, files: files.length, passed: !result });
-  return result ? { decision: 'block', reason: result } : undefined;
+  if (!result) {
+    rmSync(blocksPath, { force: true });
+    return undefined;
+  }
+  writeFileSync(blocksPath, String(blocks + 1));
+  const next =
+    blocks + 1 < MAX_BLOCKS
+      ? 'The Stop hook re-checks once after your fix.'
+      : 'That was the last automatic re-check: run the command yourself and show it passes before saying the work is done.';
+  return { decision: 'block', reason: `${result}\n\n${next}` };
 }

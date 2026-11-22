@@ -4,9 +4,27 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { executable } from '../runner/execute.mjs';
+import { detectPackageManager } from '../runner/package-manager.mjs';
 import { rootDirectory, writeDetails } from './shared.mjs';
 
 export function advisories(report) {
+  // pnpm audit reports { advisories: { <id>: { module_name, severity, url, github_advisory_id } } }.
+  if (report && !report.error && report.advisories && typeof report.advisories === 'object') {
+    const found = new Map();
+    for (const advisory of Object.values(report.advisories)) {
+      if (!advisory || typeof advisory.module_name !== 'string')
+        throw new Error('pnpm audit returned malformed advisory data');
+      if (!['high', 'critical'].includes(advisory.severity)) continue;
+      const id =
+        advisory.github_advisory_id ??
+        String(advisory.url ?? '')
+          .split('/')
+          .pop();
+      if (!id) throw new Error('pnpm audit returned malformed advisory data');
+      found.set(id, advisory.module_name);
+    }
+    return found;
+  }
   if (
     !report ||
     report.error ||
@@ -32,9 +50,7 @@ export function advisories(report) {
 export function readAllowlist(root, filename = process.env.TOOLING_AUDIT_ALLOWLIST) {
   let document;
   try {
-    document = JSON.parse(
-      readFileSync(resolve(root, filename ?? 'audit-allowlist.json'), 'utf8'),
-    );
+    document = JSON.parse(readFileSync(resolve(root, filename ?? 'audit-allowlist.json'), 'utf8'));
   } catch (error) {
     if (!filename && error.code === 'ENOENT') return new Map();
     throw error;
@@ -71,8 +87,7 @@ export function evaluateAudit(
   const all = advisories(fullReport);
   const problems = [],
     notices = [];
-  for (const [id, pkg] of prod)
-    problems.push(`${id} (${pkg}) is in a production dependency`);
+  for (const [id, pkg] of prod) problems.push(`${id} (${pkg}) is in a production dependency`);
   for (const [id, pkg] of all) {
     if (prod.has(id)) continue;
     const entry = allow.get(id);
@@ -87,16 +102,20 @@ export function evaluateAudit(
 }
 
 export function audit(root, ...args) {
-  const command = executable(root, 'npm');
-  if (!command) throw new Error('Missing npm executable');
+  const pm = detectPackageManager(root);
+  const command = executable(root, pm);
+  if (!command) throw new Error(`Missing ${pm} executable`);
+  if (pm === 'pnpm') args = args.map((arg) => (arg === '--omit=dev' ? '--prod' : arg));
   let output;
   try {
-    output = execFileSync(command[0], [...command.slice(1), 'audit', '--json', ...args], {
+    // A .cmd shim runs through cmd.exe, which splits an unquoted path containing spaces.
+    const shim = process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command[0]);
+    output = execFileSync(shim ? `"${command[0]}"` : command[0], [...command.slice(1), 'audit', '--json', ...args], {
       cwd: root,
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
       timeout: 120000,
-      shell: process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command[0]),
+      shell: shim,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (error) {
@@ -110,12 +129,15 @@ export function audit(root, ...args) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const root = rootDirectory();
+  const pm = detectPackageManager(root);
   const allow = readAllowlist(root);
   const result = evaluateAudit(audit(root, '--omit=dev'), audit(root), allow);
   writeDetails({ audit: result });
   for (const notice of result.notices) console.log(notice);
   if (result.problems.length) {
-    console.error(`npm audit (high/critical):\n- ${result.problems.join('\n- ')}\nRun \`npm audit\` for details.`);
+    console.error(
+      `${pm} audit (high/critical):\n- ${result.problems.join('\n- ')}\nRun \`${pm} audit\` for details.`,
+    );
     process.exitCode = 1;
-  } else console.log('npm audit: no unallowlisted high or critical advisories.');
+  } else console.log(`${pm} audit: no unallowlisted high or critical advisories.`);
 }

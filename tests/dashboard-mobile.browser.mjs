@@ -211,7 +211,9 @@ test(
               await dialog
                 .getByRole('button', { name: 'Atualizar comentários', exact: true })
                 .tap();
-              await dialog.getByText('Ainda não há comentários.', { exact: true }).waitFor();
+              await dialog
+                .getByText('Ainda não há comentários. Comece a conversa abaixo.', { exact: true })
+                .waitFor();
               assert.equal(
                 await page.locator('body').evaluate((body) => body.style.top),
                 lockedTop,
@@ -224,9 +226,9 @@ test(
                   const drawer = button.closest('[role="dialog"]');
                   button.click();
                   return {
-                    animated: drawer
-                      .getAnimations()
-                      .some((animation) => animation.animationName === 'conversation-exit'),
+                    animated: drawer.getAnimations().some(
+                      (animation) => animation.animationName === 'conversation-exit',
+                    ),
                     scrollLocked: document.body.style.position === 'fixed',
                   };
                 });

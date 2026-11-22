@@ -9,6 +9,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { invoke } from './execute.mjs';
+import { detectPackageManager } from './package-manager.mjs';
 
 export function formatterLock(root, selection) {
   if (
@@ -21,6 +22,9 @@ export function formatterLock(root, selection) {
     selection.checks[0].cwd ||
     JSON.stringify(selection.checks[0].command) !== JSON.stringify(['prettier', '--check', '.'])
   )
+    return null;
+  // The standalone formatter install is built from an npm lockfile entry; pnpm repos install fully.
+  if (!existsSync(join(root, 'package-lock.json')) || detectPackageManager(root) !== 'npm')
     return null;
   const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
   const entry = lock.packages?.['node_modules/prettier'];

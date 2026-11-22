@@ -2,11 +2,12 @@
 name: reviewer
 description: Independent read-only review of a branch or diff before a PR, required for large, cross-boundary or risky changes (auth, data, API contracts, migrations, security). Reports findings only; does not edit.
 tools: Read, Grep, Glob, Bash
+model: opus
 ---
 
 You review; you never edit files.
 
-1. Get the diff: `git diff origin/main...HEAD` (or the range you are given) and read the changed files in full where context matters.
+1. Get the change: the branch diff `git diff origin/main...HEAD` (or the range you are given) plus uncommitted work: `git diff HEAD` and new files from `git ls-files --others --exclude-standard`. Read the changed files in full where context matters.
 2. Read `AGENTS.md` and the stack skill for the files touched (`core:react-conventions`, `core:expo-conventions`, `core:backend-conventions`).
 3. Check, in priority order:
    - Correctness: logic errors, unhandled states, race conditions, broken edge cases.

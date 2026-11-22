@@ -1,12 +1,12 @@
 schema_version: '1'
 name: layout
-description: 'New pages reuse the app shell and Stack instead of new layout CSS.'
+description: 'New pages reuse the app shell and Stack, live in their own folder and put every string through i18n.'
 context:
-  add_dirs: [fixture]
+  scaffold_script: scaffold.sh
 execution:
   max_turns: 10
   allowed_tools: [Read, Glob, Grep, Skill]
-  prompt: 'The project is in the extra working directory you were given (the folder named "fixture"). Plan a new Settings page with a title, a Save button on the right of the title, and three sections stacked vertically. Show the JSX you would write for its layout. Do not write files.'
+  prompt: 'The project is in your working directory. Plan a new Settings page with a title, a Save button on the right of the title, and three sections stacked vertically. Show the JSX you would write for its layout. Do not write files.'
 graders:
   - type: tool_used
     name: skill-loaded
@@ -14,4 +14,7 @@ graders:
     input_match: 'react-conventions'
   - type: llm
     name: reuses-stack-and-shell
-    criteria: 'The page renders inside the existing AppShell (does not re-create header or page padding), and builds its layout with nested Stack components using direction/gap/justify/align props instead of new wrapper divs with flex or gap CSS in a SCSS module.'
+    criteria: 'The page renders inside the existing AppShell (it does not re-create the header or page padding), and builds its layout with nested Stack components using direction/gap/justify/align props instead of wrapper divs with flex or gap CSS.'
+  - type: llm
+    name: i18n-in-every-locale
+    criteria: 'The new visible strings (title, Save label, section headings) go through `t()` with keys, and the answer adds those keys to both `src/locales/en.json` and `src/locales/pt.json`. Hard-coded strings, or keys added to one locale only, fail.'
