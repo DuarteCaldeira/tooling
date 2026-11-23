@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- A history file that cannot be written (full or read-only disk) prints a warning instead of failing a validation that passed.
+- The validation fingerprint reads only files git reports as changed or untracked; unchanged tracked files are identified by their stored blob, so large repositories fingerprint faster.
+
 ## 0.3.0
 
 - pnpm support. The package manager is the `packageManager` field of the root `package.json`, else `pnpm-lock.yaml`, else npm; npm repositories behave exactly as before.

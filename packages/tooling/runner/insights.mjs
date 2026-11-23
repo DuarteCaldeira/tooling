@@ -269,10 +269,11 @@ export function performanceHistory(root, report, settings = {}) {
     slowTests: report.metrics?.slowTests ?? [],
   };
   const directory = join(root, '.tooling/history');
-  mkdirSync(directory, { recursive: true });
-  const lockPath = join(directory, 'write.lock');
   let lock;
+  let lockPath;
   try {
+    mkdirSync(directory, { recursive: true });
+    lockPath = join(directory, 'write.lock');
     try {
       if (Date.now() - statSync(lockPath).mtimeMs > 120000) unlinkSync(lockPath);
     } catch (error) {
@@ -290,7 +291,8 @@ export function performanceHistory(root, report, settings = {}) {
     );
     renameSync(temporary, target);
   } catch (error) {
-    if (error.code !== 'EEXIST') throw error;
+    // History is telemetry: a full or read-only disk must not fail a validation that passed.
+    if (error.code !== 'EEXIST') console.warn(`History not saved: ${error.message}`);
   } finally {
     if (lock !== undefined) {
       closeSync(lock);

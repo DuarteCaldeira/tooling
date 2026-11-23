@@ -193,6 +193,16 @@ test('stop check blocks on tooling failure and reports a timeout as unfinished',
   const failed = await stopCheck({ cwd: root, session_id: 'fail' }, { stateDir: failState });
   assert.equal(failed.decision, 'block');
   assert.match(failed.reason, /--profile=dev --changed --skip=format/);
+  // The failed tree is not remembered as checked: the re-check blocks again.
+  recordEdit(
+    { cwd: root, session_id: 'fail', tool_input: { file_path: join(root, 'a.txt') } },
+    { stateDir: failState },
+  );
+  const again = await stopCheck(
+    { cwd: root, session_id: 'fail', stop_hook_active: true },
+    { stateDir: failState },
+  );
+  assert.equal(again?.decision, 'block');
 
   // A hung run is killed with its children (test workers), not only the tooling process.
   const marker = join(root, 'orphan.txt');
@@ -323,6 +333,9 @@ test('guard blocks shell writes to protected files and allows reads and package 
     "sed -i 's/a/b/' package-lock.json",
     'cp tmp.js dist/index.js',
     'Set-Content -Path .env -Value x',
+    'Set-Content .env x',
+    "'x' | Out-File -Encoding utf8 .env",
+    'Add-Content package-lock.json x',
   ])
     assert.ok(bashBlockReason(command), command);
   for (const command of [
@@ -332,6 +345,8 @@ test('guard blocks shell writes to protected files and allows reads and package 
     'cp .env.example .env.example.bak',
     'npm test 2>&1 | tail',
     'ls > /dev/null',
+    "'x' | Out-File notes.txt",
+    'Set-Content notes.txt x',
     undefined,
   ])
     assert.equal(bashBlockReason(command), undefined, String(command));

@@ -31,6 +31,8 @@ const WRITE_TARGETS = [
   /\bsed\s+(?:-[a-zA-Z]*i[a-zA-Z]*|--in-place)\S*\s+.*?("[^"]+"|'[^']+'|[^\s;&|]+)\s*(?:$|[;&|])/g,
   /\b(?:cp|mv)\s+(?:-\S+\s+)*\S+\s+("[^"]+"|'[^']+'|[^\s;&|]+)/g,
   /\b(?:Set-Content|Add-Content|Out-File)\b.*?-(?:Path|FilePath|LiteralPath)\s+("[^"]+"|'[^']+'|[^\s;&|]+)/gi,
+  // Positional form: `Set-Content .env x`, `'x' | Out-File -Encoding utf8 .env`.
+  /\b(?:Set-Content|Add-Content|Out-File)\s+(?:-\w+\s+[^\s-]\S*\s+)*("[^"]+"|'[^']+'|[^\s;&|-][^\s;&|]*)/gi,
 ];
 
 /** Reason to block a shell command that writes to a protected file, or undefined. */

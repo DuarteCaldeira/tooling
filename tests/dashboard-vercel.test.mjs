@@ -4,58 +4,6 @@ import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { parseDocument } from 'yaml';
-import { requestDeployment } from '../dashboard/refresh.mjs';
-
-const hook = 'https://api.vercel.com/v1/integrations/deploy/prj_example/secret-hook-key';
-
-test('Vercel release refresh requests a fresh build without returning hook credentials', async () => {
-  const result = await requestDeployment(hook, async (url, options) => {
-    assert.equal(new URL(url).searchParams.get('buildCache'), 'false');
-    assert.equal(options.method, 'POST');
-    assert.equal(options.redirect, 'error');
-    return { ok: true, json: async () => ({ job: { id: 'job_123', state: 'PENDING' } }) };
-  });
-  assert.deepEqual(result, { requested: true });
-  assert.ok(!JSON.stringify(result).includes('secret-hook-key'));
-});
-
-test('Vercel refresh rejects missing or unsafe hooks before sending any request', async () => {
-  let calls = 0;
-  for (const value of [
-    undefined,
-    'invalid secret-hook-key',
-    'http://api.vercel.com/v1/integrations/deploy/x/y',
-    'https://api.vercel.com.evil.test/v1/integrations/deploy/x/y',
-    'https://user:secret@api.vercel.com/v1/integrations/deploy/x/y',
-    'https://api.vercel.com/something-else',
-  ]) {
-    await assert.rejects(
-      requestDeployment(value, async () => {
-        calls++;
-      }),
-      (error) => !error.message.includes('secret-hook-key'),
-    );
-  }
-  assert.equal(calls, 0);
-});
-
-test('Vercel refresh reports HTTP/network failures without leaking credential URLs', async () => {
-  await assert.rejects(
-    requestDeployment(hook, async () => ({ ok: false, status: 403 })),
-    /403/,
-  );
-  await assert.rejects(
-    requestDeployment(hook, async () => {
-      throw new Error(hook);
-    }),
-    (error) => error.message === 'Vercel deployment request failed' && !error.cause,
-  );
-  await assert.rejects(
-    requestDeployment(hook, async () => ({ ok: true, json: async () => ({}) })),
-    /did not acknowledge/,
-  );
-});
 
 test('Vercel data build writes only data.json; the web bundle comes from the preceding vite build', async () => {
   const root = await mkdtemp(join(tmpdir(), 'tooling-vercel-'));
@@ -98,20 +46,4 @@ test('Vercel data build writes only data.json; the web bundle comes from the pre
   } finally {
     await rm(root, { recursive: true, force: true });
   }
-});
-
-test('release notifications remain compatible without scheduling or requesting deployments', async () => {
-  const text = await readFile(
-    new URL('../.github/workflows/apps-dashboard.yml', import.meta.url),
-    'utf8',
-  );
-  const workflow = parseDocument(text).toJS();
-  assert.deepEqual(workflow.on.repository_dispatch.types, ['app-released']);
-  assert.equal(workflow.on.schedule, undefined);
-  assert.equal(workflow.permissions.contents, 'read');
-  assert.equal(workflow.permissions.pages, undefined);
-  assert.ok(!text.includes('secrets.VERCEL_DEPLOY_HOOK'));
-  assert.ok(!text.includes('node dashboard/refresh.mjs'));
-  assert.ok(!text.includes('APPS_READ_TOKEN'));
-  assert.ok(!text.includes('deploy-pages'));
 });

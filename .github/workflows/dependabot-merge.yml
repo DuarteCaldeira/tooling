@@ -21,6 +21,8 @@ jobs:
               const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: item.number });
               if (pr.state !== 'open' || pr.draft || pr.user.login !== 'dependabot[bot]' || pr.user.id !== 49699333) continue;
               if (pr.head.repo.full_name !== `${owner}/${repo}` || pr.head.sha !== run.head_sha) continue;
+              const isMajor = (text) => [...text.matchAll(/from `?v?(\d+)[^\s`]* to `?v?(\d+)/g), ...text.matchAll(/\|\s*`v?(\d+)[^`|]*`\s*\|\s*`v?(\d+)[^`|]*`\s*\|/g)].some((m) => m[1] !== m[2]);
+              if (isMajor(`${pr.title}\n${pr.body ?? ''}`)) continue;
               const checks = await github.paginate(github.rest.checks.listForRef, { owner, repo, ref: pr.head.sha, filter: 'latest', per_page: 100 });
               const { data: statuses } = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: pr.head.sha });
               if (!checks.length || checks.some(c => c.status !== 'completed' || !['success', 'neutral', 'skipped'].includes(c.conclusion))) continue;

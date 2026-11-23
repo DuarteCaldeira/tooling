@@ -76,6 +76,18 @@ export function createDiscussionService({
     } while (cursor);
     return all;
   }
+  async function clearExpiredLimits(client, bucket) {
+    if (!store.remove) return;
+    try {
+      const prefix = `rate-limits/v1/${digest(client)}/`;
+      const expired = (await metadata(prefix)).filter(
+        (blob) => Number(blob.pathname.slice(prefix.length).split('/')[0]) < bucket - 1,
+      );
+      if (expired.length) await store.remove(expired.map((blob) => blob.url));
+    } catch {
+      console.warn('release-discussions: rate-limit cleanup deferred');
+    }
+  }
   async function rateLimit(client, time) {
     const bucket = Math.floor(time.getTime() / 60000);
     const bucketPrefix = `rate-limits/v1/${digest(client)}/${bucket}/`;
@@ -86,8 +98,10 @@ export function createDiscussionService({
         await store.create(`rate-limits/v1/${digest(client)}/${bucket}/${slot}.json`, {
           expiresAt: time.getTime() + 120000,
         })
-      )
+      ) {
+        if (slot === 0) await clearExpiredLimits(client, bucket);
         return slot;
+      }
     }
     throw new DiscussionError(429, 'Demasiados comentários. Aguarde um minuto e tente novamente');
   }
@@ -130,7 +144,7 @@ export function createDiscussionService({
       }
       return { item };
     },
-    async edit(input) {
+    async edit(input, client = 'workspace') {
       const context = await target(input);
       if (!uuidPattern.test(input.id ?? '')) throw new DiscussionError(400, 'Comentário inválido');
       const body = typeof input.body === 'string' ? input.body.trim() : '';
@@ -139,13 +153,15 @@ export function createDiscussionService({
       const path = `${threadPrefix(context)}${input.id}.json`;
       const existing = await store.get(path);
       if (!existing) throw new DiscussionError(404, 'Comentário não encontrado');
+      await rateLimit(`${client}:review`, now());
       const comment = { ...existing, body, updatedAt: now().toISOString() };
       await store.set(path, comment);
       return { comment };
     },
-    async delete(input) {
+    async delete(input, client = 'workspace') {
       const context = await target(input);
       if (!uuidPattern.test(input.id ?? '')) throw new DiscussionError(400, 'Comentário inválido');
+      await rateLimit(`${client}:review`, now());
       await store.remove([`${threadPrefix(context)}${input.id}.json`]);
       return { deleted: true };
     },
@@ -153,13 +169,23 @@ export function createDiscussionService({
       if (!Object.hasOwn(manifest, repository ?? ''))
         throw new DiscussionError(404, 'Aplicação não encontrada');
       const blobs = await metadata(appPrefix(repository));
+      // Group once by folder (version/item/comments, version/item/state/field, version/reported).
+      const folders = new Map();
+      for (const blob of blobs) {
+        const folder = blob.pathname
+          .slice(appPrefix(repository).length)
+          .split('/')
+          .slice(0, -1)
+          .join('/');
+        if (!folders.has(folder)) folders.set(folder, []);
+        folders.get(folder).push(blob);
+      }
       const summary = {};
       const states = {};
       const reportedItems = {};
       for (const [version, items] of Object.entries(manifest[repository])) {
-        const reportedBlobs = blobs.filter((blob) =>
-          blob.pathname.startsWith(reportedPrefix({ repository, version })),
-        );
+        const base = digest(version);
+        const reportedBlobs = folders.get(`${base}/reported`) ?? [];
         const reports = [];
         for (let start = 0; start < reportedBlobs.length; start += 8) {
           reports.push(
@@ -178,18 +204,15 @@ export function createDiscussionService({
         summary[version] = {};
         states[version] = {};
         for (const item of [...items, ...reports.map((report) => report.id)]) {
-          const context = { repository, version, item };
-          const comments = blobs.filter((blob) => blob.pathname.startsWith(threadPrefix(context)));
+          const comments = folders.get(`${base}/${item}/comments`) ?? [];
           summary[version][item] = comments.length;
           states[version][item] = { validated: false, closed: false };
           for (const field of ['validated', 'closed']) {
-            const events = blobs
-              .filter((blob) => blob.pathname.startsWith(`${statePrefix(context)}${field}/`))
-              .sort(
-                (a, b) =>
-                  new Date(b.uploadedAt) - new Date(a.uploadedAt) ||
-                  b.pathname.localeCompare(a.pathname),
-              );
+            const events = [...(folders.get(`${base}/${item}/state/${field}`) ?? [])].sort(
+              (a, b) =>
+                new Date(b.uploadedAt) - new Date(a.uploadedAt) ||
+                b.pathname.localeCompare(a.pathname),
+            );
             if (!events.length) continue;
             states[version][item][field] = events[0].pathname.endsWith('.true.json');
             if (
@@ -204,7 +227,7 @@ export function createDiscussionService({
       }
       return { summary, states, reportedItems };
     },
-    async setState(input) {
+    async setState(input, client = 'workspace') {
       const context = await target(input);
       if (!['validated', 'closed'].includes(input.field) || typeof input.value !== 'boolean')
         throw new DiscussionError(400, 'Estado de revisão inválido');
@@ -220,6 +243,7 @@ export function createDiscussionService({
       const path = `${statePrefix(context)}${input.field}/${id}.${input.value}.json`;
       if (await store.get(`${statePrefix(context)}${input.field}/${id}.${!input.value}.json`))
         throw new DiscussionError(409, 'Este pedido já foi utilizado');
+      await rateLimit(`${client}:review`, now());
       const event = {
         ...context,
         field: input.field,
@@ -281,8 +305,7 @@ export function createDiscussionService({
         return existing;
       }
       const time = now();
-      const bucket = Math.floor(time.getTime() / 60000);
-      const slot = await rateLimit(client, time);
+      await rateLimit(client, time);
       const comment = {
         id,
         ...context,
@@ -295,17 +318,6 @@ export function createDiscussionService({
         const saved = await store.get(path);
         if (saved?.author === author && saved?.body === body && saved?.kind === kind) return saved;
         throw new DiscussionError(409, 'Este pedido já foi utilizado');
-      }
-      if (slot === 0 && store.remove) {
-        try {
-          const prefix = `rate-limits/v1/${digest(client)}/`;
-          const expired = (await metadata(prefix)).filter(
-            (blob) => Number(blob.pathname.slice(prefix.length).split('/')[0]) < bucket - 1,
-          );
-          if (expired.length) await store.remove(expired.map((blob) => blob.url));
-        } catch {
-          console.warn('release-discussions: rate-limit cleanup deferred');
-        }
       }
       return comment;
     },
@@ -417,12 +429,12 @@ export function createHandler(serviceFactory) {
             headers,
           });
         if (input.action === 'state')
-          return new Response(JSON.stringify(await service.setState(input)), {
+          return new Response(JSON.stringify(await service.setState(input, client)), {
             status: 200,
             headers,
           });
         if (input.action === 'edit' || input.action === 'delete')
-          return new Response(JSON.stringify(await service[input.action](input)), {
+          return new Response(JSON.stringify(await service[input.action](input, client)), {
             status: 200,
             headers,
           });

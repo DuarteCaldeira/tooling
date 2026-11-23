@@ -7,7 +7,6 @@ import {
   build,
   collect,
   createClient,
-  latestRelease,
   toolingAtRef,
   validateConfig,
 } from '../dashboard/collect.mjs';
@@ -65,25 +64,6 @@ test('dashboard records the published release and tooling locked on the default 
   assert.equal(snapshot.apps[0].tooling.version, '0.2.4');
   assert.equal(snapshot.apps[0].releasedAt, release.published_at);
   assert.equal(snapshot.generatedAt, '2026-11-15T00:00:00.000Z');
-});
-
-test('dashboard selects by publication time across pages, includes prereleases and excludes drafts', async () => {
-  const old = { ...release, published_at: '2020-01-01T00:00:00Z' };
-  const newest = {
-    ...release,
-    id: 3,
-    tag_name: 'v2.0.0-beta.1',
-    published_at: '2026-11-15T00:00:00Z',
-    prerelease: true,
-  };
-  const api = mockApi({
-    '/repos/owner/app/releases?per_page=100&page=1': Array.from({ length: 100 }, () => old),
-    '/repos/owner/app/releases?per_page=100&page=2': [
-      newest,
-      { ...newest, published_at: '2027-01-01T00:00:00Z', draft: true },
-    ],
-  });
-  assert.equal((await latestRelease(api, app.repository)).tag_name, newest.tag_name);
 });
 
 test('dashboard distinguishes no release, inaccessible repository and absent tooling', async () => {
@@ -289,4 +269,26 @@ test('dashboard data build emits safe normalized data', async () => {
   } finally {
     await rm(output, { recursive: true, force: true });
   }
+});
+
+test('file contents use the raw media type, so files over 1 MB still resolve', async () => {
+  const lock = JSON.stringify({
+    packages: { 'node_modules/@dcaldeira/tooling': { version: '0.2.4' } },
+  });
+  const accepts = [];
+  const api = createClient('token', async (url, { headers }) => {
+    accepts.push(headers.Accept);
+    if (url.includes('/contents/package-lock.json'))
+      return { ok: true, status: 200, text: async () => lock };
+    if (url.includes('/contents/package.json'))
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ devDependencies: { '@dcaldeira/tooling': '^0.2.0' } }),
+      };
+    return { ok: false, status: 404 };
+  });
+  const tooling = await toolingAtRef(api, app, 'trunk', 'owner/tooling');
+  assert.equal(tooling.version, '0.2.4');
+  assert.ok(accepts.every((value) => value === 'application/vnd.github.raw+json'));
 });

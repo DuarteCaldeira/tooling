@@ -221,7 +221,7 @@ test('init creates small safe projects, preserves user settings and doctor repor
   initialize(root, { toolingSha: 'a'.repeat(40) });
   const pkg = JSON.parse(readFileSync(join(root, 'package.json')));
   assert.equal(pkg.scripts.lint, original.scripts.lint);
-  assert.equal(pkg.devDependencies['@dcaldeira/tooling'], '0.3.0');
+  assert.equal(pkg.devDependencies['@dcaldeira/tooling'], '0.3.1');
   assert.equal(
     readFileSync(join(root, 'prettier.config.mjs'), 'utf8'),
     'export default { semi: false };',

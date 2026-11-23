@@ -72,7 +72,8 @@ export function createReleaseSource({
             console.warn('release-dashboard: snapshot persistence unavailable');
           }
           return cached;
-        } catch {
+        } catch (error) {
+          console.error('release-dashboard: collection failed', error?.message);
           retryAt = now() + ttl;
           if (cached) return cached;
           throw new Error('Release data unavailable');

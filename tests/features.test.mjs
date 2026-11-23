@@ -416,3 +416,9 @@ test('new checks are opt-in and preserve docs/style routing and canonical browse
     /Unknown architecture layer/,
   );
 });
+
+test('history that cannot be written does not fail the validation', () => {
+  const root = temp();
+  writeFileSync(join(root, '.tooling'), 'a file where the history folder belongs');
+  assert.doesNotThrow(() => performanceHistory(root, report(), { limit: 4 }));
+});

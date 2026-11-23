@@ -62,15 +62,17 @@ export function validateConfig(config) {
 
 export function createClient(token, fetchImpl = fetch, signal) {
   const cache = new Map();
-  return async function api(path, { optional = false } = {}) {
-    if (!cache.has(path))
+  return async function api(path, { optional = false, raw = false } = {}) {
+    const key = raw ? `raw:${path}` : path;
+    if (!cache.has(key))
       cache.set(
-        path,
+        key,
         (async () => {
           for (let attempt = 0; attempt < 3; attempt++) {
             const response = await fetchImpl(`https://api.github.com${path}`, {
               headers: {
-                Accept: 'application/vnd.github+json',
+                // The raw type has no 1 MB limit, unlike the default base64 JSON for files.
+                Accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json',
                 'X-GitHub-Api-Version': '2022-11-28',
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
               },
@@ -79,13 +81,13 @@ export function createClient(token, fetchImpl = fetch, signal) {
                 : AbortSignal.timeout(30000),
             });
             if (response.status === 404) return null;
-            if (response.ok) return response.json();
+            if (response.ok) return raw ? response.text() : response.json();
             if (response.status >= 500 && attempt < 2) continue;
             throw new Error(`GitHub request failed (${response.status})`);
           }
         })(),
       );
-    const result = await cache.get(path);
+    const result = await cache.get(key);
     if (result === null && !optional) throw new Error('Repository or ref unavailable (404)');
     return result;
   };
@@ -94,9 +96,10 @@ export function createClient(token, fetchImpl = fetch, signal) {
 async function contents(api, repository, path, ref) {
   const data = await api(
     `/repos/${repository}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(ref)}`,
-    { optional: true },
+    { optional: true, raw: true },
   );
   if (!data) return null;
+  if (typeof data === 'string') return data;
   if (data.encoding !== 'base64' || typeof data.content !== 'string')
     throw new Error('Unsupported repository file');
   return Buffer.from(data.content, 'base64').toString('utf8');
@@ -114,10 +117,6 @@ export async function releaseHistory(api, repository) {
       );
   }
   throw new Error('Release history exceeds pagination limit');
-}
-
-export async function latestRelease(api, repository) {
-  return (await releaseHistory(api, repository))[0] ?? null;
 }
 
 export function productNotes(body = '') {
@@ -234,7 +233,14 @@ async function collectApp(config, api, app) {
       repository.default_branch
         ? toolingAtRef(api, app, repository.default_branch, config.toolingRepository).catch(
             // Keep release information available when tooling metadata cannot be read.
-            () => row.tooling,
+            (error) => {
+              console.error(
+                'release-dashboard: tooling unreadable',
+                app.repository,
+                error?.message,
+              );
+              return row.tooling;
+            },
           )
         : row.tooling,
       releaseHistory(api, app.repository),
@@ -301,7 +307,8 @@ async function collectApp(config, api, app) {
     });
     row.status = row.tooling.status === 'unknown' ? 'partial' : 'released';
     return row;
-  } catch {
+  } catch (error) {
+    console.error('release-dashboard: app unavailable', app.repository, error?.message);
     return { ...row, status: 'unavailable' };
   }
 }
