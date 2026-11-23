@@ -742,8 +742,8 @@ button {
 }
 .release-body {
   display: grid;
-  gap: 18px;
-  padding: 20px clamp(14px, 2vw, 26px) 22px;
+  gap: var(--ds-spacing-6);
+  padding: var(--ds-spacing-2) clamp(1rem, 2vw, 1.5rem) var(--ds-spacing-6);
 }
 .release-footer {
   display: flex;
@@ -768,6 +768,11 @@ button {
   margin: 0;
   color: var(--text-3);
 }
+.source-changelog {
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .load-more {
   display: flex;
   justify-content: center;
@@ -775,11 +780,11 @@ button {
 }
 .area-groups {
   display: grid;
-  gap: 18px;
+  gap: var(--ds-spacing-5);
 }
 .release-area {
   display: grid;
-  gap: 6px;
+  gap: var(--ds-spacing-3);
 }
 .release-area-heading {
   display: flex;
@@ -818,21 +823,20 @@ button {
 }
 
 /* ───────── Change items ───────── */
-/* Every change is its own card: a status stripe, a big tap-to-validate check, and its own comment action. */
 .change-list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 8px;
+  gap: var(--ds-spacing-3);
 }
 .change-item {
   --stripe: var(--accent);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 4px 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ds-spacing-2) var(--ds-spacing-4);
   align-items: start;
-  padding: 12px 14px 12px 12px;
+  padding: var(--ds-spacing-3) var(--ds-spacing-4);
   border: 1px solid var(--line);
   border-left: 4px solid var(--stripe);
   border-radius: 18px;
@@ -841,6 +845,9 @@ button {
     background-color 150ms,
     border-color 150ms,
     opacity 200ms;
+}
+.change-item:has(> .check-wrap) {
+  grid-template-columns: auto minmax(0, 1fr);
 }
 .change-item:hover {
   background: var(--surface-2);
@@ -897,23 +904,13 @@ button {
   border-color: var(--ok);
   color: var(--on-accent);
 }
-.item-bullet {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--text-3);
-}
-.is-reported .item-bullet {
-  color: var(--bad);
-}
 .item-main {
   display: grid;
-  gap: 8px;
+  gap: var(--ds-spacing-2);
   min-width: 0;
-  padding-top: 8px;
+}
+.check-wrap + .item-main {
+  padding-block-start: 10px;
 }
 .item-trigger {
   width: 100%;
@@ -945,8 +942,7 @@ button {
   justify-content: space-between;
   gap: 8px 12px;
 }
-.item-topics,
-.topic-row {
+.item-topics {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -1086,10 +1082,9 @@ button {
 .ledger-head,
 .app-card {
   display: grid;
-  grid-template-columns: minmax(160px, 1.5fr) minmax(90px, 0.8fr) minmax(150px, 1.2fr) minmax(
-      0,
-      1.3fr
-    ) 92px;
+  grid-template-columns:
+    minmax(160px, 1.5fr) minmax(90px, 0.8fr) minmax(150px, 1.2fr) minmax(0, 1.3fr)
+    92px;
   gap: 16px;
   align-items: center;
 }
@@ -1536,7 +1531,8 @@ footer {
     border-radius: 21px;
   }
   .release-body {
-    padding: 16px 10px 16px;
+    gap: var(--ds-spacing-5);
+    padding: var(--ds-spacing-1) var(--ds-spacing-3) var(--ds-spacing-4);
   }
   .release-heading {
     flex-direction: column;
@@ -1555,9 +1551,8 @@ footer {
     font-size: 11px;
   }
   .change-item {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 2px 12px;
-    padding: 10px 12px 10px 10px;
+    column-gap: var(--ds-spacing-3);
+    padding: var(--ds-spacing-3);
   }
   .item-trigger {
     font-size: 16px;
@@ -1720,24 +1715,21 @@ footer {
 
 /* ───────── Conversation drawer ───────── */
 .conversation {
-  --conversation-section-space: var(--ds-spacing-5);
+  --conversation-section-space: var(--ds-spacing-6);
   --conversation-panel-inset: var(--ds-spacing-4);
   display: grid;
   min-inline-size: 0;
   gap: var(--conversation-section-space);
 }
-.conversation-version {
-  margin: 0;
-}
 .conversation-quote {
   margin: 0;
-  padding: var(--ds-spacing-4) var(--ds-spacing-5);
+  padding: var(--ds-spacing-4) var(--conversation-panel-inset);
   border: 1px solid var(--accent);
   border-left: 4px solid var(--color-primary);
   border-radius: var(--ds-radius-2xl);
   background: var(--color-primary-subtle);
-  font-size: 17px;
-  line-height: 1.7;
+  font-size: 16px;
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
 .comment-list {
@@ -1861,6 +1853,10 @@ footer {
 .comment-form {
   display: grid;
   gap: var(--ds-spacing-4);
+  padding: var(--conversation-panel-inset);
+  border: 1px solid var(--color-border);
+  border-radius: var(--ds-radius-xl);
+  background: var(--color-bg);
 }
 .comment-form-fields {
   display: grid;
@@ -1889,13 +1885,7 @@ footer {
   min-inline-size: 0;
   gap: var(--ds-spacing-3);
 }
-.drawer-section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ds-spacing-3);
-}
-.drawer-section-heading h3 {
+.drawer-section-title {
   margin: 0;
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1907,9 +1897,6 @@ footer {
 .drawer-section + .drawer-section {
   padding-top: var(--conversation-section-space);
   border-top: 1px solid var(--color-border);
-}
-.drawer-context .conversation-quote {
-  font-size: 16px;
 }
 .action-list {
   display: grid;
@@ -1969,23 +1956,12 @@ footer {
 }
 .drawer-empty {
   margin: 0;
-  padding: var(--ds-spacing-5);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--ds-radius-xl);
   color: var(--color-text-subtle);
-  text-align: center;
-}
-.drawer-form {
-  gap: var(--ds-spacing-4);
-  padding: var(--conversation-section-space) var(--conversation-panel-inset);
-  border: 1px solid var(--color-border);
-  border-radius: var(--ds-radius-xl);
-  background: var(--color-bg);
 }
 
 @media (max-width: 420px) {
   .conversation {
-    --conversation-section-space: var(--ds-spacing-4);
+    --conversation-section-space: var(--ds-spacing-5);
     --conversation-panel-inset: var(--ds-spacing-3);
   }
   .comment-form-fields {

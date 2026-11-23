@@ -1,16 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  Badge,
-  Button,
-  Drawer,
-  Modal,
-  Select,
-  Tag,
-  Textarea,
-  ToggleSwitch,
-} from '@dcaldeira/design-system';
+import { Button, Drawer, Modal, Select, Textarea, ToggleSwitch } from '@dcaldeira/design-system';
 import { api, itemKey } from '../lib/api.js';
-import { itemTopics, portugueseDate } from '../lib/topics.js';
+import { portugueseDate } from '../lib/topics.js';
 import { useConversationOverlay, usePolling } from '../hooks.js';
 
 const kinds = [
@@ -32,31 +23,6 @@ function CommentKind({ kind }) {
 }
 
 const authors = ['QAren', 'DUveloper'].map((value) => ({ value, label: value }));
-
-export function TopicTags({ text, technical }) {
-  const topics = itemTopics(text, technical);
-  return (
-    <div className="topic-row">
-      {topics.map((topic) => (
-        <Tag key={topic.id} size="sm" variant={topic.kind === 'area' ? 'primary' : 'default'}>
-          {`${topic.emoji} ${topic.label}`}
-        </Tag>
-      ))}
-    </div>
-  );
-}
-
-function Section({ title, aside, children, className = '' }) {
-  return (
-    <section className={`drawer-section ${className}`}>
-      <header className="drawer-section-heading">
-        <h3>{title}</h3>
-        {aside}
-      </header>
-      {children}
-    </section>
-  );
-}
 
 export function ConversationDrawer({ context, onClose, review, drafts, onReported }) {
   const open = Boolean(context);
@@ -339,77 +305,65 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
       >
         {context ? (
           <div className="conversation" ref={contentRef}>
-            <Section title="Versão" className="drawer-version">
-              <p className="conversation-version">
-                <strong>
-                  {context.appName} · {context.version}
-                </strong>
-              </p>
-            </Section>
             {!isReport ? (
-              <>
-                <Section
-                  title={isRelease ? 'Conversa da versão' : 'Alteração'}
-                  className="drawer-context"
-                >
-                  {isRelease ? null : (
-                    <TopicTags text={context.text} technical={context.technical} />
-                  )}
+              <div className="drawer-section drawer-actions">
+                {context.reported || context.technical ? (
+                  <h3 className="drawer-section-title">
+                    {context.reported ? 'Problema reportado' : 'Detalhe técnico'}
+                  </h3>
+                ) : null}
+                {isRelease ? null : (
                   <blockquote className="conversation-quote">{context.text}</blockquote>
-                </Section>
-
-                <Section title="Ações" className="drawer-actions">
-                  <div className="action-list">
-                    {canValidate ? (
-                      <ToggleSwitch
-                        id="conversation-validated"
-                        className="conversation-toggle"
-                        label="Validada"
-                        helperText="Confirma que esta novidade está correta."
-                        checked={state.validated}
-                        disabled={busy || !review.isLoaded(context.repository)}
-                        onChange={(event) =>
-                          change(
-                            'validated',
-                            event.target.checked,
-                            event.target.checked ? 'Marcada como validada' : 'Validação removida',
-                          )
-                        }
-                      />
-                    ) : null}
+                )}
+                <div className="action-list">
+                  {canValidate ? (
                     <ToggleSwitch
-                      id="conversation-resolved"
+                      id="conversation-validated"
                       className="conversation-toggle"
-                      label="Conversa resolvida"
-                      helperText="Marca esta conversa como tratada. Pode reabri-la quando quiser."
-                      checked={state.closed}
+                      label="Validada"
+                      checked={state.validated}
                       disabled={busy || !review.isLoaded(context.repository)}
                       onChange={(event) =>
                         change(
-                          'closed',
+                          'validated',
                           event.target.checked,
-                          event.target.checked ? 'Conversa resolvida' : 'Conversa reaberta',
+                          event.target.checked ? 'Marcada como validada' : 'Validação removida',
                         )
                       }
                     />
-                  </div>
-                  <div className="action-buttons">
-                    <Button variant="secondary" size="sm" onClick={copyLink}>
-                      Copiar ligação
-                    </Button>
-                    <Button variant="secondary" size="sm" disabled={busy} onClick={() => load()}>
-                      Atualizar comentários
-                    </Button>
-                  </div>
-                  <p className="drawer-notice" role="status" aria-live="polite">
-                    {notice}
-                  </p>
-                </Section>
-
-                <Section
-                  title="Comentários"
-                  aside={<Badge variant="neutral" size="sm" text={`${sorted.length}`} />}
-                >
+                  ) : null}
+                  <ToggleSwitch
+                    id="conversation-resolved"
+                    className="conversation-toggle"
+                    label="Conversa resolvida"
+                    checked={state.closed}
+                    disabled={busy || !review.isLoaded(context.repository)}
+                    onChange={(event) =>
+                      change(
+                        'closed',
+                        event.target.checked,
+                        event.target.checked ? 'Conversa resolvida' : 'Conversa reaberta',
+                      )
+                    }
+                  />
+                </div>
+                <div className="action-buttons">
+                  <Button variant="secondary" size="sm" onClick={copyLink}>
+                    Copiar ligação
+                  </Button>
+                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => load()}>
+                    Atualizar comentários
+                  </Button>
+                </div>
+                <p className="drawer-notice" role="status" aria-live="polite">
+                  {notice}
+                </p>
+              </div>
+            ) : null}
+            <section className="drawer-section">
+              {!isReport ? (
+                <>
+                  <h3 className="drawer-section-title">Comentários</h3>
                   <p className="drawer-status" role="status" aria-live="polite">
                     {status}
                   </p>
@@ -507,19 +461,15 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
                       })}
                     </ol>
                   ) : status ? null : (
-                    <p className="drawer-empty">
-                      Ainda não há comentários. Comece a conversa abaixo.
-                    </p>
+                    <p className="drawer-empty">Ainda não há comentários.</p>
                   )}
                   {cursor ? (
                     <Button variant="ghost" size="sm" onClick={() => load({ earlier: true })}>
                       Carregar comentários anteriores
                     </Button>
                   ) : null}
-                </Section>
-              </>
-            ) : null}
-            <Section title={isReport ? 'Novo problema' : 'Novo comentário'} className="drawer-form">
+                </>
+              ) : null}
               <form className="comment-form" onSubmit={submit} aria-busy={busy}>
                 <div className="comment-form-fields">
                   <Select
@@ -546,7 +496,9 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
                   required
                   maxLength={4000}
                   rows={4}
-                  placeholder="O que aconteceu? O que esperava? Se for um problema, indique os passos para o reproduzir."
+                  placeholder={
+                    isReport ? 'Descreva o que aconteceu e como reproduzir o problema.' : undefined
+                  }
                 />
                 <Button type="submit" variant="primary" isLoading={busy}>
                   {isReport ? 'Adicionar à versão' : 'Enviar comentário'}
@@ -557,7 +509,7 @@ export function ConversationDrawer({ context, onClose, review, drafts, onReporte
                   </p>
                 ) : null}
               </form>
-            </Section>
+            </section>
           </div>
         ) : null}
       </Drawer>

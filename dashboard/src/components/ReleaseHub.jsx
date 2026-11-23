@@ -8,7 +8,7 @@ import {
   Tag,
 } from '@dcaldeira/design-system';
 import { itemTopics, normalize, portugueseDate } from '../lib/topics.js';
-import { ArrowUpRight, Bug, Chat, Check, Dot, Filter, Refresh } from './Icons.jsx';
+import { ArrowUpRight, Bug, Chat, Check, Filter, Refresh } from './Icons.jsx';
 
 const FILTER_KEYS = [
   'notes-search',
@@ -43,6 +43,7 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
   const [feedback, setFeedback] = useState('');
   const [pending, setPending] = useState(false);
   const { text, technical, areaLabel, reported } = context;
+  const canValidate = !technical && !reported;
   const split = text.indexOf(': ');
   const repeated =
     split > 0 && areaLabel && normalize(text.slice(0, split)) === normalize(areaLabel);
@@ -69,12 +70,8 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
         : 'is-pending';
   return (
     <li className={`change-item ${status}${state.count && !state.closed ? ' has-open' : ''}`}>
-      <span className="check-wrap">
-        {technical || reported ? (
-          <span className="item-bullet" aria-hidden="true">
-            {reported ? <Bug /> : <Dot />}
-          </span>
-        ) : (
+      {canValidate ? (
+        <span className="check-wrap">
           <Button
             variant="secondary"
             size="sm"
@@ -85,8 +82,8 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
           >
             <Check />
           </Button>
-        )}
-      </span>
+        </span>
+      ) : null}
       <div className="item-main">
         <button
           type="button"
@@ -110,9 +107,7 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
         <div className="item-meta">
           {tags.length || reported ? (
             <div className="item-topics">
-              {reported ? (
-                <span className="comment-kind comment-kind--issue">Problema</span>
-              ) : null}
+              {reported ? <span className="comment-kind comment-kind--issue">Problema</span> : null}
               {tags.map((topic) => (
                 <button
                   key={topic.id}
@@ -311,6 +306,15 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         content === 'product'
           ? []
           : (release.technicalItems ?? []).filter((item) => itemMatches(release, item, true));
+      const sourceNotes =
+        !needsState &&
+        topic === 'all' &&
+        content === 'all' &&
+        !release.items?.length &&
+        release.originalNotes?.trim() &&
+        matchesText(`${release.version} ${release.originalNotes}`)
+          ? release.originalNotes
+          : '';
       const releaseState = review.stateOf(context(release, 'release', ''));
       const releaseMatch =
         topic === 'all' &&
@@ -331,7 +335,14 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         items,
         technical,
         reported,
-        visible: items.length || technical.length || reported.length || releaseMatch || emptyMatch,
+        sourceNotes,
+        visible:
+          items.length ||
+          technical.length ||
+          reported.length ||
+          sourceNotes ||
+          releaseMatch ||
+          emptyMatch,
       };
     })
     .filter((entry) => entry.visible);
@@ -356,6 +367,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         expanded[releaseId(entry.release)] ??
         (filtering ||
           (!fully && product.length > 0) ||
+          (entry.release === all[0] && Boolean(entry.sourceNotes)) ||
           entry.reported.some(
             (item) => !review.stateOf(context(entry.release, item.id, item.text)).closed,
           )),
@@ -382,7 +394,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             : '';
 
   const accordionItems = states.map(({ entry, product, checked, fully }) => {
-    const { release, items, technical, reported } = entry;
+    const { release, items, technical, reported, sourceNotes } = entry;
     const key = releaseId(release);
     const technicalKey = `${key}/technical`;
     const technicalOpen =
@@ -430,13 +442,20 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             <div className="area-groups">
               <AreaGroups items={items} technical={false} {...groupProps} />
             </div>
+          ) : sourceNotes ? (
+            <section className="release-area">
+              <header className="release-area-heading">
+                <h3>Changelog</h3>
+              </header>
+              <pre className="source-note source-changelog">{sourceNotes}</pre>
+            </section>
           ) : !technical.length && !reported.length && !needsState ? (
             <p className="source-note">
               {release.summaryContext ?? 'Esta versão não tem novidades de produto descritas.'}
             </p>
           ) : null}
           {reported.length ? (
-            <section className="area-groups release-area" aria-label="Problemas reportados">
+            <section className="release-area" aria-label="Problemas reportados">
               <header className="release-area-heading">
                 <h3>Problemas reportados</h3>
               </header>
@@ -616,17 +635,19 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
       </p>
       {accordionItems.length ? (
         <div className="release-feed">
-        <Accordion
-          type="multiple"
-          items={accordionItems}
-          value={states.filter((state) => state.open).map(({ entry }) => releaseId(entry.release))}
-          onChange={(value) =>
-            setOpen(
-              states.map(({ entry }) => releaseId(entry.release)),
-              [value].flat(),
-            )
-          }
-        />
+          <Accordion
+            type="multiple"
+            items={accordionItems}
+            value={states
+              .filter((state) => state.open)
+              .map(({ entry }) => releaseId(entry.release))}
+            onChange={(value) =>
+              setOpen(
+                states.map(({ entry }) => releaseId(entry.release)),
+                [value].flat(),
+              )
+            }
+          />
         </div>
       ) : null}
       {matches.length > limit ? (
@@ -639,4 +660,3 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     </section>
   );
 }
-

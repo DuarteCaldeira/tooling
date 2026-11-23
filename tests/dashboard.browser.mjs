@@ -172,11 +172,25 @@ test(
       await scan();
       await page.getByRole('button', { name: 'Mostrar versões anteriores', exact: false }).click();
       assert.equal(await page.locator('.release-heading').count(), 11);
+      await page.getByRole('button', { name: /^v1\.0\.0 / }).click();
+      const changelog = page.locator('.source-changelog');
+      await changelog.waitFor();
+      assert.equal(await changelog.textContent(), technical.originalNotes);
+      assert.equal(await changelog.locator('script').count(), 0);
       await select('content-filter', 'Só técnica');
       assert.equal(await page.getByRole('button', { name: /^Validar:/ }).count(), 0);
       await page.getByRole('button', { name: 'Expandir tudo', exact: true }).click();
-      await page.getByText(/Detalhes técnicos/).click();
+      const technicalDetails = page.getByRole('button', { name: /Detalhes técnicos/ });
+      if ((await technicalDetails.getAttribute('aria-expanded')) === 'false')
+        await technicalDetails.click();
       assert.match(await page.locator('.change-copy').textContent(), /update dependencies/);
+      const technicalCard = page.locator('.change-item.is-technical');
+      assert.equal(await technicalCard.locator('.check-wrap').count(), 0);
+      await technicalCard.getByRole('button', { name: /^Abrir conversa:/ }).click();
+      const technicalDialog = page.getByRole('dialog');
+      await technicalDialog.getByRole('heading', { name: 'Detalhe técnico' }).waitFor();
+      assert.equal(await technicalDialog.getByRole('switch', { name: 'Validada' }).count(), 0);
+      await technicalDialog.getByRole('button', { name: 'Fechar', exact: true }).click();
       assert.equal(await page.evaluate(() => globalThis.injected), undefined);
       await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
       await page.getByRole('button', { name: 'Filtrar por Dados', exact: true }).first().click();
@@ -205,6 +219,14 @@ test(
       await page.getByRole('button', { name: 'Abrir conversa: ' + texts[0], exact: true }).click();
       const dialog = page.getByRole('dialog');
       await dialog.waitFor();
+      assert.equal(
+        await dialog.getByRole('heading', { name: 'Comentários', exact: true }).count(),
+        1,
+      );
+      assert.equal(
+        await dialog.getByRole('heading', { name: /^(Alteração|Ações|Novo comentário)$/ }).count(),
+        0,
+      );
       assert.equal(await dialog.locator('#comment-author').textContent(), 'QAren');
       await dialog.getByRole('textbox', { name: /^Mensagem/ }).fill('Uma descoberta partilhada');
       await dialog.getByRole('button', { name: 'Enviar comentário', exact: true }).click();
@@ -265,9 +287,7 @@ test(
       await confirmation.waitFor({ state: 'detached' });
       await dialog.getByText('Comentário eliminado', { exact: true }).waitFor();
       await other.getByRole('button', { name: 'Atualizar comentários', exact: true }).click();
-      await other
-        .getByText('Ainda não há comentários. Comece a conversa abaixo.', { exact: true })
-        .waitFor();
+      await other.getByText('Ainda não há comentários.', { exact: true }).waitFor();
       await secondContext.close();
       await dialog.getByRole('button', { name: 'Fechar', exact: true }).click();
       await dialog.waitFor({ state: 'detached' });
@@ -337,19 +357,22 @@ test(
       await selectedRelease.getByRole('button', { name: /Reportar bug/ }).click();
       const bugDialog = page.getByRole('dialog');
       await bugDialog.getByRole('heading', { name: '🐛 Reportar bug', exact: true }).waitFor();
-      assert.match(await bugDialog.locator('.drawer-version').textContent(), /Saudinha · v1.20.0/);
+      assert.equal(await bugDialog.getByText('Saudinha · v1.20.0', { exact: true }).count(), 1);
       assert.equal(await bugDialog.locator('#comment-kind').textContent(), 'Problema');
       await bugDialog
         .getByRole('textbox', { name: 'Mensagem', exact: true })
         .fill('O botão de guardar não responde');
       await bugDialog.getByRole('button', { name: 'Adicionar à versão', exact: true }).click();
       await bugDialog.getByRole('heading', { name: '💬 Conversa', exact: true }).waitFor();
+      await bugDialog.getByRole('heading', { name: 'Problema reportado' }).waitFor();
+      assert.equal(await bugDialog.getByRole('switch', { name: 'Validada' }).count(), 0);
       assert.match(
         await bugDialog.locator('.conversation-quote').textContent(),
         /guardar não responde/,
       );
       await bugDialog.getByRole('button', { name: 'Fechar', exact: true }).click();
       await selectedRelease.getByRole('region', { name: 'Problemas reportados' }).waitFor();
+      assert.equal(await selectedRelease.locator('.is-reported .check-wrap').count(), 0);
       assert.equal(
         await page
           .locator('.release-body')
@@ -371,7 +394,10 @@ test(
         'https://tooling.test/?app=owner%2Fapp&release=v1.20.0&item=' + report.id + '#discussion',
       );
       await linked.getByRole('dialog').waitFor();
-      assert.match(await linked.locator('.drawer-version').textContent(), /v1.20.0/);
+      assert.equal(
+        await linked.getByRole('dialog').getByText('Saudinha · v1.20.0', { exact: true }).count(),
+        1,
+      );
       assert.match(
         await linked.locator('.conversation-quote').textContent(),
         /guardar não responde/,

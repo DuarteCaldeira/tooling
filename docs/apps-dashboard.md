@@ -20,7 +20,7 @@ Choose an app from the emoji picker (or the selector on mobile) to browse its re
 
 `dashboard/release-notes.json` contains reviewed Portuguese summaries for all 32 published Saudinha versions and 28 published Rookie versions, including 1.27.2. Saudinha's source is its versioned `CHANGELOG.md`; Rookie's versioned in-app changelog and Portuguese translations were checked as well as GitHub release notes, because some GitHub releases contain cumulative older changes. Design system 1.0.0 has no published changelog detail and is labelled accordingly. Summaries are shown only when a matching published release exists. Dates come from GitHub and historical behaviours remain tied to their own version.
 
-Technical maintenance appears in **Detalhes técnicos**, collapsed by default, only when technical items exist. The original-changelog expander is omitted. Routine dependency, test, build and release-script updates stay out of the main product summary. No AI provider is called at build time; new app-authored `Novidades` sections are imported automatically, and reviewed summaries can be edited in the file.
+Technical maintenance appears in **Detalhes técnicos**, collapsed by default, only when technical items exist. Routine dependency, test, build and release-script updates stay out of the main product summary. New app-authored `Novidades` sections are imported automatically, and reviewed summaries can be edited in the file.
 
 For automatic product notes on new releases, publish a top-level `Novidades` (Portuguese) or `Product updates` (English) section with plain-language bullet points in the GitHub release body:
 
@@ -35,13 +35,13 @@ For automatic product notes on new releases, publish a top-level `Novidades` (Po
 - Internal implementation details can remain here.
 ```
 
-Collection reads those bullets at each refresh. An explicit summary in `release-notes.json` takes precedence. Releases without an edited summary or product section show an honest “Product summary not available” message and expandable original GitHub notes; the site does not invent or automatically translate summaries. Visible notes and comments are rendered as inert text; original release bodies remain available through GitHub. The first ten releases appear initially; “Show older releases” loads more from the collected history.
+Collection reads those bullets at each refresh. An explicit summary in `release-notes.json` takes precedence. When a release has no product summary, the dashboard displays its **Changelog** using the corresponding version section or the GitHub release body. Visible notes and comments are rendered as text. The first ten releases appear initially; "Show older releases" loads more from the collected history.
 
 ## Apps
 
 Edit `dashboard/apps.json` to add or remove apps. The list includes Rookie, Billy, Dra. Gabriela Videira, Saudinha, Comidinha, Despesas and Design system (`DuarteCaldeira/design-system`). Each app can have an `emoji`. Only explicitly listed repositories are published; include each private repository in the read token's access list. Optional `packagePath`, `lockPath`, `workflowPath` and `changelogPath` support monorepos and custom CI locations; paths are relative to the repository root.
 
-Several apps can share one repository (Saudinha and Comidinha both live in `saudinha-pnn`). Each of them then needs a distinct `tagPrefix`, and all but one need an `id`. An app only shows releases whose tag is its prefix followed by a version, such as `meals-v0.1.0` for `"tagPrefix": "meals-v"`, and shows the version as `v0.1.0`. The `id` replaces the repository in the `?app=` URL, in shared validation and conversation storage, and as the key in `release-notes.json`. Apps without an `id` keep their repository as the key, so their existing reviews stay.
+Several apps can share one repository (Saudinha and Comidinha both live in `saudinha-pnn`). Saudinha uses health-v and Comidinha uses meals-v. Each of them needs a distinct `tagPrefix`, and all but one need an `id`. An app only shows releases whose tag is its prefix followed by a version, such as `meals-v0.1.0` for `"tagPrefix": "meals-v"`, and shows the version as `v0.1.0`. The `id` replaces the repository in the `?app=` URL, in shared validation and conversation storage, and as the key in `release-notes.json`. Apps without an `id` keep their repository as the key, so their existing reviews stay.
 
 ## Shared discussions
 

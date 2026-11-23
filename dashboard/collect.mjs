@@ -122,9 +122,13 @@ export async function releaseHistory(api, repository) {
 export function productNotes(body = '') {
   if (typeof body !== 'string') return null;
   const lines = body.split(/\r?\n/);
-  const start = lines.findIndex((line) => /^##\s+(Novidades|Product updates)\s*$/i.test(line));
+  const heading = /^(#{2,6})\s+(Novidades|Product updates)\s*$/i;
+  const start = lines.findIndex((line) => heading.test(line));
   if (start < 0) return null;
-  const next = lines.slice(start + 1).findIndex((line) => /^##\s/.test(line));
+  const depth = lines[start].match(heading)[1].length;
+  const next = lines
+    .slice(start + 1)
+    .findIndex((line) => (line.match(/^(#{1,6})\s/)?.[1].length ?? Infinity) <= depth);
   const section = lines.slice(start + 1, next < 0 ? undefined : start + 1 + next);
   const changes = section
     .filter((line) => /^\s*[-*]\s+/.test(line))
@@ -249,63 +253,69 @@ async function collectApp(config, api, app) {
     const history = releases
       .map((item) => ({ item, version: appVersion(app, item.tag_name) }))
       .filter(({ version }) => version);
-    row.releases = history.map(({ item, version }) => {
-      const override = app.releaseNotes?.[version.replace(/^v/, '')];
-      const edited = override ?? productNotes(item.body);
-      if (
-        edited &&
-        (!Array.isArray(edited.changes) ||
-          edited.changes.some((change) => typeof change !== 'string'))
-      )
-        throw new Error('Invalid product release notes');
-      return {
-        version,
-        releasedAt: item.published_at,
-        url: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(item.tag_name)}`,
-        prerelease: Boolean(item.prerelease),
-        notes: edited?.changes ?? [],
-        summaryContext: edited?.context ?? null,
-        language: edited?.language ?? null,
-        source: override ? 'edited' : edited ? 'published' : 'github',
-        originalNotes: typeof item.body === 'string' ? item.body : '',
-      };
-    });
     const release = history[0]?.item;
-    if (!release) {
-      return { ...row, status: 'unreleased' };
-    }
+    if (!release) return { ...row, status: 'unreleased' };
     const commit = await api(
       `/repos/${app.repository}/commits/${encodeURIComponent(release.tag_name)}`,
+      { optional: true },
+    ).catch(() => null);
+    const releaseSha = /^[a-f\d]{40}$/i.test(commit?.sha) ? commit.sha : null;
+    const readChangelog = async (ref) => {
+      try {
+        return changelogSections(
+          (await contents(api, app.repository, app.changelogPath ?? 'CHANGELOG.md', ref)) ?? '',
+        );
+      } catch {
+        return {};
+      }
+    };
+    const sections = await readChangelog(releaseSha ?? release.tag_name);
+    row.releases = await Promise.all(
+      history.map(async ({ item, version }) => {
+        const versionKey = version.replace(/^v/, '');
+        const body = typeof item.body === 'string' ? item.body.trim() : '';
+        const section =
+          sections[versionKey] ||
+          (!body && item !== release ? (await readChangelog(item.tag_name))[versionKey] : '');
+        const originalNotes = section || body;
+        const override = app.releaseNotes?.[versionKey];
+        const published = productNotes(body);
+        const edited = override ?? published ?? productNotes(section);
+        if (
+          edited &&
+          (!Array.isArray(edited.changes) ||
+            edited.changes.some((change) => typeof change !== 'string'))
+        )
+          throw new Error('Invalid product release notes');
+        const notes = edited?.changes ?? [];
+        const maintenance = technicalNotes(originalNotes);
+        return {
+          version,
+          releasedAt: item.published_at,
+          url: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(item.tag_name)}`,
+          prerelease: Boolean(item.prerelease),
+          notes,
+          summaryContext: edited?.context ?? null,
+          language: edited?.language ?? null,
+          source: override ? 'edited' : published ? 'published' : section ? 'changelog' : 'github',
+          originalNotes,
+          technicalNotes: maintenance,
+          items: notes.map((text, index) => ({
+            id: override?.itemIds?.[index] ?? itemId(text),
+            text,
+          })),
+          technicalItems: maintenance.map((text) => ({ id: itemId(text, 'technical'), text })),
+        };
+      }),
     );
-    if (!/^[a-f\d]{40}$/i.test(commit.sha)) throw new Error('Invalid release commit');
-    const changelog = await contents(
-      api,
-      app.repository,
-      app.changelogPath ?? 'CHANGELOG.md',
-      commit.sha,
-    );
-    const sections = changelogSections(changelog ?? '');
-    for (const entry of row.releases) {
-      const source = sections[entry.version.replace(/^v/, '')] ?? entry.originalNotes;
-      entry.originalNotes = source;
-      entry.technicalNotes = technicalNotes(source);
-      entry.items = entry.notes.map((text, index) => ({
-        id: app.releaseNotes?.[entry.version.replace(/^v/, '')]?.itemIds?.[index] ?? itemId(text),
-        text,
-      }));
-      entry.technicalItems = entry.technicalNotes.map((text) => ({
-        id: itemId(text, 'technical'),
-        text,
-      }));
-    }
     Object.assign(row, {
       version: history[0].version,
       releasedAt: release.published_at,
       releaseUrl: `https://github.com/${app.repository}/releases/tag/${encodeURIComponent(release.tag_name)}`,
       prerelease: release.prerelease,
-      commit: commit.sha,
+      commit: releaseSha,
     });
-    row.status = row.tooling.status === 'unknown' ? 'partial' : 'released';
+    row.status = !releaseSha || row.tooling.status === 'unknown' ? 'partial' : 'released';
     return row;
   } catch (error) {
     console.error('release-dashboard: app unavailable', app.repository, error?.message);
