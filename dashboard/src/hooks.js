@@ -109,14 +109,6 @@ export function usePolling(callback, ms, enabled) {
   }, [ms, enabled]);
 }
 
-/** A string kept in sync with the URL query, e.g. `?topic-filter=ux`. */
-export function useQueryState(key, fallback) {
-  const [value, setValue] = useState(
-    () => new URLSearchParams(location.search).get(key) ?? fallback,
-  );
-  return [value, setValue];
-}
-
 /** The scroll lock lasts exactly as long as the conversation panel is mounted. */
 export function useConversationOverlay(open, contentRef) {
   useLayoutEffect(() => {

@@ -431,3 +431,17 @@ test('comments can be edited and deleted persistently without changing their ide
   assert.equal((await mutate('edit', { body: 'Missing comment' })).status, 404);
   assert.equal((await mutate('delete', { id: '../escape' })).status, 400);
 });
+
+test('review writes are rate limited per client without using the comment budget', async () => {
+  const { service, input } = fixture();
+  const comment = await service.post(input);
+  const toggle = (client) =>
+    service.setState({ ...input, field: 'closed', value: true, requestId: randomUUID() }, client);
+  for (let index = 0; index < 10; index++) await toggle('bot');
+  const limited = (error) => error.status === 429;
+  await assert.rejects(toggle('bot'), limited);
+  await assert.rejects(service.edit({ ...input, id: comment.id, body: 'Edited' }, 'bot'), limited);
+  await assert.rejects(service.delete({ ...input, id: comment.id }, 'bot'), limited);
+  await service.post({ ...input, body: 'Comments keep their own budget' }, 'bot');
+  await toggle('someone-else');
+});

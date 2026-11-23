@@ -70,3 +70,14 @@ test('workflow YAML is valid and privileged merge never checks out PR code', () 
   );
   assert.ok(release.jobs.validate.steps.some((step) => step.name === 'Publish validation summary'));
 });
+
+test('Dependabot auto-merge skips pull requests that contain a major update', () => {
+  const merge = readFileSync('.github/workflows/dependabot-merge.yml', 'utf8');
+  const source = merge.match(/const isMajor = .*;$/m)[0];
+  const isMajor = new Function(`${source}\nreturn isMajor;`)();
+  assert.equal(isMajor('Bump vite from 8.0.0 to 8.1.6'), false);
+  assert.equal(isMajor('Bump react from 19.2.0 to 20.0.0'), true);
+  assert.equal(isMajor('Updates `a` from 1.0.0 to 1.1.0\nUpdates `b` from v2.9.1 to v3.0.0'), true);
+  assert.equal(isMajor('| [x](https://example.com) | `1.2.3` | `1.3.0` |'), false);
+  assert.equal(isMajor('| [x](https://example.com) | `1.2.3` | `2.0.0` |'), true);
+});

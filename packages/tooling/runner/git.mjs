@@ -94,10 +94,29 @@ export function captureSnapshot(
   const files = new Set(
     nul(git(root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z')),
   );
+  // Files git reports as unchanged are identified by their stored blob; only the rest are read.
+  const stored = new Map();
+  const changed = new Set([
+    ...nul(git(root, 'ls-files', '--modified', '-z')),
+    ...nul(git(root, 'ls-files', '--deleted', '-z')),
+  ]);
+  for (const entry of nul(git(root, 'ls-files', '--stage', '-z'))) {
+    const [meta, path] = entry.split('\t');
+    const [mode, blob, stage] = meta.split(' ');
+    if (stage !== '0') changed.add(path);
+    stored.set(path, `${mode} ${blob}`);
+  }
   const digests = {};
   for (const file of [...files].sort()) {
     const content = createHash('sha256');
     const part = (value) => content.update(JSON.stringify(value));
+    if (stored.has(file) && !changed.has(file)) {
+      part(`stored ${stored.get(file)}`);
+      digests[file] = content.digest('hex');
+      add(file);
+      add(digests[file]);
+      continue;
+    }
     try {
       const stat = lstatSync(resolve(root, file));
       part(stat.mode & 0o111);

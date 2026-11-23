@@ -2,6 +2,11 @@
 
 Plugin `core@dcaldeira`. Bump `version` in `.claude-plugin/plugin.json` with every entry.
 
+## 0.2.7
+
+- Guard: PowerShell writes with a positional path (`Set-Content .env x`, `'x' | Out-File .env`) are blocked like the `-Path` forms.
+- Stop hook: a failed or timed-out validation is not remembered as checked, so the re-check after Claude's fix runs again on an unchanged tree.
+
 ## 0.2.6
 
 - Evals: the `react-component` fixture uses vite 8.1.6 (was 8.0.0).

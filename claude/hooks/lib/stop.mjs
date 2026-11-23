@@ -280,7 +280,8 @@ export async function stopCheck(
   const started = Date.now();
   const result = await runTooling(root, timeoutMs);
   mkdirSync(stateDir, { recursive: true });
-  writeFileSync(statePath, current);
+  // A failed or timed-out run is not remembered, so an unchanged tree is checked again.
+  if (!result || result === NOT_RUN) writeFileSync(statePath, current);
   if (result === NOT_RUN) return undefined;
   logTiming(root, { ms: Date.now() - started, files: files.length, passed: !result });
   if (!result) {
