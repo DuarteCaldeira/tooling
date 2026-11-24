@@ -306,6 +306,14 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         content === 'product'
           ? []
           : (release.technicalItems ?? []).filter((item) => itemMatches(release, item, true));
+      const releaseState = review.stateOf(context(release, 'release', ''));
+      const releaseMatch =
+        topic === 'all' &&
+        content === 'all' &&
+        filter === 'all' &&
+        conversation !== 'all' &&
+        matchesConversation(releaseState) &&
+        matchesText(`${release.version} ${release.summaryContext ?? ''}`);
       const sourceNotes =
         !needsState &&
         topic === 'all' &&
@@ -315,14 +323,6 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         matchesText(`${release.version} ${release.originalNotes}`)
           ? release.originalNotes
           : '';
-      const releaseState = review.stateOf(context(release, 'release', ''));
-      const releaseMatch =
-        topic === 'all' &&
-        content === 'all' &&
-        filter === 'all' &&
-        conversation !== 'all' &&
-        matchesConversation(releaseState) &&
-        matchesText(`${release.version} ${release.summaryContext ?? ''}`);
       const emptyMatch =
         !needsState &&
         topic === 'all' &&
@@ -397,6 +397,11 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     const { release, items, technical, reported, sourceNotes } = entry;
     const key = releaseId(release);
     const technicalKey = `${key}/technical`;
+    const notesStatus = release.originalNotes?.trim()
+      ? 'Changelog disponível'
+      : release.technicalItems?.length
+        ? 'Detalhes técnicos'
+        : 'Sem notas publicadas';
     const technicalOpen =
       expanded[technicalKey] ??
       (content === 'technical' || conversation !== 'all' || Boolean(search));
@@ -424,7 +429,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             <span className={`release-review${fully ? ' complete' : ''}`}>
               <i className="status-dot" aria-hidden="true" />
               {!product.length
-                ? 'Sem validação necessária'
+                ? notesStatus
                 : loaded
                   ? fully
                     ? 'Tudo validado'
