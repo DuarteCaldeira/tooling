@@ -27,6 +27,8 @@ test(
       originalNotes: '<script>globalThis.injected = true</script>',
     });
     const technical = release('v1.0.0', []);
+    technical.originalNotes =
+      '## Changelog\n- Corrige a pesquisa\n- <script>globalThis.injected = true</script>';
     technical.technicalItems = [
       { id: itemId('chore: update dependencies', 'technical'), text: 'chore: update dependencies' },
     ];
@@ -172,6 +174,14 @@ test(
       await scan();
       await page.getByRole('button', { name: 'Mostrar versões anteriores', exact: false }).click();
       assert.equal(await page.locator('.release-heading').count(), 11);
+      const changelogRelease = page.getByRole('button', {
+        name: /^v1\.0\.0 .*Changelog disponível/,
+      });
+      await changelogRelease.click();
+      const changelog = page.locator('.source-changelog');
+      await changelog.waitFor();
+      assert.equal(await changelog.textContent(), technical.originalNotes);
+      assert.equal(await changelog.locator('script').count(), 0);
       await select('content-filter', 'Só técnica');
       assert.equal(await page.getByRole('button', { name: /^Validar:/ }).count(), 0);
       await page.getByRole('button', { name: 'Expandir tudo', exact: true }).click();

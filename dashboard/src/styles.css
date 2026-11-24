@@ -768,6 +768,11 @@ button {
   margin: 0;
   color: var(--text-3);
 }
+.source-changelog {
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .load-more {
   display: flex;
   justify-content: center;
@@ -1086,10 +1091,9 @@ button {
 .ledger-head,
 .app-card {
   display: grid;
-  grid-template-columns: minmax(160px, 1.5fr) minmax(90px, 0.8fr) minmax(150px, 1.2fr) minmax(
-      0,
-      1.3fr
-    ) 92px;
+  grid-template-columns:
+    minmax(160px, 1.5fr) minmax(90px, 0.8fr) minmax(150px, 1.2fr) minmax(0, 1.3fr)
+    92px;
   gap: 16px;
   align-items: center;
 }

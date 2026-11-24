@@ -110,9 +110,7 @@ function ChangeItem({ context, review, onOpen, onTopic, activeTopic }) {
         <div className="item-meta">
           {tags.length || reported ? (
             <div className="item-topics">
-              {reported ? (
-                <span className="comment-kind comment-kind--issue">Problema</span>
-              ) : null}
+              {reported ? <span className="comment-kind comment-kind--issue">Problema</span> : null}
               {tags.map((topic) => (
                 <button
                   key={topic.id}
@@ -319,6 +317,15 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         conversation !== 'all' &&
         matchesConversation(releaseState) &&
         matchesText(`${release.version} ${release.summaryContext ?? ''}`);
+      const sourceNotes =
+        !needsState &&
+        topic === 'all' &&
+        content === 'all' &&
+        !release.items?.length &&
+        release.originalNotes?.trim() &&
+        matchesText(`${release.version} ${release.originalNotes}`)
+          ? release.originalNotes
+          : '';
       const emptyMatch =
         !needsState &&
         topic === 'all' &&
@@ -331,7 +338,14 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         items,
         technical,
         reported,
-        visible: items.length || technical.length || reported.length || releaseMatch || emptyMatch,
+        sourceNotes,
+        visible:
+          items.length ||
+          technical.length ||
+          reported.length ||
+          sourceNotes ||
+          releaseMatch ||
+          emptyMatch,
       };
     })
     .filter((entry) => entry.visible);
@@ -356,6 +370,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
         expanded[releaseId(entry.release)] ??
         (filtering ||
           (!fully && product.length > 0) ||
+          (entry.release === all[0] && Boolean(entry.sourceNotes)) ||
           entry.reported.some(
             (item) => !review.stateOf(context(entry.release, item.id, item.text)).closed,
           )),
@@ -382,9 +397,14 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             : '';
 
   const accordionItems = states.map(({ entry, product, checked, fully }) => {
-    const { release, items, technical, reported } = entry;
+    const { release, items, technical, reported, sourceNotes } = entry;
     const key = releaseId(release);
     const technicalKey = `${key}/technical`;
+    const notesStatus = release.originalNotes?.trim()
+      ? 'Changelog disponível'
+      : release.technicalItems?.length
+        ? 'Detalhes técnicos'
+        : 'Sem notas publicadas';
     const technicalOpen =
       expanded[technicalKey] ??
       (content === 'technical' || conversation !== 'all' || Boolean(search));
@@ -412,7 +432,7 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             <span className={`release-review${fully ? ' complete' : ''}`}>
               <i className="status-dot" aria-hidden="true" />
               {!product.length
-                ? 'Sem validação necessária'
+                ? notesStatus
                 : loaded
                   ? fully
                     ? 'Tudo validado'
@@ -430,6 +450,8 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
             <div className="area-groups">
               <AreaGroups items={items} technical={false} {...groupProps} />
             </div>
+          ) : sourceNotes ? (
+            <pre className="source-note source-changelog">{sourceNotes}</pre>
           ) : !technical.length && !reported.length && !needsState ? (
             <p className="source-note">
               {release.summaryContext ?? 'Esta versão não tem novidades de produto descritas.'}
@@ -616,17 +638,19 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
       </p>
       {accordionItems.length ? (
         <div className="release-feed">
-        <Accordion
-          type="multiple"
-          items={accordionItems}
-          value={states.filter((state) => state.open).map(({ entry }) => releaseId(entry.release))}
-          onChange={(value) =>
-            setOpen(
-              states.map(({ entry }) => releaseId(entry.release)),
-              [value].flat(),
-            )
-          }
-        />
+          <Accordion
+            type="multiple"
+            items={accordionItems}
+            value={states
+              .filter((state) => state.open)
+              .map(({ entry }) => releaseId(entry.release))}
+            onChange={(value) =>
+              setOpen(
+                states.map(({ entry }) => releaseId(entry.release)),
+                [value].flat(),
+              )
+            }
+          />
         </div>
       ) : null}
       {matches.length > limit ? (
@@ -639,4 +663,3 @@ export function ReleaseHub({ apps, app, review, onOpen }) {
     </section>
   );
 }
-
