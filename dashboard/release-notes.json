@@ -1,5 +1,70 @@
 {
   "DuarteCaldeira/saudinha-pnn": {
+    "2.3.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Cópias de segurança: escolha os dados a incluir no ficheiro e continue a poder restaurar cópias de versões anteriores.",
+        "Cópias de segurança: documentos sem ficheiro já não impedem a exportação. Se um restauro ficar incompleto, a aplicação avisa e recarrega os dados.",
+        "Visual: o logótipo e as cores do Saudinha passam a azul, incluindo nos modos claro e escuro."
+      ]
+    },
+    "2.2.6": {
+      "language": "pt-PT",
+      "changes": [
+        "Perfil: o Saudinha passa a usar o perfil comum. Os dados pessoais existentes são migrados e os campos clínicos continuam no Saudinha.",
+        "Cópias de segurança: os dados voltam a carregar após a importação e os nomes das cópias no Drive foram corrigidos.",
+        "Visual: o Saudinha passa a usar uma identidade verde no logótipo, nos ícones e nas notificações."
+      ]
+    },
+    "2.2.5": {
+      "language": "pt-PT",
+      "changes": ["Lembretes: no Android, o Saudinha passa a manter até 400 lembretes de saúde."]
+    },
+    "2.2.4": {
+      "language": "pt-PT",
+      "changes": [
+        "Medicação: uma receita associada a vários medicamentos ocupa espaço uma só vez na cópia de segurança.",
+        "Cópias de segurança: o tamanho passa a contar também os documentos mais antigos e o restauro remove os ficheiros que substitui.",
+        "Visual: as cores do Saudinha acompanham o azul do logótipo."
+      ]
+    },
+    "2.2.3": {
+      "language": "pt-PT",
+      "changes": [
+        "Cópias de segurança: se uma importação falhar, os dados anteriores são repostos."
+      ]
+    },
+    "2.2.2": {
+      "language": "pt-PT",
+      "changes": [
+        "Bloqueio: o Android volta a mostrar a pré-visualização do Saudinha nas aplicações recentes.",
+        "Cópias de segurança: Saudinha e Comidinha passam a usar a mesma pasta para as cópias automáticas."
+      ]
+    },
+    "2.2.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Cópias de segurança: as exportações são restauradas por partes e uma leitura tardia ou inválida não substitui os dados válidos já carregados."
+      ]
+    },
+    "2.2.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Resumo para o médico: reúna o perfil, a medicação e os resultados fora do intervalo numa única página."
+      ]
+    },
+    "2.1.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Cópias de segurança: se a importação de um documento falhar, os registos anteriores continuam ligados aos seus ficheiros."
+      ]
+    },
+    "2.0.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Documentos: a leitura aceita mais formatos de PDF e lê a camada de texto até 20 MB. A aplicação avisa quando o ficheiro tem palavra-passe ou quando o telemóvel não consegue ler um documento digitalizado."
+      ]
+    },
     "1.17.1": {
       "language": "pt-PT",
       "changes": [
@@ -418,6 +483,69 @@
         "product-f1feff8df187219b6b18",
         "product-d70b46ccc414b52bf342",
         "product-b305ba93aff22d0b2c7c"
+      ]
+    }
+  },
+  "DuarteCaldeira/saudinha-pnn/meals": {
+    "0.6.2": {
+      "language": "pt-PT",
+      "changes": [
+        "Cópias de segurança: escolha o que exportar e restaure também ficheiros criados em versões anteriores.",
+        "Receitas: há mais 106 ingredientes de base. A quantidade é obrigatória, exceto quando se escolhe «q.b.».",
+        "Receitas: alterações aos ingredientes são guardadas à medida que edita e as etiquetas já usadas são sugeridas noutras receitas.",
+        "Planeamento: o botão «Planear» continua disponível nas refeições que já têm pratos e o cabeçalho recolhe ao deslizar."
+      ]
+    },
+    "0.6.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Perfil: o nome e a fotografia passam a vir do perfil comum da aplicação.",
+        "Receitas: o cabeçalho ocupa a largura do ecrã e o espaçamento entre secções é consistente."
+      ]
+    },
+    "0.6.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Planeamento: defina as doses de cada prato e encontre receitas através de sugestões na pesquisa.",
+        "Compras: pesquise por ingrediente, receita ou etiqueta e adicione extras num formulário próprio.",
+        "Receitas: a barra inferior mantém-se ao abrir uma receita e é mais fácil editar as quantidades e os ingredientes."
+      ]
+    },
+    "0.5.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Planeamento: coloque vários pratos na mesma refeição e consulte a semana numa vista mais compacta."
+      ]
+    },
+    "0.4.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Compras: os ingredientes ficam organizados por corredores do supermercado.",
+        "Receitas: basta indicar o nome para começar. O formulário de ingredientes ficou mais compacto.",
+        "Planeamento: o ecrã inicial volta a abrir na última semana escolhida."
+      ]
+    },
+    "0.3.1": {
+      "language": "pt-PT",
+      "changes": [
+        "Receitas: as sugestões de ingredientes foram melhoradas e cada ecrã tem uma ilustração própria."
+      ]
+    },
+    "0.3.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Receitas: filtre o livro de receitas e edite as receitas por secção.",
+        "Compras: os ingredientes do plano semanal e os extras ficam numa única lista.",
+        "Cópias de segurança: foram melhorados o restauro e a recuperação dos dados quando uma leitura falha."
+      ]
+    },
+    "0.2.0": {
+      "language": "pt-PT",
+      "changes": [
+        "Receitas: escolha ingredientes de uma lista, arraste-os para os reordenar e remova-os no próprio formulário.",
+        "Planeamento: a semana atual acompanha a mudança de dia, com refeições configuráveis e pesquisa de receitas.",
+        "Compras: consulte a lista de ingredientes calculada a partir do plano semanal.",
+        "Cópias de segurança: as receitas e o plano anterior são preservados se uma importação falhar."
       ]
     }
   },
